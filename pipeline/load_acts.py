@@ -20,9 +20,12 @@ HEADING_RE = re.compile(r"^(\d+[A-Z]*)\.\s*(.*)$")   # '204. Punishment of murde
 def act_id_of(doc):
     cap = doc["metadata"].get("Citation", "")   # 'Cap. 63A'
     m = re.fullmatch(r"Cap\.\s*(\w+)", cap)
-    if not m:
-        raise ValueError(f"no Cap. citation for {doc['work']}: {cap!r}")
-    return f"ke/act/cap-{m.group(1).lower()}", m.group(1)
+    if m:
+        return f"ke/act/cap-{m.group(1).lower()}", m.group(1)
+    slug = doc["work"].rsplit("/", 1)[1]          # no Cap.: '/akn/ke/act/2010/constitution' -> 'constitution'
+    if not slug.isdigit():
+        return f"ke/act/{slug}", None
+    raise ValueError(f"no Cap. citation or named work for {doc['work']}: {cap!r}")
 
 
 def split_heading(h):
@@ -32,6 +35,7 @@ def split_heading(h):
 
 def main():
     docs = [json.loads(p.read_text()) for p in sorted((parsed_dir() / "act").glob("*.json"))]
+    docs = [d for d in docs if d.get("expression_date")]   # skips non-version pages, e.g. '.../publication'
     docs.sort(key=lambda d: (d["work"], d["expression_date"]))
     acts, versions, provisions, texts = {}, [], {}, []
     for d in docs:

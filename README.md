@@ -6,10 +6,10 @@ This file explains the project from scratch: what has been built, how the data f
 
 | Phase | What it covers | Status |
 |---|---|---|
-| **1. Data acquisition** | Get the statutes and judgments onto disk, legally and reproducibly | Done for statutes. The bulk judgment pull is running |
+| **1. Data acquisition** | Get the statutes and judgments onto disk, legally and reproducibly | Done: 8 Acts, 16,824 judgments |
 | **2. Ground truth** | A hand-checked answer key of what courts did to which sections | Done: 19 events, all verified |
-| 3. Database | Load Acts, versions and sections into Postgres (Neon) | Done: schema + 4 Acts loaded. Embeddings 950/1,289, rest after the free-tier daily quota resets |
-| 4. Judgments | Load judgment metadata into Postgres | Done: 16,419 judgments (metadata; full text stays on disk) |
+| **3. Database** | Load Acts, versions and sections into Postgres (Neon), with embeddings | Done: 8 Acts, 1,862 sections, 4,592 section texts. Embeddings: 3,043 of 4,592 stored (the original 4 Acts); the 4 new Acts finish after tomorrow's free quota |
+| **4. Judgments + answer key** | Load judgment metadata and the answer key into Postgres | Done: 16,419 judgments; 19 answer-key events in `citation_events` |
 | 5–9 | Extract citations, classify events, status resolver, API/UI, filing checker, deploy | Not started |
 
 ---
@@ -21,8 +21,9 @@ This file explains the project from scratch: what has been built, how the data f
 3. [Quick start](#3-quick-start)
 4. [Phase 1: data acquisition](#4-phase-1-data-acquisition)
 5. [Phase 2: ground truth](#5-phase-2-ground-truth)
-6. [Glossary](#6-glossary)
-7. [Open items and next steps](#7-open-items-and-next-steps)
+6. [Phases 3–4: the database](#6-phases-34-the-database)
+7. [Glossary](#7-glossary)
+8. [What's left](#8-whats-left)
 
 ---
 
@@ -62,8 +63,15 @@ Code and data are kept apart. **Data is never committed to git.**
     scope.*.yaml    what to crawl (one file per run type)
     REPORT.md       the full Phase 1 lab notebook
     README.md       crawler operating manual
+  pipeline/                          ← Phases 3–4: load everything into Postgres (Neon)
+    schema.sql      all tables; idempotent, applied by every loader
+    db.py           connection (direct/unpooled URL) + apply_schema
+    load_acts.py    Acts → acts, act_versions, provisions, provision_texts
+    embed.py        gemini-embedding-2 vectors for section texts (disk-cached)
+    load_judgments.py   judgment metadata → judgments
+    load_ground_truth.py  ground_truth/events.csv → citation_events
   ground_truth/                      ← Phase 2: the answer key
-    events.csv      18 verified events (the main output)
+    events.csv      19 verified events (the main output)
     negatives.csv   6 judgments that cite a section without affecting it
     check.py        verifies every quote against the stored judgments
     audit.md, audit_blind.csv, decisions.md   ← how the table was checked
@@ -81,8 +89,11 @@ $LEXHACK_DATA  (= /Users/leo/lexhack-data, outside the repo)
     judgment/*.json                  ← one file per judgment
     source/*.json                    ← text extracted from PDFs
     analysis.md                      ← pilot statistics
+  cache/embeddings/*.json           ← one vector per unique text (keyed by model + text hash)
   external/hf_ipfs_kenya_laws/       ← a third-party dataset we evaluated
 ```
+
+`.env` also holds `DATABASE_URL` / `DATABASE_URL_UNPOOLED` (Neon, written by `neon link`) and `GEMINI_API_KEY`.
 
 Code always reads the data location from the `LEXHACK_DATA` environment variable, never a hardcoded path.
 
@@ -99,6 +110,7 @@ uv run python -m ground_truth.check                           # verify the answe
 uv run python -m pipeline.load_acts                           # apply pipeline/schema.sql + load Acts into Neon
 uv run python -m pipeline.embed                               # gemini-embedding-2 vectors for section texts
 uv run python -m pipeline.load_judgments                      # judgment metadata into Neon (text stays on disk)
+uv run python -m pipeline.load_ground_truth                   # ground_truth/events.csv -> citation_events (method='manual')
 
 # the bulk judgment pull (3 parallel workers; re-running resumes where it stopped)
 for i in 0 1 2; do nohup uv run python -m crawler.crawl run \
@@ -135,15 +147,17 @@ Build a local, reproducible copy of the Kenyan statutes and judgments we need, a
    None was enough. Details are in `crawler/REPORT.md` §8–9.
 3. **Wayback pilot (Internet Archive).** The crawler got a mode that reads the Internet Archive's copies of Kenya Law pages and never contacts Kenya Law itself. The pilot made 126 requests and fetched 17 Act pages (every captured version of the Penal Code, KICA and the Employment Act), 73 judgments and 11 PDFs. It confirmed every structural assumption (see 4.6).
 4. **Sexual Offences Act added.** All 9 of its versions (2006–2024) are archived, and all were fetched.
-5. **Bulk judgment pull (running).** Every archived judgment of the three courts that decide whether a statute is valid:
+5. **Bulk judgment pull (finished 2026-09-23).** Every archived judgment of the three courts that decide whether a statute is valid:
 
-   | Court | Code | Archived | Status (2026-09-23, 14:47 UTC) |
+   | Court | Code | Fetched | Missing from the Archive |
    |---|---|---|---|
-   | Supreme Court | `kesc` | ~640 | done |
-   | Court of Appeal | `keca` | ~5,550 | 5,355 done, 165 left |
-   | High Court | `kehc` | ~10,900 | queued, ~4 h at the current rate |
+   | Supreme Court | `kesc` | 625 | 0 |
+   | Court of Appeal | `keca` | 5,520 | 34 |
+   | High Court | `kehc` | 10,679 | 220 |
 
-   It runs as 3 parallel workers at about 50 pages per minute, with no rate-limit errors so far. The Internet Archive holds only about 10% of Kenya Law's ~275k judgments, so this is a large sample, not a mirror. Pages it never captured cannot be pulled this way.
+   It ran as 3 parallel workers at about 50 pages per minute and hit the Archive's rate limit only 3 times. The fetched pages parse to 16,419 distinct judgments: some judgments were fetched more than once and collapse into one. 286 of them are PDF-only, so they have no text. The Internet Archive holds only about 10% of Kenya Law's ~275k judgments, so this is a large sample, not a mirror. Pages it never captured cannot be pulled this way.
+6. **One judgment saved by hand.** CA *Mwaura* (2013), needed for the answer key, isn't in the Archive. It was saved from Kenya Law through Chrome into `raw/manual/`; `crawler.parse` reads that folder too.
+7. **Four more Acts (2026-09-26).** The judgments cite these far more than our focus Acts, so step 5 needs them to link citations to sections: the Constitution (cited in 6,730 judgments), the Civil Procedure Act (5,033), the Evidence Act (2,234) and the Criminal Procedure Code (2,162). All four came from the Archive.
 
 ### 4.3 How the crawler works
 
@@ -225,12 +239,21 @@ Build a local, reproducible copy of the Kenyan statutes and judgments we need, a
 
 ### 4.5 What we hold now
 
-- **Acts:** 25 parsed Act-version pages. That's every archived version of the four Acts we need, plus the pilot extras:
-  - Penal Code (Cap. 63): all 3 versions.
-  - Sexual Offences Act (Cap. 63A): all 9 versions.
-  - KICA (Cap. 411A): 2 of 13 versions (the rest were never archived).
-  - Employment Act: 11 of 13 versions.
-- **Judgments:** ~6,000 fetched: all of the Supreme Court and nearly all of the Court of Appeal. About 11,000 more are coming from the High Court. The `parsed/` copy only includes what was stored the last time `crawler.parse` ran, so re-run it after the pull.
+- **Acts:** 31 versions of 8 Acts, every version the Archive holds:
+
+  | Act | ID | Versions | Sections |
+  |---|---|---|---|
+  | Penal Code (Cap. 63) | `ke/act/cap-63` | 3 of 3 | 416 |
+  | Sexual Offences Act (Cap. 63A) | `ke/act/cap-63a` | 9 of 9 | 52 |
+  | KICA (Cap. 411A) | `ke/act/cap-411a` | 2 of 13 | 198 |
+  | Employment Act (Cap. 226) | `ke/act/cap-226` | 11 of 13 | 190 |
+  | Constitution of Kenya, 2010 | `ke/act/constitution` | 1 | 264 articles |
+  | Civil Procedure Act (Cap. 21) | `ke/act/cap-21` | 2 | 116 |
+  | Evidence Act (Cap. 80) | `ke/act/cap-80` | 1 | 199 |
+  | Criminal Procedure Code (Cap. 75) | `ke/act/cap-75` | 2 | 427 |
+
+  The Constitution has no Cap. number, so its ID comes from its Kenya Law address. Its articles use `sec_` IDs like everything else, e.g. Article 50 is `chp_Four__part_2__sec_50`.
+- **Judgments:** 16,419 distinct judgments, all parsed.
 
 ### 4.6 What Phase 1 found (the facts later phases build on)
 
@@ -358,7 +381,37 @@ Six judgments that **mention** a focus section but do nothing to it: a murder tr
 
 ---
 
-## 6. Glossary
+## 6. Phases 3–4: the database
+
+### 6.1 Aim
+
+Put everything into one Postgres database (Neon, with pgvector), so the later steps (extraction, the status resolver, the API) query one place.
+
+### 6.2 What's in it
+
+| Table | Rows | Loaded by | What it holds |
+|---|---|---|---|
+| `acts` | 8 | `load_acts.py` | One row per Act: ID, title, Cap. number, Kenya Law work URI |
+| `act_versions` | 31 | `load_acts.py` | One row per dated version; `raw_path` points at the parsed JSON |
+| `provisions` | 1,862 | `load_acts.py` | One row per section (ID stable across versions), with its number and heading |
+| `provision_texts` | 4,592 | `load_acts.py`, `embed.py` | A section's text in one version, plus a full-text index (`tsv`) and a 1,536-number meaning vector (`embedding`) |
+| `judgments` | 16,419 | `load_judgments.py` | Metadata only: citation, title, court, case number, date, judges, Kenya Law link, path to the full text on disk |
+| `citation_events` | 19 | `load_ground_truth.py` | The answer key (`method = 'manual'`). Step 6 will add extracted rows |
+| `citation_mentions` | 0 | step 5 | Empty until citation extraction |
+
+The full schema, with a comment on every column, is `pipeline/schema.sql`. It includes the verifier's additions: `subsection`, `verified_by`, `notes`, and a list of allowed event types.
+
+### 6.3 Design decisions
+
+- **The full text of judgments stays on disk, not in Postgres.** It's ~360 MB, and Neon's free plan caps storage at ~0.5 GB. The database is 30 MB. Every judgment row has `raw_path` to its text file.
+- **Loaders are re-runnable.** Each applies the schema first, then updates rows in place. Re-running `load_acts` keeps a section's embedding unless its text changed.
+- **Loaders use the direct (unpooled) connection,** as Neon recommends for bulk writes and schema changes. The app will use the pooled one.
+- **Embeddings:** `gemini-embedding-2` at 1,536 dimensions, chosen over `gemini-embedding-001` because it reads up to 8,192 tokens (001 reads 2,048) and returns normalised vectors. Each unique text is embedded once and cached on disk, so identical sections across versions cost one call.
+  - **Limit:** Google's free tier allows 1,000 texts per day per model. `embed.py` stops with a clear message when that's hit; re-running resumes from the cache.
+  - **Don't mix models:** vectors from different models can't be compared. Changing the model means re-embedding everything.
+- **Search check.** Search by meaning finds Penal Code s.194 for "publishing false statements that damage someone's reputation" and s.204 for "sentence for killing a person". It missed Sexual Offences Act s.8 for "sex with a child under eighteen", which is why the plan combines it with word search (hybrid).
+
+## 7. Glossary
 
 | Term | Meaning |
 |---|---|
@@ -380,21 +433,30 @@ Six judgments that **mention** a focus section but do nothing to it: a murder tr
 
 ---
 
-## 7. Open items and next steps
+## 8. What's left
 
-**Open**
+### Before step 5
 
-- **E20 (*Mwaura*, 2013)** was saved by hand into `raw/manual/`, because the Internet Archive doesn't have it. `crawler.parse` now also reads hand-saved pages from that folder.
-- **Appeals of *EG*, *Alai* and *Andama*** haven't been checked. *Okuta* and *Andare*: no appeals found (absence unverified).
-- **The live Kenya Law pages** should be re-checked before the presentation, to confirm they still lack court notes (our evidence is from Archive snapshots).
-- **Schema changes** proposed by the verification (`ground_truth/decisions.md`), to fold into Phase 3: a `subsection` column, a `verified_by` column, the scope and `affects_event` definitions above, and possibly a `superseded_by_precedent` event type.
+- **Finish embedding the four new Acts.** 445 texts are left, waiting on the daily quota. Run `uv run python -m pipeline.embed` again tomorrow.
 
-**Next (from `CLAUDE.md`)**
+### Steps 5–9 (from `CLAUDE.md`)
 
-3. Load Acts, versions, sections and section texts into Postgres (+ pgvector).
-4. Load the parsed judgments into the `judgments` table.
-5. Citation extraction (regex first, an LLM for messy cases) → `citation_mentions`; score it on a hand-checked sample.
-6. Event classification → `citation_events`; score it against this ground truth.
-7. Status resolver (per-jurisdiction rules), then API (FastAPI) and UI (Next.js).
-8. Synthetic demo filings (clearly labelled) and the filing checker.
-9. Deploy end to end.
+5. **Citation extraction:** find every "section X of the Y Act" / "Article N of the Constitution" in the 16,419 judgments → `citation_mentions`. Regex first, an LLM for messy cases. Score it on a hand-checked sample.
+6. **Event classification:** decide which mentions are actual rulings (struck down, read down, upheld…) → `citation_events` with `method = 'extracted'`. Score it against the 19 answer-key events and the 6 no-effect cases.
+7. **Status resolver** (per-jurisdiction rules: reversals cancel earlier events; later Supreme Court precedent displaces a Court of Appeal read-down), then the API (FastAPI) and the UI (Next.js).
+8. **Synthetic demo filings** (clearly labelled) and the filing checker: does the case exist, is the quote in it, is the section still good law.
+9. **Deploy** end to end.
+
+### Known gaps (not blocking)
+
+- **Parliament's changes aren't events yet.** The Acts carry over 1,000 amendment notes ("[Act No. 7 of 2007, Sch.]"). Turning them into `amended_by_statute` / `repealed_by_statute` events belongs with step 6 or 7.
+- **286 PDF-only judgments have no text** (1.7%). The Archive may hold some of their PDFs; fetching them is about 300 requests. None are in the answer key.
+- **Coverage:** the Archive holds about 10% of Kenya's judgments, KICA has 2 of 13 versions, and 254 listed judgment pages were missing.
+- **Employment Act IDs changed in 2022,** so its sections can't be linked across that revision. It isn't a focus Act.
+- **Unchecked appeals:** *EG*, *Alai* and *Andama*. *Okuta* and *Andare*: no appeals found (absence unverified).
+
+### Housekeeping
+
+- **Before the presentation:** confirm the live Kenya Law pages still lack court notes (our evidence is from Archive snapshots).
+- **Neon API key:** the one created during setup (`neon api-keys revoke 3363955`) can go if the Neon MCP server isn't used.
+- **The bulk-request letter** (`letters/`) is unsent. It's optional now.

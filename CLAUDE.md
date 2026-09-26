@@ -51,14 +51,14 @@ Example output:
 
 | Data | Source | Status |
 |---|---|---|
-| Statutes | Internet Archive snapshots | Done: 17 Act pages. Penal Code: all 3 versions. KICA: 2 of 13 versions (enough). Sexual Offences Act: all 9 versions + 2024 PDF. Gaps filled by saving individual pages by hand in a browser |
-| Judgments for building the extractor | Internet Archive snapshots | Done: 73 judgments, 11 PDFs |
-| Ground truth | `ground_truth/events.csv` (18 events) + `negatives.csv` (6 mention-only) | Drafted by Claude, audited blind, verified by a third agent (17/18) + Leo (E11 = read_down): 18/18. Decisions in `ground_truth/decisions.md`. Check: `uv run python -m ground_truth.check` |
+| Statutes | Internet Archive snapshots | Done: 8 Acts, 31 versions (table in README §4.5). Focus: Penal Code (3/3 versions), Sexual Offences Act (9/9), KICA (2/13). For citation linking: Constitution, Civil Procedure Act, Evidence Act, Criminal Procedure Code. Gaps filled by saving pages by hand |
+| Judgments | Internet Archive bulk pull (kesc, keca, kehc) + 1 saved by hand | Done: 16,419 distinct judgments (286 PDF-only, no text). Metadata in Postgres; full text on disk |
+| Ground truth | `ground_truth/events.csv` (19 events) + `negatives.csv` (6 mention-only) | Done: drafted by Claude, audited blind, verified by agents + Leo (E11 = read_down): 19/19. Loaded into `citation_events`. Decisions in `ground_truth/decisions.md`. Check: `uv run python -m ground_truth.check` |
 | Demo filings | Written by us, clearly labelled as synthetic | Not started |
 
 Details of the Internet Archive pilot are in `crawler/REPORT.md`.
 
-**Focus Acts:** Penal Code (Cap. 63), confirmed. Candidates: Sexual Offences Act, Kenya Information and Communications Act (s.29).
+**Focus Acts:** Penal Code (Cap. 63), Sexual Offences Act (Cap. 63A), Kenya Information and Communications Act (Cap. 411A, s.29).
 
 ## What the pilot found (facts to build on)
 
@@ -91,7 +91,8 @@ Details of the Internet Archive pilot are in `crawler/REPORT.md`.
 ## Tech stack (decided)
 
 - **Pipeline:** Python. `pymupdf` for PDFs, `warcio` for the archive, plain `re` + an LLM pass for citation extraction. Plain scripts, no orchestration framework.
-- **Database:** Postgres with `pgvector`. One database for everything.
+- **Database:** Postgres with `pgvector` on **Neon** (project `empty-firefly-79861883`, branch `production`, free plan ~0.5 GB). One database for everything; judgment full text stays on disk (`judgments.raw_path`).
+- **Embeddings:** `gemini-embedding-2`, 1536 dims (key: `GEMINI_API_KEY` in `.env`). Free tier: 1,000 texts/day; `pipeline/embed.py` caches every vector and resumes.
 - **Search:** hybrid, Postgres full-text search + pgvector, merged with reciprocal rank fusion.
 - **API:** FastAPI.
 - **Frontend:** Next.js.
@@ -116,7 +117,9 @@ $LEXHACK_DATA/             outside the repo, never committed
 
 Always read paths from the `LEXHACK_DATA` environment variable. Never hardcode paths, never commit data.
 
-## Schema (draft, open to change)
+## Schema
+
+**The live schema is `pipeline/schema.sql`** (applied to Neon). It extends the draft below with `provision_texts.tsv`, and on `citation_events`: `event_key`, `subsection`, `verified_by`, `notes`, and CHECK constraints on `event_type` / `scope`. The draft is kept for reference.
 
 Every ID includes the jurisdiction so the design can extend beyond Kenya later.
 
@@ -219,21 +222,23 @@ For each citation in an uploaded document, three checks only:
 
 ## Where we are and what's next
 
-Done:
-- Project direction and pitch
-- Internet Archive pilot: 73 judgments, 17 Act pages, 11 PDFs, structure mapped
-- Stack decided, draft schema above
+Full history and file-by-file explanation: `README.md`.
 
-Next, roughly in order:
-1. ~~Check Wayback for the Sexual Offences Act~~ Done: all 9 versions archived, none missing. s.8 eid is `sec_8`.
-2. **Ground truth table:** done, 19/19 verified (E20 Mwaura saved by hand into raw/manual/). (was: save by hand).
-3. ~~Load Acts into Postgres~~ Done on Neon (free plan, ~0.5 GB cap): `pipeline/schema.sql`, `pipeline/load_acts.py`. Embeddings: `pipeline/embed.py` (gemini-embedding-2, 1536d); 950/1,289 done, free tier = 1,000 texts/day.
-4. ~~Load judgments~~ Done: 16,419 judgments' metadata via `pipeline/load_judgments.py`. Full text stays on disk (too big for the free plan).
-5. Build citation extraction (regex first, LLM for messy cases) into `citation_mentions`, measure against a hand-checked sample.
-6. Build event classification into `citation_events`, measure against ground truth.
-7. Status resolver (per-jurisdiction rules), then API, then UI.
-8. Write the synthetic demo filings and the filing checker.
-9. Deploy end to end early (Neon/Supabase, Railway/Fly, Vercel).
+Done:
+1. **Data:** 8 Acts (31 versions) and 16,419 judgments from the Internet Archive; *Mwaura* saved by hand. `crawler/`.
+2. **Ground truth:** 19 events, all verified. `ground_truth/`.
+3. **Database:** Neon Postgres. `pipeline/schema.sql`; `load_acts.py` (1,862 sections, 4,592 texts); `embed.py`.
+4. **Judgments and answer key in the database:** `load_judgments.py` (16,419 rows, metadata only), `load_ground_truth.py` (19 events).
+
+Next:
+- **Before step 5:** finish the embeddings. 1,549 texts from the 4 new Acts (445 unique still to call) wait on the daily quota: re-run `uv run python -m pipeline.embed`.
+5. **Citation extraction** (regex first, LLM for messy cases) → `citation_mentions`; measure against a hand-checked sample. Must handle "Article N of the Constitution" as well as "section N of the X Act".
+6. **Event classification** → `citation_events` (`method='extracted'`); measure against the ground truth and `negatives.csv`. Also turn the Acts' amendment notes into `amended_by_statute` / `repealed_by_statute` events.
+7. **Status resolver** (per-jurisdiction rules; `affects_event_id` = direct reversal only, precedent handled by rules), then API, then UI.
+8. **Synthetic demo filings and the filing checker.**
+9. **Deploy** end to end.
+
+Known gaps: 286 PDF-only judgments have no text; Archive coverage is ~10% of judgments; the Employment Act's eIds changed in 2022; appeals of *EG*, *Alai* and *Andama* are unchecked. Before the presentation, confirm the live Kenya Law pages still lack court notes.
 
 ## Rules for working in this repo
 

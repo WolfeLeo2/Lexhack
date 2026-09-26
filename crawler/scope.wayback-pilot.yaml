@@ -3,7 +3,7 @@
 name: wayback-pilot
 hosts: [web.archive.org]           # the only host we actually connect to
 max_depth: 2
-max_requests: 400
+max_requests: 100000             # counts ALL requests ever stored in frontier.db, not just this run
 min_delay: 5                       # courtesy to IA; also matches kenyalaw's own Crawl-delay: 5
 
 wayback:
@@ -13,12 +13,20 @@ wayback:
     - new.kenyalaw.org/akn/ke/act/1998/2/      # Kenya Information and Communications Act (Cap. 411A)
     - new.kenyalaw.org/akn/ke/act/2007/11/     # Employment Act, 2007
     - new.kenyalaw.org/akn/ke/act/2006/3/      # Sexual Offences Act, 2006
+    - new.kenyalaw.org/akn/ke/act/2010/constitution/   # Constitution of Kenya, 2010
+    - new.kenyalaw.org/akn/ke/act/1924/3/      # Civil Procedure Act (Cap. 21)
+    - new.kenyalaw.org/akn/ke/act/1963/46/     # Evidence Act (Cap. 80)
+    - new.kenyalaw.org/akn/ke/act/1930/11/     # Criminal Procedure Code (Cap. 75)
     - new.kenyalaw.org/akn/ke/judgment/
   works:                           # every captured point-in-time version + source file
     - /akn/ke/act/1930/10
     - /akn/ke/act/1998/2
     - /akn/ke/act/2007/11
     - /akn/ke/act/2006/3
+    - /akn/ke/act/2010/constitution
+    - /akn/ke/act/1924/3
+    - /akn/ke/act/1963/46
+    - /akn/ke/act/1930/11
   sample:                          # 60 judgments: 20 per era, round-robin across courts
     prefix: /akn/ke/judgment/
     per_bucket: 20
