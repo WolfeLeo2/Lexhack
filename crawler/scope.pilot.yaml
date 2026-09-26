@@ -1,0 +1,23 @@
+# Pilot scope: targeted fetch only. No listing->document following; sample judgments are added
+# by hand (crawl.py add) after picking them from listing pages.
+name: pilot
+hosts: [new.kenyalaw.org]
+max_depth: 2
+max_requests: 400          # hard budget, counted over everything in the WARC index
+min_delay: 2               # seconds; raised automatically if robots.txt sets Crawl-delay / Request-rate
+
+# First match wins.
+kinds:
+  - {kind: source,   pattern: '^https://new\.kenyalaw\.org/(akn/.+/source(\.\w+)?|media/.+)$'}
+  - {kind: act,      pattern: '^https://new\.kenyalaw\.org/akn/ke(-[a-z]+)?/act/'}
+  - {kind: judgment, pattern: '^https://new\.kenyalaw\.org/akn/ke(-[a-z]+)?/judgment/'}
+  - {kind: gazette,  pattern: '^https://new\.kenyalaw\.org/(akn/ke/officialGazette/|gazettes/)'}
+  - {kind: listing,  pattern: '^https://new\.kenyalaw\.org/(legislation|judgments|gazettes|sitemap)'}
+
+follow:
+  act: [act, source]       # point-in-time versions + PDFs of the same Act
+  judgment: [source]       # a judgment's own PDF
+same_work: [act, source]   # only within the same FRBR work (not cited Acts)
+
+seeds:
+  - {url: 'https://new.kenyalaw.org/terms-of-use/', kind: other}

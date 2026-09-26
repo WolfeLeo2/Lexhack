@@ -1,0 +1,58 @@
+# Pilot via the Internet Archive: new.kenyalaw.org refuses our crawler (HTTP 403), so we read the
+# captures the Wayback Machine already holds. Nothing here contacts new.kenyalaw.org.
+name: wayback-pilot
+hosts: [web.archive.org]           # the only host we actually connect to
+max_depth: 2
+max_requests: 400
+min_delay: 5                       # courtesy to IA; also matches kenyalaw's own Crawl-delay: 5
+
+wayback:
+  origin_host: new.kenyalaw.org    # its archived robots.txt is obeyed too
+  cdx:                             # capture lists to load (one request per CDX page)
+    - new.kenyalaw.org/akn/ke/act/1930/10/     # Penal Code (Cap. 63)
+    - new.kenyalaw.org/akn/ke/act/1998/2/      # Kenya Information and Communications Act (Cap. 411A)
+    - new.kenyalaw.org/akn/ke/act/2007/11/     # Employment Act, 2007
+    - new.kenyalaw.org/akn/ke/act/2006/3/      # Sexual Offences Act, 2006
+    - new.kenyalaw.org/akn/ke/judgment/
+  works:                           # every captured point-in-time version + source file
+    - /akn/ke/act/1930/10
+    - /akn/ke/act/1998/2
+    - /akn/ke/act/2007/11
+    - /akn/ke/act/2006/3
+  sample:                          # 60 judgments: 20 per era, round-robin across courts
+    prefix: /akn/ke/judgment/
+    per_bucket: 20
+    buckets: [[1900, 2004], [2010, 2015], [2022, 2100]]
+    seed: 0
+
+# Kinds are matched against the ORIGINAL url (the part after /web/<ts>id_/).
+kinds:
+  - {kind: source,   pattern: '^https://new\.kenyalaw\.org/(akn/.+/source(\.\w+)?|media/.+)$'}
+  - {kind: act,      pattern: '^https://new\.kenyalaw\.org/akn/ke(-[a-z]+)?/act/'}
+  - {kind: judgment, pattern: '^https://new\.kenyalaw\.org/akn/ke(-[a-z]+)?/judgment/'}
+  - {kind: gazette,  pattern: '^https://new\.kenyalaw\.org/(akn/ke/officialGazette/|gazettes/)'}
+  - {kind: listing,  pattern: '^https://new\.kenyalaw\.org/(legislation|judgments|gazettes|sitemap)'}
+
+follow:
+  act: [act, source]
+  judgment: [source]
+same_work: [act, source]
+
+# Candidates for the three named judgments, picked by decision date from the CDX list; the parser
+# identifies which is which from the title. (Muruatetu: SC, 14 Dec 2017; Andare: HC, 19 Apr 2016;
+# Okuta: HC, early Feb 2017.)
+seeds:
+  - {url: 'https://new.kenyalaw.org/akn/ke/judgment/kesc/2017/2/eng@2017-12-14'}
+  - {url: 'https://new.kenyalaw.org/akn/ke/judgment/kesc/2017/1/eng@2017-12-15'}
+  - {url: 'https://new.kenyalaw.org/akn/ke/judgment/kehc/2016/5536/eng@2016-04-19'}
+  - {url: 'https://new.kenyalaw.org/akn/ke/judgment/kehc/2016/5698/eng@2016-04-19'}
+  - {url: 'https://new.kenyalaw.org/akn/ke/judgment/kehc/2016/7592/eng@2016-04-19'}
+  - {url: 'https://new.kenyalaw.org/akn/ke/judgment/kehc/2017/442/eng@2017-02-09'}
+  - {url: 'https://new.kenyalaw.org/akn/ke/judgment/kehc/2017/7288/eng@2017-02-02'}
+  - {url: 'https://new.kenyalaw.org/akn/ke/judgment/kehc/2017/7811/eng@2017-02-02'}
+  - {url: 'https://new.kenyalaw.org/akn/ke/judgment/kehc/2017/7904/eng@2017-02-07'}
+  - {url: 'https://new.kenyalaw.org/akn/ke/judgment/kehc/2017/7988/eng@2017-02-03'}
+  - {url: 'https://new.kenyalaw.org/akn/ke/judgment/kehc/2017/8018/eng@2017-02-03'}
+  - {url: 'https://new.kenyalaw.org/akn/ke/judgment/kehc/2017/8027/eng@2017-02-09'}
+  - {url: 'https://new.kenyalaw.org/akn/ke/judgment/kehc/2017/8086/eng@2017-02-09'}
+  - {url: 'https://new.kenyalaw.org/akn/ke/judgment/kehc/2017/8382/eng@2017-02-06'}

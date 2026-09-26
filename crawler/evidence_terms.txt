@@ -1,0 +1,123 @@
+Navigation
+
+              Terms of Use
+
+              Navigation
+
+Navigation
+
+What do these terms relate to?
+
+  These terms of use describe the permitted use for the Kenya Law service available at 
+https://kenyalaw.org/
+ and its subdomains.
+
+Who are we, and how to contact us?
+
+  The National Council for Law Reporting (Kenya Law) is committed to Law Reporting and Law Revision by providing accessible, accurate and timely publication of public legal information for an informed society. You can contact us by email at 
+info@kenyalaw.org
+ or by filling out 
+this form
+.
+
+  By using the Kenya Law service you accept these terms
+
+  By using the Kenya Law service, you confirm that you accept these terms of use and agree to comply with them.
+
+Fair and reasonable use
+
+  You must use the service responsibly by not making too many requests. In order to maintain the integrity of the service for everyone, we may block or disable use of the service from certain IP addresses, for making too many requests.
+
+  Scraping and bulk downloading from this website is strictly prohibited. We are a donor-funded organisation and bulk and frequent scraping affects our costs, endangering the sustainability of the service. There are more efficient ways of obtaining access to our data in bulk. Please email us if you would like to access our data in bulk.
+
+Crawling and indexing
+
+  You may access the Kenya Law service through the website, or access the data through our APIs.
+
+  We restrict external indexing of documents by search engine robots or spiders. You must adhere to the instructions in the 
+/robots.txt
+ file.
+
+  We may block or disable use of the service from certain IP addresses, if they appear to be compiling a search engine index.
+
+Coverage
+
+  Kenya Law collects caselaw, legislation, African Union documents, journals, books and other materials through cooperation with regional, governmental, academic and non-profit organisations and sometimes individuals.
+
+  We strive to ensure high quality standards on all documents published on the platform. Where verification was not possible, this will be indicated on the document concerned.
+
+Errors and omissions
+
+  We scan and digitize most of the documents made available on the Kenya Law and affiliate LII websites. We use industry-standard Optical Character Recognition (OCR) software to convert these documents to readable text and there may be errors introduced by this process.
+
+  Please contact us should you encounter errors in any of the documents published and we shall rectify them within a reasonable time.
+
+Disclaimer
+
+  Although we make every effort to authenticate information and include the source and history of documents published on this service, you should note that information on Kenya Law is:
+
+not necessarily comprehensive, complete, accurate or up-to-date;
+
+    sometimes linked to external sites over which Kenya Law has no control and for which Kenya Law assumes no responsibility;
+
+    not professional or legal advice (if you need specific advice, you should always consult a suitably qualified professional).
+
+  Kenya Law and Laws.Africa, members of its staff, and its contractors shall not be liable for any financial or other consequences arising from the use of information or data contained on this site, including the inappropriate, improper or fraudulent use of such information or data.
+
+  Kenya Law does not invite reliance upon, nor accept responsibility for, the information it provides. Kenya Law makes every effort to provide a high-quality service. However, neither Kenya Law nor the providers of data on Kenya Law, give any guarantees, undertakings or warranties concerning the accuracy, completeness or up-to-date nature of the information provided. Users should confirm information from another source if it is of sufficient importance for them to do so.
+
+  Hypertext links on Kenya Law are (in most cases) inserted by Kenya Law, not by the data providers. Automated insertion of hypertext links on Kenya Law means that links will not be comprehensive or accurate in all cases. Neither Kenya Law nor its providers of data, give any guarantees, undertakings or warranties concerning hypertext linking.
+
+Copyright and Licensing
+
+  You may use and re-use primary and secondary law content on Kenya Law under the terms of the Creative Commons 
+Attribution-NonCommercial 4.0 International
+ license. Under this license, you may freely use, re-use and redistribute works from Kenya Law provided you credit Kenya Law as your source and your use is not for commercial gain.
+
+  Specific collections on Kenya Law may be licensed under more permissive licenses. Examples of these collections are unedited African Union documentation, national and regional caselaw and government gazettes. Check the landing page of each collection for specific licensing information.
+
+  Use of legal materials published by Kenya Law can be subject to additional conditions set by courts, regional and government bodies, and publishers claiming intellectual property rights relating to the documents. Kenya Law makes an effort to indicate the existence of additional conditions on the pages of the relevant databases. Still, Users remain responsible for checking whether their use of the documents is authorised.
+
+  Kenya Law reserves the intellectual property rights on the Kenya Law name, website’s graphics and website design.
+
+Privacy
+
+  Information concerning the usage of Kenya Law
+
+  Kenya Law collects information which identifies, for each page accessed on Kenya Law, the network identity of the machine which has accessed it. We use Google Analytics and in-house software to perform this function.
+
+  Kenya Law retains this usage information for purposes of network analysis, usage analysis, and research into usage patterns to improve the Kenya Law services. Access to and use of this information is restricted to Google Analytics, Kenya Law management and staff, and to researchers working on Kenya Law projects and subject to an agreement to adhere to these Terms of Use.
+
+  Kenya Law reserves the right to gather more extensive information than stated above (i) about any attempted access to Kenya Law which raise security issues (and, where necessary, to make disclosures to relevant authorities); and (ii) for network analyses on an occasional basis.
+
+  Personal information contained in Kenya Law databases
+
+Personal information in court cases
+
+  Kenya Law publishes comprehensive collections of court decisions with the consent of the public bodies concerned. The electronic dissemination of judgments is in concordance with the open court principle, instituted to ensure the impartiality and transparency of the judicial process by allowing access to the record of judicial proceedings, including judgments. Therefore, Kenya Law operates on the core principle that all citizens and organisations should be provided with free, unconditional and unrestricted access to basic legal materials.
+
+  Kenya Law undertakes to monitor and delete from published judgments personal information as directed by law or specific court order. Kenya Law retains the right to remove personal information from judgments at its discretion where this is possible without distorting the meaning and context of the document.
+
+Personal information in government gazettes
+
+  Government gazettes and official journals are official publications of the states that publish them. The law mandates that certain personal information should be made public via the government gazette and government departments place these public notices in the government gazette with the intent of the contents being made accessible to the public.
+
+  Kenya Law cannot withdraw from circulation, redact or amend the government gazette.
+
+Automated monitoring
+
+  Kenya Law performs automated monitoring and, where necessary, de-identification of judgments before publication and does not guarantee that all sensitive material has been correctly de-identified.
+
+  Should you have concerns over personal information published on the Kenya Law website, please contact us.
+
+Your responsible use of personal information
+
+  Kenya Law users should note that there are legal limitations on the use, publication and dissemination of some personal information in Kenya Law databases. It is the responsibility of Kenya Law users to comply with the laws of the land.
+
+Right to amend these Terms of Use, Copyright and Privacy statements
+
+  We reserve the right to amend these terms of use, copyright, and privacy and security statements at any time. All amendments will be posted on this website. Unless otherwise stated, the current version shall supersede and replace all previous versions of this document.
+
+If you have any comments or suggestions about this policy, please contact us.
+
+Date of notice: 6 June 2024

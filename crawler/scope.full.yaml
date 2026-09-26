@@ -1,0 +1,35 @@
+# DRAFT full-mirror scope. UNVERIFIED: the pilot was blocked at robots.txt (HTTP 403), so every
+# pattern below is the Peachjam/lawlibrary.org.za layout carried over as a hypothesis. Re-derive
+# from the real robots.txt, sitemaps and listing pages once access is granted, before running this.
+name: full
+hosts: [new.kenyalaw.org]
+max_depth: 6               # listing -> listing(page N) -> document -> version -> source
+max_requests: 1000000      # ~500k expected (see REPORT.md); budget is a safety stop, not a target
+min_delay: 2               # robots.txt Crawl-delay overrides upward automatically
+
+kinds:
+  - {kind: source,   pattern: '^https://new\.kenyalaw\.org/(akn/.+/source(\.\w+)?|media/.+)$'}
+  - {kind: act,      pattern: '^https://new\.kenyalaw\.org/akn/ke(-[a-z]+)?/act/'}
+  - {kind: judgment, pattern: '^https://new\.kenyalaw\.org/akn/ke(-[a-z]+)?/judgment/'}
+  - {kind: gazette,  pattern: '^https://new\.kenyalaw\.org/(akn/ke/officialGazette/|gazettes/)'}
+  # Listings: court/year browse pages and ?page=N pagination. Keep filter/facet query strings OUT
+  # (they multiply URLs without new documents) - tighten this once the real listing URLs are known.
+  - {kind: listing,  pattern: '^https://new\.kenyalaw\.org/(legislation|judgments|gazettes)(/[A-Za-z0-9_-]+)*/?(\?page=\d+)?$'}
+
+follow:
+  listing: [listing, act, judgment, gazette]
+  act: [act, source]       # point-in-time versions + PDFs
+  judgment: [source]
+  gazette: [source]
+same_work: [act, source]   # never follow cited documents from inside a document
+
+seeds:
+  - {url: 'https://new.kenyalaw.org/legislation/', kind: listing}
+  - {url: 'https://new.kenyalaw.org/judgments/', kind: listing}
+  - {url: 'https://new.kenyalaw.org/gazettes/', kind: listing}
+  # Better: seed from sitemap.xml children (one request per ~N documents) instead of paginating.
+
+# Incremental updates after the first full pass:
+#   uv run python -m crawler.crawl requeue --kind listing   # conditional GETs (ETag / If-Modified-Since)
+#   uv run python -m crawler.crawl run --scope scope.full.yaml
+# New documents appear on listing pages and are enqueued; unchanged pages return 304.

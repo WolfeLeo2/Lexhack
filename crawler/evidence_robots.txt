@@ -1,0 +1,54 @@
+# This content is made available subject to our Terms of Use at /terms-of-use/
+
+User-agent: *
+Allow: /
+Disallow: /search/
+Disallow: /api/
+Crawl-delay: 5
+Disallow: /akn/ke/doc/kenya-law-reports/2025-01-13/devolution-law-reports-volume-3/
+Disallow: /akn/ke/judgment/keelrc/2017/1098/
+Disallow: /akn/ke/judgment/kehc/2022/13503/
+Disallow: /akn/ke/doc/bench-bulletin/2026-04-01/bench-bulletin-issue-72-jan-mar-2026/
+Disallow: /akn/ke/judgment/kehc/2023/21341/
+Disallow: /akn/ke/judgment/kehc/2023/20275/
+
+
+
+User-Agent: AhrefsBot
+Disallow: /
+
+User-agent: Amazonbot
+Disallow: /
+
+User-agent: anthropic-ai
+Disallow: /
+
+User-agent: Applebot-Extended
+Disallow: /
+
+User-agent: ChatGPT-User
+Disallow: /
+
+User-agent: ClaudeBot
+Disallow: /
+
+User-agent: Claude-Web
+Disallow: /
+
+User-agent: cohere-ai
+Disallow: /
+
+User-agent: Google-Extended
+Disallow: /
+
+User-agent: GPTBot
+Disallow: /
+
+User-Agent: ImagesiftBot
+Disallow: /
+
+User-agent: meta-externalagent
+Disallow: /
+
+User-agent: SemrushBot
+Disallow: /

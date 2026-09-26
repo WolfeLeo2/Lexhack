@@ -1,0 +1,13 @@
+.env
+*.warc
+*.warc.gz
+*.db
+data/
+parsed/
+.venv/
+__pycache__/
+.neon
+node_modules/
+node_modules/
+.DS_Store
+.idea/

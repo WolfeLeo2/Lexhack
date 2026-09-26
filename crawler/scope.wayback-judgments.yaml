@@ -1,0 +1,24 @@
+# Bulk judgment pull from the Internet Archive: every captured judgment of the courts that decide
+# whether a statute section is valid. Order matters: the frontier is FIFO, so kesc comes in first.
+# Uses CDX rows already loaded by the pilot; nothing here contacts new.kenyalaw.org.
+name: wayback-judgments
+hosts: [web.archive.org]
+max_depth: 1
+max_requests: 25000
+min_delay: 2                       # ~30 req/min; fetcher backs off on 429/503
+
+wayback:
+  origin_host: new.kenyalaw.org
+  sample:                          # per_bucket is larger than any court: takes everything
+    - {prefix: /akn/ke/judgment/kesc/, per_bucket: 100000, buckets: [[1900, 2100]]}   # Supreme Court ~640
+    - {prefix: /akn/ke/judgment/keca/, per_bucket: 100000, buckets: [[1900, 2100]]}   # Court of Appeal ~5.6k
+    - {prefix: /akn/ke/judgment/kehc/, per_bucket: 100000, buckets: [[1900, 2100]]}   # High Court ~11k
+
+kinds:
+  - {kind: source,   pattern: '^https://new\.kenyalaw\.org/(akn/.+/source(\.\w+)?|media/.+)$'}
+  - {kind: act,      pattern: '^https://new\.kenyalaw\.org/akn/ke(-[a-z]+)?/act/'}
+  - {kind: judgment, pattern: '^https://new\.kenyalaw\.org/akn/ke(-[a-z]+)?/judgment/'}
+
+follow: {}                         # HTML has full text for ~97% of judgments; PDFs not worth 2x requests
+same_work: []
+seeds: []
