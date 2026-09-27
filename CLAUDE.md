@@ -229,14 +229,15 @@ Done:
 2. **Ground truth:** 19 events, all verified. `ground_truth/`.
 3. **Database:** Neon Postgres. `pipeline/schema.sql`; `load_acts.py` (1,862 sections, 4,592 texts); `embed.py`.
 4. **Judgments and answer key in the database:** `load_judgments.py` (16,419 rows, metadata only), `load_ground_truth.py` (19 events).
-5. **Citation extraction, regex (done) + LLM (in progress)** → `citation_mentions` (README §7).
-   - Regex: `pipeline/extract_citations.py`, 304,310 mentions in 13,098 judgments; every law recorded in `act_ref`, `provision_id` set for our 8 Acts (173,014). Tests: `pipeline.test_extract`.
-   - LLM: `pipeline/llm_resolve.py` (`gemini-3.5-flash-lite`, cached in `$LEXHACK_DATA/cache/llm/`) resolves bare mentions. ~400 of 7,385 judgments done; the free tier allows ~500 requests/day. Re-run daily, or enable billing (~$5–8).
-   - Scored on a verified 30-judgment sample (`ground_truth/mentions_README.md`; `uv run python -m ground_truth.eval_mentions --llm`): precision 99.5%, recall 98.5%, law right 99.3% / wrong 0%. Those regex scores are optimistic (tuned on that sample). **Held-out score, the one to quote:** 30 unseen judgments, double-labelled blind (469/471 agreement): precision 98.1%, recall 98.1%, law right 88.8% / wrong 0.5% / unresolved 10.7% (regex only). `eval_mentions --set heldout`.
+5. **Citation extraction (done)** → `citation_mentions` (README §7).
+   - Regex: `pipeline/extract_citations.py`, 304,310 mentions in 13,098 judgments; every law recorded in `act_ref`. Tests: `pipeline.test_extract`.
+   - LLM pass (done 2026-09-27): `pipeline/llm_resolve.py` resolved 41,382 bare mentions. 38,366 used `deepseek-flash`, run as 8 workers (`--shard i/8`) for roughly $1.50–2; 3,016 used `gemini-3.5-flash-lite`, the first ~400 judgments. The model is recorded in `citation_mentions.llm_model`. Answers are cached in `$LEXHACK_DATA/cache/llm/`, so re-runs are free. DeepSeek answers are validated in code, because its JSON mode doesn't enforce the enum.
+   - After the pass, 182,571 mentions link to our sections, 5,186 remain unresolved, and 200 more judgments are eligible for step 6.
+   - Scored on a verified 30-judgment tuning sample (`ground_truth/mentions_README.md`; `uv run python -m ground_truth.eval_mentions --llm`): precision 99.5%, recall 98.5%, law right 99.0% (DeepSeek) / 99.3% (Gemini), wrong 0%. Those regex scores are optimistic, because the regex was tuned on that sample.
+   - **Held-out score, the one to quote** (`eval_mentions --set heldout --llm`): 30 unseen judgments, double-labelled blind with 469/471 agreement. Precision 98.1%, recall 98.1%. Law right 97.8% / wrong 1.0% / unresolved 1.2% with DeepSeek; Gemini gets 98.3% / 1.0% / 0.7%; the regex alone gets 88.8% / 0.5% / 10.7%.
    - **Order matters:** `extract_citations` rebuilds all mention rows (regex and LLM); always run `llm_resolve` after it.
 
 Next:
-- **Finish step 5:** the LLM pass (above). Embeddings are done (all 4,592).
 6. **Event classification (README §7b):** `pipeline/classify_events.py` → `citation_events` (`method='extracted'`, unverified). Model: **`deepseek-flash`** (`DEEPSEEK_API_KEY`), thinking off, JSON mode, answers validated in code. `ground_truth/eval_events.py`: 19/19 answer-key events found, 18/19 right type, 0/6 false alarms (optimistic: the prompt was tuned on those events). Full run done 2026-09-27 (271 events). **Blind review of 40 random extracted events: ~53% precision** (README §7b): false positives from courts *following* another ruling, `reversed_on_appeal` on ordinary appeals (0/5), and generic "findings upheld" orders. Prompt v6 + `MIN_LINK_CONFIDENCE` 0.8 (no "the Act" guesses) → 143 events. **Second-pass checker `pipeline/verify_events.py`** (thinking on: own holding? right section?) lifts precision on 111 blind-reviewed events from 59% to ~80% (`ground_truth/eval_checker.py`). Live: 120 events shown (23 failed are hidden). The API defaults to verified events only; extracted ones are unverified leads (`include_unverified=true`). Next step for quality: a human review queue in the UI.
 7. **Status resolver + API (README §7c):** `api/status_ke.py` (rules: direct reversal; precedent = later equal-or-higher court pointing the other way), `api/test_status.py`, `api/main.py` (FastAPI: `/api/acts`, `/api/provisions/{id}`, `/api/search`; the Pydantic models are the UI's contract). **Next:** the UI (Next.js, `web/`). Also turn the Acts' amendment notes into `amended_by_statute` / `repealed_by_statute` events.
    - Still to do in step 7: the **UI** (Next.js, `web/`) against the API above.
@@ -253,6 +254,7 @@ Blind spots to keep in mind (details in README §9):
 - **Constitution:** "section N of the Constitution" is always treated as the repealed Constitution, so 2010 Schedule sections are misattributed.
 - **`act_ref` for laws we don't hold is not normalised.**
 - **Not extracted:** rules, orders and regulations.
+- **`db.connect()` has no timeouts:** on a flaky network a worker can hang forever on a dead connection. `llm_resolve` uses its own connections with keepalives and timeouts; `classify_events` and `verify_events` don't yet.
 
 ## Windows setup notes
 

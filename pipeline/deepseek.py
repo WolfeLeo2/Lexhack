@@ -24,7 +24,8 @@ def call_json(prompt, cache, key, model="deepseek-flash", thinking=False):
         try:
             r = requests.post(URL, json=body, timeout=600,
                               headers={"Authorization": f"Bearer {require_env('DEEPSEEK_API_KEY')}"})
-        except (requests.ConnectionError, requests.Timeout) as e:
+        except (requests.ConnectionError, requests.Timeout, requests.exceptions.ChunkedEncodingError) as e:
+            # ChunkedEncodingError: the connection dropped mid-reply
             print(f"  network error ({type(e).__name__}); retrying in {wait}s", flush=True)
             time.sleep(wait)
             continue

@@ -37,12 +37,17 @@ def main():
     ap.add_argument("--errors", action="store_true")
     ap.add_argument("--set", default="", help="'heldout' scores mentions_heldout_{candidates,gold}.csv")
     ap.add_argument("--llm", action="store_true", help="also apply pipeline.llm_resolve to unresolved citations")
+    ap.add_argument("--llm-model", help="the resolver model to score (default: llm_resolve.BACKEND); one model only, "
+                                        "no reuse of cached answers from another model")
     args = ap.parse_args()
     if args.llm:
         from crawler.config import require_env
-        from pipeline.llm_resolve import NOT_CITATION, UNKNOWN, resolve_judgment
-        api_key, cache = require_env("GEMINI_API_KEY"), data_dir() / "cache" / "llm"
+        from pipeline.llm_resolve import BACKEND, NOT_CITATION, UNKNOWN, resolve_judgment
+        llm_model = args.llm_model or BACKEND
+        api_key = None if llm_model.startswith("deepseek") else require_env("GEMINI_API_KEY")
+        cache = data_dir() / "cache" / "llm"
         cache.mkdir(parents=True, exist_ok=True)
+        print(f"LLM pass: {llm_model}")
 
     prefix = f"mentions_{args.set + '_' if args.set else ''}"
     cands = list(csv.DictReader(open(HERE / f"{prefix}candidates.csv", encoding="utf-8")))
@@ -66,9 +71,9 @@ def main():
         lo, hi = spans[jid]
         every = list(extract(text, ddate))
         if args.llm:
-            answers, _ = resolve_judgment(title, text, every, api_key, cache)
+            answers, _ = resolve_judgment(title, text, every, api_key, cache, llm_model, reuse_gemini=False)
             for x in every:
-                law, conf = answers.get((x["char_start"], x["char_end"]), (None, None))
+                law, conf, _ = answers.get((x["char_start"], x["char_end"]), (None, None, None))
                 if x["act_ref"] in (None, "the Act", "the Code") and law not in (None, UNKNOWN, NOT_CITATION):
                     x["act_ref"] = law
         ext = [x for x in every if x["char_end"] > lo and x["char_start"] <= hi]
