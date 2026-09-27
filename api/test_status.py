@@ -54,9 +54,22 @@ def main():
     led = with_leads(resolve, ev + [lead])
     if led["status"] != "limited by a court" or states(led) != {**states(s204), "LEAD": "in effect"}:
         fails.append(("lead changed status", led["status"], states(led)))
+    # Parliament: an amendment changes nothing; a total repeal wins; a later court ruling doesn't displace a repeal
+    amend = dict(ev[0], event_id=98, event_key="AMD", event_type="amended_by_statute", court=None, scope="partial",
+                 effective_date="2003-01-01", verified=True, affects_event_id=None)
+    if with_leads(resolve, ev + [amend])["status"] != "limited by a court":
+        fails.append(("amendment changed status",))
+    if resolve([amend])["status"] != "in force; no recorded court rulings":
+        fails.append(("amendment-only status", resolve([amend])["status"]))
+    rep = dict(amend, event_id=97, event_key="REP", event_type="repealed_by_statute", scope="total")
+    upheld_after = dict(ev[0], event_id=96, event_key="UP", event_type="upheld", court="Supreme Court",
+                        effective_date="2030-01-01", affects_event_id=None)
+    r = resolve([rep, upheld_after])
+    if r["status"] != "repealed" or states(r)["REP"] != "in effect":
+        fails.append(("repeal", r["status"], states(r)))
     for f in fails:
         print("FAIL", *f)
-    print(f"{8 - len(fails)}/8 passed")
+    print(f"{11 - len(fails)}/11 passed")
     raise SystemExit(1 if fails else 0)
 
 

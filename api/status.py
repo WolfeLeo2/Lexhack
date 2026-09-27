@@ -32,9 +32,10 @@ def load_events_many(conn, provision_ids, include_unverified=False):
     seen, out = set(), {}
     for pid, *r in rows:
         e = dict(zip(cols, r))
-        if (pid, e["judgment_id"], e["event_type"]) in seen:
+        k = (pid, e["judgment_id"] or e["event_key"] or e["event_id"], e["event_type"])   # Parliament's events have no judgment
+        if k in seen:
             continue
-        seen.add((pid, e["judgment_id"], e["event_type"]))
+        seen.add(k)
         out.setdefault(pid, []).append(e)
     return out
 

@@ -31,7 +31,10 @@ export function rank(court: string | null) {
 }
 
 /** A court has acted unless the status says no rulings are recorded. */
-export const courtActed = (status: string) => !status.includes('no recorded')
+export const courtActed = (status: string) => !status.includes('no recorded') && status !== 'repealed'
+
+/** Parliament's amendments and repeals (from Kenya Law's notes), as opposed to court rulings. */
+export const isStatutory = (e: { event_type: string }) => e.event_type.endsWith('_by_statute')
 
 export const sectionHref = (id: string) => `/p/${id}`
 export const actHref = (id: string) => `/acts/${id}`

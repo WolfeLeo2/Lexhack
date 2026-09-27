@@ -9,6 +9,9 @@ An event stops counting when either
 The result is never a yes/no: it's a status label plus the events that produce it, each with the court's words.
 """
 RANK = {"Supreme Court": 3, "Court of Appeal": 2, "High Court": 1}
+# Parliament's changes (pipeline/statutory_events.py). They never displace, and are never displaced by, a court ruling;
+# an amendment leaves the status alone (it shows in the history); a total repeal makes the section "repealed".
+STATUTORY = {"repealed_by_statute", "amended_by_statute"}
 LIMITING = {"declared_unconstitutional", "read_down", "severed", "repealed_by_statute"}
 VALIDATING = {"upheld", "reversed_on_appeal"}
 
@@ -28,33 +31,37 @@ def resolve(events):
         if target and e["event_type"] == "reversed_on_appeal":
             out[target["event_id"]].update(state="reversed on appeal", superseded_by=e["event_id"])
     for i, e in enumerate(events):        # 2. precedent: a later, equal-or-higher court pointing the other way
-        if out[e["event_id"]]["state"] != "in effect" or not direction(e):
+        if out[e["event_id"]]["state"] != "in effect" or not direction(e) or e["event_type"] in STATUTORY:
             continue
         for later in events[i + 1:]:
-            if (direction(later) and direction(later) != direction(e)
+            if (later["event_type"] not in STATUTORY and direction(later) and direction(later) != direction(e)
                     and RANK.get(later["court"], 0) >= RANK.get(e["court"], 0)
                     and later.get("effective_date") != e.get("effective_date")):
                 out[e["event_id"]].update(state="displaced by a later ruling", superseded_by=later["event_id"])
                 break
     live = [out[e["event_id"]] for e in events if out[e["event_id"]]["state"] == "in effect"]
     limits = [e for e in live if direction(e) == "limits"]
-    if any(e["event_type"] == "repealed_by_statute" for e in limits):
+    court = [e for e in events if e["event_type"] not in STATUTORY]
+    if any(e["event_type"] == "repealed_by_statute" and e["scope"] == "total" for e in live):
         status = "repealed"
     elif any(e["event_type"] == "declared_unconstitutional" and e["scope"] == "total" for e in limits):
         status = "declared unconstitutional"
-    elif limits:
+    elif (limits := [e for e in limits if e["event_type"] not in STATUTORY]):
         status = "limited by a court"
     elif any(e["event_type"] == "upheld" for e in live):
         status = "in force; its validity has been tested in court"
     elif any(e["event_type"] == "reversed_on_appeal" for e in live):
         status = "in force; earlier court limits were reversed"
-    elif events:
+    elif court:
         status = "in force; interpreted by a court"
     else:
         status = "in force; no recorded court rulings"
     # ponytail: a lower court limiting a section after a higher court upheld it keeps "limited"; flag such
     # conflicts in the UI if they turn up in the extracted events.
-    summary = limits or [e for e in live if direction(e)] or live
+    repeal = [e for e in live if e["event_type"] == "repealed_by_statute" and e["scope"] == "total"]
+    live_court = [e for e in live if e["event_type"] not in STATUTORY]
+    summary = repeal or limits or [e for e in live_court if direction(e)] or live_court
     # interpretations of the summary events (same section) travel with them
-    summary += [e for e in live if e["event_type"] == "interpreted" and e not in summary]
+    if not repeal:
+        summary += [e for e in live if e["event_type"] == "interpreted" and e not in summary]
     return {"status": status, "summary_events": summary, "history": [out[e["event_id"]] for e in events]}

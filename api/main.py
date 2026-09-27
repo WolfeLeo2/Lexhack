@@ -19,7 +19,7 @@ from psycopg_pool import ConnectionPool
 
 from .status import provision_status, statuses
 
-DISCLAIMER = "LexHack reports what published sources say. It is not legal advice."
+DISCLAIMER = "Hakiki reports what published sources say. It is not legal advice."
 app = FastAPI(title="LexHack citator API", version="0.1")
 app.add_middleware(CORSMiddleware, allow_origins=os.environ.get("CORS_ORIGINS", "http://localhost:3000").split(","),
                    allow_methods=["GET"], allow_headers=["*"])
@@ -180,8 +180,8 @@ def act_provisions(act_id: str):
 @app.get("/api/stats", response_model=Stats)
 def stats():
     with db() as conn:
-        row = conn.execute("""WITH live_events AS (SELECT e.* FROM citation_events e LEFT JOIN judgments j USING (judgment_id)
-                                                  WHERE j.duplicate_of IS NULL)
+        row = conn.execute("""WITH live_events AS (SELECT e.* FROM citation_events e JOIN judgments j USING (judgment_id)
+                                                  WHERE j.duplicate_of IS NULL)   -- court events only
             SELECT (SELECT count(*) FROM acts), (SELECT count(*) FROM provisions),
             (SELECT count(*) FROM judgments WHERE duplicate_of IS NULL),
             (SELECT count(DISTINCT provision_id) FROM citation_mentions WHERE provision_id IS NOT NULL),

@@ -9,6 +9,8 @@ export function SectionMeta({ status, cited_by, lead_count }: Counts & { status:
     <span className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-[0.95rem]">
       {acted ? (
         <span className="text-seal">{cap(status)}</span>
+      ) : status === 'repealed' ? (
+        <span className="text-ink-2">Repealed by Parliament</span>
       ) : (
         <span className="text-ink-2">{cited_by ? `Cited in ${plural(cited_by, 'judgment')}` : 'Not cited in the judgments we hold'}</span>
       )}

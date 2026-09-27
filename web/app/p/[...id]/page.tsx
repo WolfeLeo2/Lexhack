@@ -8,7 +8,7 @@ import { Lineage } from '@/components/Lineage'
 import { StatusStamp } from '@/components/Stamp'
 import { StatuteText } from '@/components/StatuteText'
 import { getCitations, getProvision } from '@/lib/api'
-import { actHref, courtActed, fmtDate, plural, stripHead } from '@/lib/format'
+import { EVENT_LABEL, actHref, courtActed, fmtDate, isStatutory, plural, stripHead } from '@/lib/format'
 import { cleanUrl } from '@/lib/text'
 
 type Props = PageProps<'/p/[...id]'>
@@ -34,8 +34,11 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
 export default async function ProvisionPage(props: Props) {
   const { id, leads, cites, data, citing } = await load(props)
   if (!data) notFound()
-  const { provision: p, status, summary_events: summary, history, cited_by, lead_count } = data
+  const { provision: p, status, summary_events: summary, cited_by, lead_count } = data
   const acted = courtActed(status)
+  // Parliament's changes get their own list: decades of amendments would crowd out the courts' lineage
+  const history = data.history.filter((e) => !isStatutory(e))
+  const parliament = data.history.filter(isStatutory)
   const query = (o: { leads?: boolean; cites?: number }) => {
     const q = new URLSearchParams()
     if (o.leads ?? leads) q.set('leads', '1')
@@ -80,7 +83,16 @@ export default async function ProvisionPage(props: Props) {
 
         <aside className="lg:pt-16" aria-label="Status">
           <StatusStamp status={status} />
-          {summary.length > 0 ? (
+          {status === 'repealed' ? (
+            <div className="mt-6 space-y-2 text-[0.95rem] text-ink-2">
+              {summary.filter(isStatutory).map((e) => (
+                <p key={e.event_id}>
+                  Parliament repealed this section ({e.source_paragraph?.replace(/\.$/, '')}). Kenya Law’s note reads{' '}
+                  <span className="statute text-ink">{e.operative_quote}</span>
+                </p>
+              ))}
+            </div>
+          ) : summary.length > 0 ? (
             <div className="mt-6 space-y-6">
               <p className="text-[0.95rem] text-ink-2">
                 {summary.length === 1 ? 'Because of this ruling:' : 'Because of these rulings, read together:'}
@@ -160,6 +172,32 @@ export default async function ProvisionPage(props: Props) {
           </div>
         )}
       </section>
+
+      {parliament.length > 0 && (
+        <section className="mt-16 border-t border-rule pt-10" aria-labelledby="parl-h">
+          <h2 id="parl-h" className="statute text-[2rem] font-medium tracking-[-0.01em]">
+            What Parliament has done
+          </h2>
+          <p className="mt-2 max-w-[68ch] text-ink-2">
+            From the reviser’s notes in Kenya Law’s own text. The notes give only the year of the amending law, not the
+            day it took effect.
+          </p>
+          <ol className="mt-6 max-w-[74ch] divide-y divide-rule border-y border-rule">
+            {parliament.map((e) => (
+              <li key={e.event_id} className="grid grid-cols-[3.5rem_minmax(0,1fr)] gap-x-4 py-3">
+                <span className="statute text-lg text-ink-2 tabular-nums">{e.effective_date?.slice(0, 4)}</span>
+                <span>
+                  <span className="statute text-lg">
+                    {EVENT_LABEL[e.event_type]}
+                    {e.subsection && <span className="text-ink-2"> (s.{e.subsection})</span>}
+                  </span>
+                  <span className="block text-[0.95rem] text-ink-2">{e.source_paragraph}</span>
+                </span>
+              </li>
+            ))}
+          </ol>
+        </section>
+      )}
 
       {citing && citing.total > 0 && (
         <section className="mt-16 border-t border-rule pt-10" aria-labelledby="cited-h">
