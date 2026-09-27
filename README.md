@@ -579,11 +579,38 @@ Results: s.204 → "limited by a court" (*Muruatetu* + the 2021 directions in ef
 | `GET /api/acts` | The 8 Acts with their version dates |
 | `GET /api/acts/{act_id}/provisions` | Sections of an Act, in number order |
 | `GET /api/provisions/{provision_id}` | The section's latest text, `status`, `summary_events`, full `history`, and a disclaimer. `?include_unverified=false` hides extracted events |
+| `GET /api/stats` | Counts for the UI: Acts, sections, judgments, verified events and sections, leads, cited sections |
+| `GET /api/provisions/{provision_id}/citations` | Judgments that cite the section (highest court first, then newest), each with its first citation as written. `?limit=&offset=` |
 | `GET /api/search?q=` | Hybrid search: Postgres full-text + meaning (pgvector), merged by reciprocal rank fusion; each hit carries its status. Falls back to words only if the embedding call fails |
 
 Each event carries the court's verbatim `operative_quote`, `scope_text`, paragraph, date, court, case name, citation, Kenya Law link, `verified`, and `state` / `superseded_by`. CORS allows `http://localhost:3000` (set `CORS_ORIGINS` to change).
 
 **Known limit:** search matches the statute's own words, so colloquial names miss: "criminal defamation" ranks s.194 fourth (its text says "libel"), and "sex with a child" misses SOA s.8 ("defilement"). A synonym list or citation-based ranking would fix it.
+
+**Unverified leads never change the status** (`api/status.py` `with_leads`): with `include_unverified=true`, status, summary and the states of verified events come from verified events alone; leads are only added to the history. Before this fix a lead could flip s.8's status. `api/test_status.py` checks it.
+
+Sections in lists, search hits and the provision response also carry `cited_by` (distinct citing judgments) and `lead_count` (unverified leads hidden by default).
+
+### Agent review of extracted events (`pipeline/review_events.py`)
+
+Turns unverified leads into checked rulings. Code exports each case (claim, section text, judgment text on disk, and a verbatim check of the quote); reviewer agents follow `pipeline/review_brief.md` (same event definitions as §5.4) and write verdicts to `$LEXHACK_DATA/review/<set>/verdicts/`.
+- **Benchmark** (`export --set benchmark`, `score`): the 111 events two blind reviewers agreed on. Agents accepted 59, all right (precision 100%); kept 59 of 63 real events; 3 unsure. The 4 misses are Court of Appeal "we declare" orders resting only on "emerging jurisprudence", rejected as following.
+- **Applied** (`apply`, idempotent, 2026-09-27): 90 accepts, 35 rejects, 6 unsure on live events → 108 verified events on 59 sections. 8 operative quotes replaced by the reviewer's better quote, only where code found it verbatim.
+- Accepts get `verified_by = 'agent:claude-opus-5-5 review v1'`; rejects get `check_verdict = 'fail'`. Re-run `apply` after `classify_events`/`verify_events`.
+
+### Duplicate judgments (`pipeline/dedupe_judgments.py`)
+
+219 groups share court, case number and date; 181 copies have matching text (word 5-gram overlap ≥ 0.7; copies score ≥ 0.78, different rulings ≤ 0.52) and get `judgments.duplicate_of`. The API skips their events and counts citations once. E.g. *Kahinga* (Petition 618 of 2010) was stored three times.
+
+### Web UI (`web/`, Next.js): **Hakiki**
+
+The product is called **Hakiki** (Swahili for "verify"); LexHack is the hackathon.
+
+`cd web && pnpm dev` (with the API running), then http://localhost:3000. Routes and design notes: `web/README.md`. Server components call the API directly (`API_URL`, default `http://127.0.0.1:8000`).
+- **Section page** (`/p/{provision_id}`): the statute text as Kenya Law publishes it, a status stamp (words, never a flag), the rulings behind the status in the court's words, a **lineage chart** (one lane per court rank, an arrow from each ruling to the one it reversed or displaced), and every ruling in full. `?leads=1` adds unverified leads, drawn dashed.
+- **Home**, **Acts** (versions + filterable sections, with statuses, citation counts and leads), **search** and **About** (how to use it, what each status means, where the data comes from).
+- **Display-only tidying** (`web/lib/text.ts`, `pnpm check`): subsections and paragraphs split back onto their own lines, amendment notes (`[Act No. … ]`) set apart, extraction spacing fixed (`( Cap. 245 )`), shouting case names title-cased, answer-key locators in words. Stored text is never changed (embeddings and citation offsets depend on it). Court quotes get spacing fixes only.
+- Not built yet: the review queue for extracted events (needs a write endpoint) and the filing checker.
 
 ## 8. Glossary
 

@@ -5,6 +5,7 @@
 import csv
 from pathlib import Path
 
+from .status import with_leads
 from .status_ke import resolve
 
 COURT = {"kesc": "Supreme Court", "keca": "Court of Appeal", "kehc": "High Court"}
@@ -46,9 +47,16 @@ def main():
             fails.append((suffix, got))
     if resolve([])["status"] != "in force; no recorded court rulings":
         fails.append(("no events",))
+    # an unverified lead (a later Supreme Court "upheld") must not displace Muruatetu or change the status
+    ev = [dict(e, verified=True) for e in events_for("sec_204")]
+    lead = dict(ev[0], event_id=99, event_key="LEAD", event_type="upheld", court="Supreme Court",
+                effective_date="2030-01-01", verified=False, affects_event_id=None)
+    led = with_leads(resolve, ev + [lead])
+    if led["status"] != "limited by a court" or states(led) != {**states(s204), "LEAD": "in effect"}:
+        fails.append(("lead changed status", led["status"], states(led)))
     for f in fails:
         print("FAIL", *f)
-    print(f"{7 - len(fails)}/7 passed")
+    print(f"{8 - len(fails)}/8 passed")
     raise SystemExit(1 if fails else 0)
 
 

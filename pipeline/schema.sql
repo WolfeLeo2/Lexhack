@@ -109,3 +109,6 @@ ALTER TABLE citation_events ADD COLUMN IF NOT EXISTS check_verdict TEXT;   -- 'p
 ALTER TABLE citation_events ADD COLUMN IF NOT EXISTS check_reason TEXT;
 ALTER TABLE citation_events ADD COLUMN IF NOT EXISTS check_version INT;
 ALTER TABLE event_runs ADD COLUMN IF NOT EXISTS prompt_key TEXT;   -- classify_events --redo skips a judgment whose prompt is unchanged
+
+-- A judgment Kenya Law published under more than one ID points at the copy we keep (pipeline/dedupe_judgments.py).
+ALTER TABLE judgments ADD COLUMN IF NOT EXISTS duplicate_of TEXT REFERENCES judgments(judgment_id);

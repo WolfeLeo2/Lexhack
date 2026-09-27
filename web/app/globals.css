@@ -1,0 +1,159 @@
+@import "tailwindcss";
+
+/* Same paper, ink and court colours as the edu site (edu/src/index.css): one product, two doors. */
+@theme {
+  --color-paper: #f1f3ee;
+  --color-panel: #e6eae2;
+  --color-ink: #18212b;
+  --color-ink-2: #4d5a66;
+  --color-rule: #c9d0c6;
+  --color-gazette: #1e5b47;
+  --color-mark: #f5d76e;
+  --color-seal: #8e2c48;
+  --color-note: #fbf7e4;      /* the court's note pinned to the page */
+  --color-note-rule: #e5dcb2;
+
+  --font-sans: var(--font-plex), ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-newsreader), Georgia, serif;
+}
+
+/* Dark: the same inks on a night-time page. Highlighter becomes a translucent wash so light text stays readable. */
+html {
+  --hl: var(--color-mark);
+  --grain: rgba(24, 33, 43, 0.045);
+  color-scheme: light;
+}
+html[data-theme='dark'] {
+  --color-paper: #141a20;
+  --color-panel: #1c242c;
+  --color-ink: #e7eae4;
+  --color-ink-2: #a6b0b8;
+  --color-rule: #33404a;
+  --color-gazette: #7fcaa9;
+  --color-seal: #ea8ca7;
+  --color-note: #262416;
+  --color-note-rule: #4a4428;
+  --hl: rgba(245, 215, 110, 0.28);
+  --grain: rgba(255, 255, 255, 0.03);
+  color-scheme: dark;
+}
+
+body {
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 1.0625rem;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--hl);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-gazette);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* The law's own words: serif. The court's words: serif italic on highlighter. Our words: sans. */
+.statute {
+  font-family: var(--font-serif);
+  font-optical-sizing: auto;
+  line-height: 1.5;
+}
+
+.court {
+  font-family: var(--font-serif);
+  font-style: italic;
+  line-height: 1.55;
+}
+
+.hl {
+  background: linear-gradient(transparent 12%, var(--hl) 12%, var(--hl) 88%, transparent 88%);
+  padding: 0 0.1em;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
+a.link {
+  color: var(--color-gazette);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+}
+
+.paper-grain {
+  background-image: radial-gradient(var(--grain) 1px, transparent 1px);
+  background-size: 3px 3px;
+}
+
+/* The home page's one orchestrated moment: the status is stamped on the Act's page, then the court's note is pinned. */
+.pinned-note {
+  animation: pin 0.6s 0.65s both cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes strike {
+  to { stroke-dashoffset: 0; }
+}
+@keyframes pin {
+  from { opacity: 0; transform: translateY(12px) rotate(1.4deg); }
+  to { opacity: 1; transform: translateY(0) rotate(-1.2deg); }
+}
+
+/* The section page's moment: the status is stamped, then the rulings appear in date order. Pure CSS, so the page
+   is complete even before (or without) JavaScript. */
+.stamp {
+  transform: rotate(-1.5deg);
+  animation: stamp 0.45s 0.2s both cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.lineage-node {
+  transform-box: view-box;
+  animation: node-in 0.4s both cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.lineage-edge {
+  stroke-dasharray: 1;
+  animation: strike 0.6s both cubic-bezier(0.65, 0, 0.35, 1);
+  stroke-dashoffset: 1;
+  transition: opacity 0.2s;
+}
+.lineage-edge-dashed {
+  /* displaced: the dash pattern can't also carry the draw-on, so these fade in instead */
+  animation: fade-in 0.6s both;
+  transition: opacity 0.2s;
+}
+@keyframes stamp {
+  from { opacity: 0; transform: scale(1.4) rotate(-6deg); }
+  to { opacity: 1; transform: scale(1) rotate(-1.5deg); }
+}
+@keyframes node-in {
+  from { opacity: 0; transform: scale(0.4); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+}
+
+.theme-icon {
+  animation: turn 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes turn {
+  from { opacity: 0; transform: rotate(-60deg) scale(0.7); }
+}
+
+/* Book spines on the shelf lean out when pointed at. */
+.spine {
+  transform-box: fill-box;
+  transform-origin: bottom left;
+  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+}
+a:hover > .spine,
+a:focus-visible > .spine {
+  transform: rotate(-4deg) translateY(-4px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pinned-note { animation: none; transform: rotate(-1.2deg); }
+  .spine { transition: none; }
+  .theme-icon, .stamp, .lineage-node, .lineage-edge, .lineage-edge-dashed { animation: none; stroke-dashoffset: 0; }
+}

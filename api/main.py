@@ -76,7 +76,8 @@ class Event(BaseModel):
     title: str | None              # case name
     neutral_citation: str | None
     source_url: str | None         # judgment on Kenya Law
-    verified: bool                 # False = extracted by the pipeline, not yet checked by a person
+    verified: bool                 # False = extracted by the pipeline and not yet reviewed
+    verified_by: str | None        # 'human:…' = checked by a person; 'agent:…' = checked by an AI reviewer
     state: str                     # 'in effect' | 'reversed on appeal' | 'displaced by a later ruling'
     superseded_by: int | None      # event_id of the event that reversed or displaced this one
 
@@ -86,12 +87,69 @@ class ProvisionStatus(BaseModel):
     status: str                    # e.g. 'limited by a court' — always read together with summary_events
     summary_events: list[Event]    # the events that produce the status, court's words included
     history: list[Event]           # every event, oldest first
+    cited_by: int                  # distinct judgments we hold that cite this section
+    lead_count: int                # unverified leads not shown unless include_unverified=true
     disclaimer: str = DISCLAIMER
 
 
-class SearchHit(ProvisionRef):
+class Counts(BaseModel):
+    cited_by: int = 0
+    lead_count: int = 0
+
+
+class ActSection(ProvisionRef, Counts):
+    status: str                    # from verified events only, like search
+
+
+class SearchHit(ProvisionRef, Counts):
     status: str
     snippet: str
+
+
+class CitingJudgment(BaseModel):
+    judgment_id: str
+    title: str
+    court: str | None
+    neutral_citation: str | None
+    decision_date: str | None
+    source_url: str | None
+    mentions: int                  # how often this judgment cites the section
+    raw_text: str                  # the first citation as written, e.g. 'section 204 of the Penal Code'
+    paragraph: str | None          # where that first citation is
+
+
+class Citations(BaseModel):
+    total: int                     # distinct citing judgments
+    judgments: list[CitingJudgment]  # highest court first, then newest
+
+
+class Stats(BaseModel):
+    acts: int
+    sections: int
+    judgments: int
+    cited_sections: int            # sections cited by at least one judgment
+    verified_events: int           # by a person (answer key) or an AI reviewer
+    verified_sections: int
+    person_events: int             # verified_by 'human:…'
+    agent_events: int              # verified_by 'agent:…' (the answer key's agent audit, and review_events)
+    leads: int                     # extracted events the checker didn't fail
+    lead_sections: int
+
+
+def counts(conn, provision_ids):
+    """{provision_id: Counts}. Leads are counted as load_events shows them: one per judgment and event type, and not
+    when a verified event already records the same ruling."""
+    rows = conn.execute("""
+        SELECT p,
+               (SELECT count(DISTINCT coalesce(j.duplicate_of, m.judgment_id)) FROM citation_mentions m
+                  JOIN judgments j USING (judgment_id) WHERE m.provision_id = p),
+               (SELECT count(*) FROM (SELECT DISTINCT e.judgment_id, e.event_type FROM citation_events e
+                  JOIN judgments dj ON dj.judgment_id = e.judgment_id AND dj.duplicate_of IS NULL
+                  WHERE e.provision_id = p AND NOT e.verified AND e.check_verdict IS DISTINCT FROM 'fail'
+                    AND NOT EXISTS (SELECT 1 FROM citation_events v WHERE v.provision_id = p AND v.verified
+                                    AND v.judgment_id IS NOT DISTINCT FROM e.judgment_id AND v.event_type = e.event_type)) x)
+        FROM unnest(%s::text[]) p""", (list(provision_ids),)).fetchall()
+    return {p: Counts(cited_by=c, lead_count=n) for p, c, n in rows}
 
 
 def ref_row(r):
@@ -106,15 +164,53 @@ def acts():
     return [Act(act_id=a, title=t, cap_number=c, versions=v) for a, t, c, v in rows]
 
 
-@app.get("/api/acts/{act_id:path}/provisions", response_model=list[ProvisionRef])
+@app.get("/api/acts/{act_id:path}/provisions", response_model=list[ActSection])
 def act_provisions(act_id: str):
     with db() as conn:
         rows = conn.execute("""SELECT p.provision_id, p.act_id, a.title, p.number, p.heading FROM provisions p
                                JOIN acts a USING (act_id) WHERE p.act_id = %s""", (act_id,)).fetchall()
-    if not rows:
-        raise HTTPException(404, f"no act {act_id}")
+        if not rows:
+            raise HTTPException(404, f"no act {act_id}")
+        status = statuses(conn, [r[0] for r in rows])
+        n = counts(conn, [r[0] for r in rows])
     key = lambda r: (int("".join(c for c in (r[3] or "0") if c.isdigit()) or 0), r[3] or "")
-    return [ProvisionRef(**ref_row(r)) for r in sorted(rows, key=key)]
+    return [ActSection(**ref_row(r), **n[r[0]].model_dump(), status=status[r[0]]) for r in sorted(rows, key=key)]
+
+
+@app.get("/api/stats", response_model=Stats)
+def stats():
+    with db() as conn:
+        row = conn.execute("""WITH live_events AS (SELECT e.* FROM citation_events e LEFT JOIN judgments j USING (judgment_id)
+                                                  WHERE j.duplicate_of IS NULL)
+            SELECT (SELECT count(*) FROM acts), (SELECT count(*) FROM provisions),
+            (SELECT count(*) FROM judgments WHERE duplicate_of IS NULL),
+            (SELECT count(DISTINCT provision_id) FROM citation_mentions WHERE provision_id IS NOT NULL),
+            (SELECT count(*) FROM live_events WHERE verified),
+            (SELECT count(DISTINCT provision_id) FROM live_events WHERE verified),
+            (SELECT count(*) FROM live_events WHERE verified AND verified_by LIKE 'human:%%'),
+            (SELECT count(*) FROM live_events WHERE verified AND verified_by LIKE 'agent:%%'),
+            (SELECT count(*) FROM live_events WHERE NOT verified AND check_verdict IS DISTINCT FROM 'fail'),
+            (SELECT count(DISTINCT provision_id) FROM live_events WHERE NOT verified AND check_verdict IS DISTINCT FROM 'fail')
+        """).fetchone()
+    return Stats(**dict(zip(Stats.model_fields, row)))
+
+
+# Registered before /api/provisions/{id}: its :path converter would otherwise swallow '/citations'.
+@app.get("/api/provisions/{provision_id:path}/citations", response_model=Citations)
+def citations(provision_id: str, limit: int = Query(20, le=100), offset: int = 0):
+    with db() as conn:
+        total = conn.execute("""SELECT count(DISTINCT m.judgment_id) FROM citation_mentions m JOIN judgments j USING (judgment_id)
+                                WHERE m.provision_id = %s AND j.duplicate_of IS NULL""", (provision_id,)).fetchone()[0]
+        rows = conn.execute("""
+            SELECT j.judgment_id, j.title, j.court, j.neutral_citation, j.decision_date::text, j.source_url, count(*),
+                   (array_agg(m.raw_text ORDER BY m.char_start))[1], (array_agg(m.paragraph ORDER BY m.char_start))[1]
+            FROM citation_mentions m JOIN judgments j USING (judgment_id) WHERE m.provision_id = %s AND j.duplicate_of IS NULL
+            GROUP BY j.judgment_id
+            ORDER BY CASE j.court WHEN 'Supreme Court' THEN 3 WHEN 'Court of Appeal' THEN 2 ELSE 1 END DESC,
+                     j.decision_date DESC NULLS LAST, j.judgment_id
+            LIMIT %s OFFSET %s""", (provision_id, limit, offset)).fetchall()
+    cols = list(CitingJudgment.model_fields)
+    return Citations(total=total, judgments=[CitingJudgment(**dict(zip(cols, r))) for r in rows])
 
 
 @app.get("/api/provisions/{provision_id:path}", response_model=ProvisionStatus)
@@ -130,10 +226,11 @@ def provision(provision_id: str, include_unverified: bool = False):
         if not row:
             raise HTTPException(404, f"no provision {provision_id}")
         res = provision_status(conn, provision_id, include_unverified)
+        n = counts(conn, [provision_id])[provision_id]
     prov = Provision(**ref_row(row[:5]), text=row[5], version_date=row[6], source_url=row[7])
     return ProvisionStatus(provision=prov, status=res["status"],
                            summary_events=[Event(**e) for e in res["summary_events"]],
-                           history=[Event(**e) for e in res["history"]])
+                           history=[Event(**e) for e in res["history"]], **n.model_dump())
 
 
 @functools.lru_cache(maxsize=2048)   # a repeated query skips the ~1 s Gemini call
@@ -167,4 +264,5 @@ def search(q: str = Query(min_length=2), limit: int = Query(10, le=50)):
             JOIN latest l USING (provision_id) ORDER BY f.score DESC LIMIT %(n)s""",
                             {"q": q, "v": vec, "n": limit}).fetchall()
         status = statuses(conn, [r[0] for r in rows])
-    return [SearchHit(**ref_row(r[:5]), snippet=r[5], status=status[r[0]]) for r in rows]
+        n = counts(conn, [r[0] for r in rows])
+    return [SearchHit(**ref_row(r[:5]), **n[r[0]].model_dump(), snippet=r[5], status=status[r[0]]) for r in rows]

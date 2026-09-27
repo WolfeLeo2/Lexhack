@@ -20,13 +20,14 @@ def load_events_many(conn, provision_ids, include_unverified=False):
     checker failed (pipeline/verify_events.py) are never returned."""
     rows = conn.execute("""
         SELECT e.provision_id, e.event_id, e.event_key, e.event_type, e.scope, e.scope_text, e.subsection, e.operative_quote,
-               e.source_paragraph, e.effective_date::text, e.affects_event_id, e.method, e.verified, e.confidence,
+               e.source_paragraph, e.effective_date::text, e.affects_event_id, e.method, e.verified, e.verified_by, e.confidence,
                j.judgment_id, j.title, j.court, j.neutral_citation, j.source_url
         FROM citation_events e LEFT JOIN judgments j USING (judgment_id)
         WHERE e.provision_id = ANY(%s) AND (e.verified OR (%s AND e.check_verdict IS DISTINCT FROM 'fail'))
+          AND j.duplicate_of IS NULL   -- a judgment Kenya Law published twice counts once (pipeline/dedupe_judgments.py)
         ORDER BY e.method = 'manual' DESC, e.event_id""", (list(provision_ids), include_unverified)).fetchall()
     cols = ["event_id", "event_key", "event_type", "scope", "scope_text", "subsection", "operative_quote",
-            "source_paragraph", "effective_date", "affects_event_id", "method", "verified", "confidence",
+            "source_paragraph", "effective_date", "affects_event_id", "method", "verified", "verified_by", "confidence",
             "judgment_id", "title", "court", "neutral_citation", "source_url"]
     seen, out = set(), {}
     for pid, *r in rows:
@@ -38,9 +39,19 @@ def load_events_many(conn, provision_ids, include_unverified=False):
     return out
 
 
+def with_leads(resolve, events):
+    """Status, summary and the states of verified events come from verified events alone; unverified leads are
+    listed in the history with the state they would have, but never change what the verified record says."""
+    res = resolve([e for e in events if e["verified"]])
+    if all(e["verified"] for e in events):
+        return res
+    checked = {e["event_id"]: e for e in res["history"]}
+    return {**res, "history": [checked.get(e["event_id"], e) for e in resolve(events)["history"]]}
+
+
 def provision_status(conn, provision_id, include_unverified=False):
     rules = RULES[provision_id.split("/", 1)[0]]
-    return rules.resolve(load_events(conn, provision_id, include_unverified))
+    return with_leads(rules.resolve, load_events(conn, provision_id, include_unverified))
 
 
 def statuses(conn, provision_ids, include_unverified=False):
