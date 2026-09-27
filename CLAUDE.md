@@ -247,7 +247,7 @@ Known gaps: 286 PDF-only judgments have no text; Archive coverage is ~10% of jud
 
 Blind spots to keep in mind (details in README §9):
 - **One shared Neon branch:** both teammates write to `production`, and pipeline re-runs are destructive. Agree who runs them, or use Neon branches.
-- **Caches are per machine:** `cache/llm/` and `cache/embeddings/` make re-runs free. Copy them between machines, or the API calls are made (and paid for) again.
+- **Data sharing:** `$LEXHACK_DATA` is shared through Cloudflare R2 with `scripts/sync.sh` / `sync.ps1` (pull before work, push after; copies only, never deletes; `raw/frontier.db` only with `--with-frontier`). See README §3.
 - **Neon storage:** 215 MB of ~512 MB used.
 - **Paragraph numbers:** fixed 2026-09-27 ("1.", "[1]", "1)" styles; 19/19 answer-key paragraphs right). To re-derive them without losing LLM rows: `extract_citations --paragraphs-only`. ~23% of mentions have none because the judgment is unnumbered.
 - **Constitution:** "section N of the Constitution" is always treated as the repealed Constitution, so 2010 Schedule sections are misattributed.

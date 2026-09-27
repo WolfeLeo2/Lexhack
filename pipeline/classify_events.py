@@ -21,6 +21,7 @@ import re
 import time
 from pathlib import Path
 
+import psycopg
 import requests
 
 from crawler.config import data_dir, require_env
@@ -29,7 +30,7 @@ from .db import apply_schema, connect
 from .extract_citations import paragraph_at, paragraph_markers
 from .llm_resolve import call
 
-MODEL, PROMPT_VERSION = "deepseek-flash", 5   # "gemini-3.5-flash-lite" also works (via llm_resolve.call)
+MODEL, PROMPT_VERSION = "deepseek-flash", 6   # "gemini-3.5-flash-lite" also works (via llm_resolve.call)
 DEEPSEEK_URL = "https://api.deepseek.com/chat/completions"
 WINDOW, TAIL = 1500, 12_000   # chars kept around each relevant spot, and from the end (the orders)
 GT = Path(__file__).resolve().parent.parent / "ground_truth"
@@ -46,8 +47,10 @@ listed statute sections. Most judgments merely apply or mention sections: then r
 
 Record an event only when this court itself makes a holding or order about a section's validity or meaning:
 - declared_unconstitutional: the court declares the section (or part of it) unconstitutional / invalid / void.
-  A declaration "to the extent that…" is declared_unconstitutional with scope "partial", NOT read_down.
-- read_down: the court does not strike the words but holds they must be read more narrowly to be constitutional
+  A declaration "to the extent that…", or a finding that the section "falls foul of" / "offends" an Article to some
+  extent, is declared_unconstitutional with scope "partial", NOT read_down.
+- read_down: the court does not strike the words but holds they must be read more narrowly SO AS TO BE CONSTITUTIONAL
+  (ordinary statutory construction with no constitutional reason, e.g. "read disjunctively", is "interpreted")
   (e.g. a mandatory sentence "must be interpreted so as not to take away the discretion of the court",
   or "life imprisonment translates to thirty years"). A read_down is always scope "partial"; scope_text is the
   court's words saying how the section must be read.
@@ -65,6 +68,9 @@ Record an event only when this court itself makes a holding or order about a sec
   set aside and the 20-year sentence reinstated", where the Court of Appeal had held the section's minimum sentence
   not binding). If the court also holds the section valid, record upheld as well.
 NOT events — these are the most common mistakes, so check each candidate against them:
+- RESTATING a higher court's ruling or directions ("we are bound by the decision of the Supreme Court", applying
+  the 2021 Muruatetu directions or Republic v Mwangi to the case at hand). This includes the Supreme Court repeating
+  its own earlier directions in a NEW case: only the original case's ruling is the event.
 - FOLLOWING or APPLYING another court's ruling, even when it changes the outcome. A sentencing appeal that re-sentences
   because Muruatetu, Kilwake, Mwangi, Ayako or any other decision says the sentence is discretionary (or mandatory)
   is not an event on the section: the ruling belongs to that other court. Record an event only if THIS court gives
@@ -82,7 +88,8 @@ For each event:
 - operative_quote: the court's own words that make the order or holding, copied EXACTLY, character for character,
   from the judgment (one to three sentences). Prefer the formal order or the "we hold / we declare" sentence.
 - scope: "partial" if the court limits it ("to the extent that…", only one aspect, only a subsection), else "total".
-  For upheld/interpreted: the part the court actually ruled on.
+  For upheld/interpreted: the part the court actually ruled on — if the challenge concerned only one subsection
+  or proviso, scope is "partial" and subsection names it.
 - scope_text: the court's exact limiting words when scope is partial, copied EXACTLY; else "".
 - subsection: e.g. "8(2)" when the holding is limited to a sub-provision, else "".
 - confidence: high if the words are an explicit order or holding, medium if clearly implied, low otherwise."""
@@ -185,14 +192,17 @@ def norm(s):
     return re.sub(r"\s+", " ", s or "").strip()
 
 
+QUOTES = str.maketrans("‘’‛“”„«»–—", "''\'\"\"\"\"\"--")   # curly vs straight quotes, dashes: one char each, so offsets hold
+
+
 def locate(quote, text):
     """(start, end) in norm(text) of the LAST occurrence of quote, ignoring whitespace entirely (models tidy spacing:
     "(a)- (d )" comes back as "(a)-(d )"), or None. Last, because orders restate earlier summaries of the same words.
     Callers store text[start:end], the source's own characters, so stored quotes stay verbatim."""
     t = norm(text)
     keep = [i for i, ch in enumerate(t) if not ch.isspace()]
-    q = re.sub(r"\s+", "", quote or "")
-    at = "".join(t[i] for i in keep).rfind(q) if q else -1
+    q = re.sub(r"\s+", "", quote or "").translate(QUOTES)
+    at = "".join(t[i] for i in keep).translate(QUOTES).rfind(q) if q else -1
     return (keep[at], keep[at + len(q) - 1] + 1) if at >= 0 else None
 
 
@@ -284,19 +294,29 @@ def main():
     stats = collections.Counter()
     try:
         for n, row in enumerate(rows, 1):
-            events = classify(row, labels, api_key, cache, stats)
-            with connect() as conn, conn.transaction():
-                conn.execute("DELETE FROM citation_events WHERE method = 'extracted' AND judgment_id = %s", (row[0],))
-                conn.cursor().executemany("""INSERT INTO citation_events (provision_id, judgment_id, event_type, scope,
-                    scope_text, subsection, operative_quote, source_paragraph, effective_date, confidence, notes, method)
-                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'extracted')""", events)
-                conn.execute("""INSERT INTO event_runs (judgment_id, model, prompt_version, events) VALUES (%s,%s,%s,%s)
-                    ON CONFLICT (judgment_id) DO UPDATE SET model=EXCLUDED.model, prompt_version=EXCLUDED.prompt_version,
-                    events=EXCLUDED.events, run_at=now()""", (row[0], MODEL, PROMPT_VERSION, len(events)))
+            try:
+                events = classify(row, labels, api_key, cache, stats)
+                write(row, events)
+            except psycopg.OperationalError as e:   # a network drop: skip it; a re-run picks the judgment up again
+                stats["skipped_db_error"] += 1
+                print(f"  database error on {row[0]} ({str(e).splitlines()[0][:80]}); skipped", flush=True)
+                time.sleep(10)
             if n % 25 == 0 or n == len(rows):
                 print(f"  {n}/{len(rows)} judgments, {dict(stats)}", flush=True)
     finally:
         print(f"done: {dict(stats)}")
+
+
+def write(row, events):
+    """Replace this judgment's extracted events and record the run, in one transaction."""
+    with connect() as conn, conn.transaction():
+        conn.execute("DELETE FROM citation_events WHERE method = 'extracted' AND judgment_id = %s", (row[0],))
+        conn.cursor().executemany("""INSERT INTO citation_events (provision_id, judgment_id, event_type, scope,
+            scope_text, subsection, operative_quote, source_paragraph, effective_date, confidence, notes, method)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'extracted')""", events)
+        conn.execute("""INSERT INTO event_runs (judgment_id, model, prompt_version, events) VALUES (%s,%s,%s,%s)
+            ON CONFLICT (judgment_id) DO UPDATE SET model=EXCLUDED.model, prompt_version=EXCLUDED.prompt_version,
+            events=EXCLUDED.events, run_at=now()""", (row[0], MODEL, PROMPT_VERSION, len(events)))
 
 
 if __name__ == "__main__":

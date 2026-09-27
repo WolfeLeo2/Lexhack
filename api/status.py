@@ -12,29 +12,40 @@ RULES = {"ke": status_ke}
 def load_events(conn, provision_id, include_unverified=False):
     """Manual (answer-key) and extracted events. When both record the same ruling (same judgment and type), the
     verified one wins. Extracted rows are unverified and say so."""
+    return load_events_many(conn, [provision_id], include_unverified).get(provision_id, [])
+
+
+def load_events_many(conn, provision_ids, include_unverified=False):
+    """{provision_id: events} for many provisions in ONE query (search results)."""
     rows = conn.execute("""
-        SELECT e.event_id, e.event_key, e.event_type, e.scope, e.scope_text, e.subsection, e.operative_quote,
+        SELECT e.provision_id, e.event_id, e.event_key, e.event_type, e.scope, e.scope_text, e.subsection, e.operative_quote,
                e.source_paragraph, e.effective_date::text, e.affects_event_id, e.method, e.verified, e.confidence,
                j.judgment_id, j.title, j.court, j.neutral_citation, j.source_url
         FROM citation_events e LEFT JOIN judgments j USING (judgment_id)
-        WHERE e.provision_id = %s AND (e.verified OR %s)
-        ORDER BY e.method = 'manual' DESC, e.event_id""", (provision_id, include_unverified)).fetchall()
+        WHERE e.provision_id = ANY(%s) AND (e.verified OR %s)
+        ORDER BY e.method = 'manual' DESC, e.event_id""", (list(provision_ids), include_unverified)).fetchall()
     cols = ["event_id", "event_key", "event_type", "scope", "scope_text", "subsection", "operative_quote",
             "source_paragraph", "effective_date", "affects_event_id", "method", "verified", "confidence",
             "judgment_id", "title", "court", "neutral_citation", "source_url"]
-    seen, out = set(), []
-    for r in rows:
+    seen, out = set(), {}
+    for pid, *r in rows:
         e = dict(zip(cols, r))
-        if (e["judgment_id"], e["event_type"]) in seen:
+        if (pid, e["judgment_id"], e["event_type"]) in seen:
             continue
-        seen.add((e["judgment_id"], e["event_type"]))
-        out.append(e)
+        seen.add((pid, e["judgment_id"], e["event_type"]))
+        out.setdefault(pid, []).append(e)
     return out
 
 
 def provision_status(conn, provision_id, include_unverified=False):
     rules = RULES[provision_id.split("/", 1)[0]]
     return rules.resolve(load_events(conn, provision_id, include_unverified))
+
+
+def statuses(conn, provision_ids, include_unverified=False):
+    """{provision_id: status label} for many provisions, one query."""
+    events = load_events_many(conn, provision_ids, include_unverified)
+    return {p: RULES[p.split("/", 1)[0]].resolve(events.get(p, []))["status"] for p in provision_ids}
 
 
 if __name__ == "__main__":

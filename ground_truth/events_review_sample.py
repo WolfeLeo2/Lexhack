@@ -2,6 +2,7 @@
 
   uv run python -m ground_truth.events_review_sample            # round 1 (seed 7): prompt v4
   uv run python -m ground_truth.events_review_sample --round 2  # round 2 (seed 11): fresh judgments, prompt v5
+  uv run python -m ground_truth.events_review_sample --round 3  # round 3 (seed 13): fresh judgments, prompt v6
 
 Excludes the answer-key judgments (the prompt was tuned on them), so the review measures precision on unseen data.
 """
@@ -14,16 +15,18 @@ from pipeline.db import connect
 
 HERE = Path(__file__).parent
 N = 40
-ROUNDS = {1: ("", 7), 2: ("_r2", 11)}   # round -> (file suffix, seed)
+ROUNDS = {1: ("", 7), 2: ("_r2", 11), 3: ("_r3", 13)}   # round -> (file suffix, seed); round N = prompt v(N+3)
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--round", type=int, default=1, choices=ROUNDS)
-    suffix, seed = ROUNDS[ap.parse_args().round]
+    rnd = ap.parse_args().round
+    suffix, seed = ROUNDS[rnd]
     key = {r["judgment_id"] for f in ("events.csv", "negatives.csv") for r in csv.DictReader(open(HERE / f, encoding="utf-8"))}
-    if suffix:   # later rounds never reuse a judgment an earlier round reviewed
-        key |= {r["judgment_id"] for r in csv.DictReader(open(HERE / "events_review_sample.csv", encoding="utf-8"))}
+    for earlier in range(1, rnd):   # later rounds never reuse a judgment an earlier round reviewed
+        key |= {r["judgment_id"] for r in csv.DictReader(open(HERE / f"events_review_sample{ROUNDS[earlier][0]}.csv",
+                                                               encoding="utf-8"))}
     with connect() as conn:
         rows = conn.execute("""
             SELECT e.event_id, e.judgment_id, j.title, j.court, a.title || ' s.' || p.number || ' (' || coalesce(p.heading, '') || ')',

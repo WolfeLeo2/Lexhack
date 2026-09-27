@@ -5,17 +5,19 @@
 Every answer reports what the sources say, with the court's verbatim words and a link. Never legal advice, never a
 bare yes/no.
 """
+import functools
 import os
 from contextlib import contextmanager
 
-import psycopg
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 import crawler.config  # noqa: F401  (loads .env)
 
-from .status import provision_status
+from psycopg_pool import ConnectionPool
+
+from .status import provision_status, statuses
 
 DISCLAIMER = "LexHack reports what published sources say. It is not legal advice."
 app = FastAPI(title="LexHack citator API", version="0.1")
@@ -23,10 +25,20 @@ app.add_middleware(CORSMiddleware, allow_origins=os.environ.get("CORS_ORIGINS", 
                    allow_methods=["GET"], allow_headers=["*"])
 
 
+# Opening a connection costs ~1 s from Kenya to Neon (Frankfurt); a pool keeps a few open. Pooled URL (PgBouncer).
+POOL = ConnectionPool(os.environ["DATABASE_URL"], min_size=1, max_size=5, open=False,
+                      kwargs={"prepare_threshold": None},   # PgBouncer transaction mode: no prepared statements
+                      check=ConnectionPool.check_connection)  # Neon drops idle connections; re-check before use
+
+
+@app.on_event("startup")
+def _open_pool():
+    POOL.open()
+
+
 @contextmanager
 def db():
-    # ponytail: a connection per request; add psycopg_pool if traffic ever matters
-    with psycopg.connect(os.environ["DATABASE_URL"]) as conn:   # pooled URL for app traffic
+    with POOL.connection() as conn:
         yield conn
 
 
@@ -124,16 +136,20 @@ def provision(provision_id: str, include_unverified: bool = False):
                            history=[Event(**e) for e in res["history"]])
 
 
+@functools.lru_cache(maxsize=2048)   # a repeated query skips the ~1 s Gemini call
+def query_vector(q):
+    from pipeline.embed import embed_batch
+    return str(embed_batch([q], os.environ["GEMINI_API_KEY"], task="RETRIEVAL_QUERY")[0])
+
+
 @app.get("/api/search", response_model=list[SearchHit])
 def search(q: str = Query(min_length=2), limit: int = Query(10, le=50)):
     """Hybrid search over the latest text of every section: Postgres full-text + meaning (pgvector), merged by
     reciprocal rank fusion. Meaning search is skipped if the embedding call fails, so search always answers."""
-    vec = None
     try:
-        from pipeline.embed import embed_batch
-        vec = str(embed_batch([q], os.environ["GEMINI_API_KEY"], task="RETRIEVAL_QUERY")[0])
+        vec = query_vector(q.strip().lower())
     except Exception:   # quota or network: fall back to words only
-        pass
+        vec = None
     with db() as conn:
         rows = conn.execute("""
             WITH latest AS (
@@ -150,4 +166,5 @@ def search(q: str = Query(min_length=2), limit: int = Query(10, le=50)):
             FROM fused f JOIN provisions p USING (provision_id) JOIN acts a USING (act_id)
             JOIN latest l USING (provision_id) ORDER BY f.score DESC LIMIT %(n)s""",
                             {"q": q, "v": vec, "n": limit}).fetchall()
-        return [SearchHit(**ref_row(r[:5]), snippet=r[5], status=provision_status(conn, r[0])["status"]) for r in rows]
+        status = statuses(conn, [r[0] for r in rows])
+    return [SearchHit(**ref_row(r[:5]), snippet=r[5], status=status[r[0]]) for r in rows]

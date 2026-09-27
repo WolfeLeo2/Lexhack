@@ -143,6 +143,25 @@ pkill -TERM -f "crawler.crawl run"                            # stop it (backgro
 
 **On Windows,** set `PYTHONUTF8=1` first (`setx PYTHONUTF8 1`, then open a new terminal). Much of the code reads files without naming an encoding, and Windows would otherwise read them as cp1252 and crash on judgment text. `uv` installs to `C:\Users\<you>\.local\bin`.
 
+### Sharing `$LEXHACK_DATA` between machines (Cloudflare R2)
+
+The data folder (~880 MB: WARCs, parsed JSON, LLM and embedding caches) is shared through a Cloudflare R2 bucket
+(`lexhack-data`, free tier 10 GB, no download fees) with rclone. Each person keeps a normal local copy, so the pipeline
+stays fast; the bucket is the shared master.
+
+```sh
+scripts/sync.sh pull                  # get what the other person added   (Windows: .\scripts\sync.ps1 pull)
+scripts/sync.sh push                  # upload what you added            (Windows: .\scripts\sync.ps1 push)
+scripts/sync.sh push --dry-run        # show what would be copied
+scripts/sync.sh push --with-frontier  # also raw/frontier.db: ONLY the person who crawls
+```
+
+- **Copies only; never deletes** on either side. Files are compared by checksum, so re-parsing doesn't re-upload unchanged files.
+- **Safe both ways:** cache files are named by a hash of their input, so two people's LLM and embedding caches merge without overwriting each other.
+- **Not synced by default:** `raw/frontier.db` (the crawler's live database; one writer only), logs, lock files.
+- **Don't sync while a pipeline job is running.** Pull before starting work; push after a run.
+- **Setup, once per machine:** install rclone and run `rclone config` to add an S3 remote named `lexhack-data`: provider Cloudflare, your R2 **Access Key ID (32 characters)** and **Secret Access Key**, endpoint `https://<account-id>.r2.cloudflarestorage.com` (**without** the bucket name). Check with `rclone lsd lexhack-data:`. A different remote or bucket: set `LEXHACK_R2=remote:bucket`.
+
 ---
 
 ## 4. Phase 1: data acquisition
@@ -597,7 +616,7 @@ For the front end (step 7): the UI can start now against mock JSON shaped like t
 ### Blind spots (noted during step 5)
 
 - **Shared database, destructive re-runs.** Both teammates' `.env` point at the same Neon `production` branch. `extract_citations` deletes and rebuilds *every* mention row, and `llm_resolve` must then be re-run. Agree who runs pipeline steps, or give each person a Neon branch.
-- **The Gemini cache lives on one machine.** `$LEXHACK_DATA/cache/llm/` (and `cache/embeddings/`) are what make re-runs free. If Leo re-runs the LLM pass on his Mac without a copy, the requests are made (and paid for) again. Keep the data folders in sync.
+- **Caches are shared through R2** (§3, `scripts/sync.sh`). Pull before re-running an LLM step, or the calls are made (and paid for) again.
 - **Neon storage:** 215 MB of ~512 MB. Step 6's events are small, but embedding *judgments* (for search over judgments) would not fit on the free plan.
 - **Paragraph numbers (fixed 2026-09-27).** Detection now reads "1.", "[1]" and "1)" numbering, tolerates up to 2 missed "1." numbers, and rejects footnote and element lists (the "[n]"/"n)" styles must run strictly in order, have 5+ paragraphs and span half the judgment). It matches the hand-recorded paragraph for all 19 answer-key events (16/19 before). Applied in place with `extract_citations --paragraphs-only`, which keeps the LLM rows. 23% of mentions still have no paragraph, mostly because the judgment isn't numbered at all (older judgments especially).
 - **Character offsets depend on the parsed text.** `char_start`/`char_end` index the stored JSON's `text`. If `crawler.parse` is re-run and the text changes, re-run extraction.
