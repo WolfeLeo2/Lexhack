@@ -514,7 +514,11 @@ What it gets wrong: "sections 25 A (1)" (a space inside the number); a list endi
 2. **`reversed_on_appeal`: 0 of 5 right.** Every ordinary "appeal allowed / sentence set aside" was labelled a reversal.
 3. **Generic orders** ("all other findings are upheld") read as upholding a section. In *CORD* (Evidence Act s.20A) this inverts the real outcome.
 
-Until a fixed prompt is re-run and re-scored on a fresh sample, **extracted events must be treated as unverified leads, not status.**
+**Prompt v5 (2026-09-27)** adds explicit rules for those three patterns. The answer key still scores 18/19 found, 18/18 right type, 0/6 false alarms. The full re-run left 189 events in 122 judgments (read_down 68 → 16, reversed_on_appeal 15 → 6).
+
+**Round 2 (fresh sample: seed 11, 40 events from judgments round 1 never saw; `eval_events_review --round 2`): 28 of 36 agreed events right, about 78%** (70–78% counting the 4 split cases either way). Remaining errors: courts restating the *Muruatetu* directions or SC *Mwangi* without reasoning of their own, recorded as upheld/interpreted (6); two wrong types; `upheld` scope defaulting to total when one subsection was argued. Also, one judgment (*Kahinga*, Petition 618 of 2010) exists under two judgment IDs, so its events are double-counted.
+
+**How they're used:** the API returns only verified events by default (`include_unverified=false`). Extracted events are machine-found leads, shown as unverified, never as a section's status.
 
 **DeepSeek:** its JSON mode doesn't enforce a schema, so every answer is checked in code (section must be one the judgment cites; type, scope and confidence must be allowed values). Labels without the "(heading)" are accepted when unambiguous. Key: `DEEPSEEK_API_KEY` in `.env`. The full run (2026-09-27): 2,051 judgments in ~37 min with 8 workers (`--shard i/8`; finished judgments are skipped on re-run), 271 events in 196 judgments; about $3–4 off-peak.
 

@@ -9,7 +9,7 @@ from . import status_ke
 RULES = {"ke": status_ke}
 
 
-def load_events(conn, provision_id, include_unverified=True):
+def load_events(conn, provision_id, include_unverified=False):
     """Manual (answer-key) and extracted events. When both record the same ruling (same judgment and type), the
     verified one wins. Extracted rows are unverified and say so."""
     rows = conn.execute("""
@@ -32,7 +32,7 @@ def load_events(conn, provision_id, include_unverified=True):
     return out
 
 
-def provision_status(conn, provision_id, include_unverified=True):
+def provision_status(conn, provision_id, include_unverified=False):
     rules = RULES[provision_id.split("/", 1)[0]]
     return rules.resolve(load_events(conn, provision_id, include_unverified))
 

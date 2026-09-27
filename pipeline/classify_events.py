@@ -29,7 +29,7 @@ from .db import apply_schema, connect
 from .extract_citations import paragraph_at, paragraph_markers
 from .llm_resolve import call
 
-MODEL, PROMPT_VERSION = "deepseek-flash", 4   # "gemini-3.5-flash-lite" also works (via llm_resolve.call)
+MODEL, PROMPT_VERSION = "deepseek-flash", 5   # "gemini-3.5-flash-lite" also works (via llm_resolve.call)
 DEEPSEEK_URL = "https://api.deepseek.com/chat/completions"
 WINDOW, TAIL = 1500, 12_000   # chars kept around each relevant spot, and from the end (the orders)
 GT = Path(__file__).resolve().parent.parent / "ground_truth"
@@ -57,12 +57,22 @@ Record an event only when this court itself makes a holding or order about a sec
   of unconstitutionality of the impugned sections are without merit").
 - interpreted: the court authoritatively settles what the section, or an earlier ruling on it, means or covers,
   without changing its validity (e.g. further directions limiting an earlier ruling).
-- reversed_on_appeal: this court, on appeal, sets aside a lower court's decision that had declared, read down or
-  otherwise ruled on the section. Put the lower court's case (name, case number, date) in appeal_from. Record it
+- reversed_on_appeal: this court, on appeal, sets aside a lower court's decision that had ITSELF declared the section
+  unconstitutional, read it down, or ruled on its meaning. An ordinary appeal outcome ("appeal allowed", "conviction
+  quashed", "sentence set aside", "award reduced") is NOT a reversal unless the lower court's ruling on the section's
+  validity or meaning is what is set aside. Put the lower court's case (name, case number, date) in appeal_from. Record it
   on that section even when the order itself doesn't name the section (e.g. "the judgment of the Court of Appeal is
   set aside and the 20-year sentence reinstated", where the Court of Appeal had held the section's minimum sentence
   not binding). If the court also holds the section valid, record upheld as well.
-NOT events: convicting or sentencing under a section; quoting or following another court's ruling without making
+NOT events — these are the most common mistakes, so check each candidate against them:
+- FOLLOWING or APPLYING another court's ruling, even when it changes the outcome. A sentencing appeal that re-sentences
+  because Muruatetu, Kilwake, Mwangi, Ayako or any other decision says the sentence is discretionary (or mandatory)
+  is not an event on the section: the ruling belongs to that other court. Record an event only if THIS court gives
+  its own reasoned holding on the section's validity or meaning, beyond citing and applying the earlier case.
+- Generic appellate orders ("all the other findings of the trial court are upheld", "the judgment is affirmed"):
+  never an "upheld" event on a section, unless the court itself decided the section's constitutionality.
+- A section that is only quoted, recited or used as the basis of a charge, claim or award.
+Also not events: convicting or sentencing under a section; quoting or following another court's ruling without making
 its own; reciting a party's argument; the court's reasoning that ends in no holding on the section; describing what
 an earlier ruling in a DIFFERENT case did or did not cover (e.g. "Muruatetu only considered section 204"). The
 exception is further directions in the SAME case, which are "interpreted" events on the sections they limit to.

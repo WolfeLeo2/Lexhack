@@ -29,9 +29,11 @@ def load(name):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--resolved")
+    ap.add_argument("--round", type=int, default=1)
     args = ap.parse_args()
-    sample = load("events_review_sample.csv")
-    a, b = load("events_review_A.csv"), load("events_review_B.csv")
+    sfx = "" if args.round == 1 else f"_r{args.round}"
+    sample = load(f"events_review_sample{sfx}.csv")
+    a, b = load(f"events_review{sfx}_A.csv"), load(f"events_review{sfx}_B.csv")
     res = load(args.resolved) if args.resolved else {}
     final, split, quotes = collections.Counter(), [], collections.Counter()
     for eid, e in sample.items():

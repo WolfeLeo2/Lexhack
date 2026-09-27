@@ -106,7 +106,9 @@ def act_provisions(act_id: str):
 
 
 @app.get("/api/provisions/{provision_id:path}", response_model=ProvisionStatus)
-def provision(provision_id: str, include_unverified: bool = True):
+def provision(provision_id: str, include_unverified: bool = False):
+    """include_unverified=true adds machine-extracted events (verified: false). Blind review measured their precision at
+    ~53% (README §7b), so they're off by default and must be shown as unverified leads, never as status."""
     with db() as conn:
         row = conn.execute("""
             SELECT p.provision_id, p.act_id, a.title, p.number, p.heading, t.text, v.version_date::text, v.source_url
