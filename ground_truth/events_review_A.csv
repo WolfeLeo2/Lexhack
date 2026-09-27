@@ -1,0 +1,41 @@
+event_id,is_event,correct_type,section_right,scope_right,quote_operative,note
+215,yes,interpreted,yes,yes,yes,No paras; CA holds s.200(3) mandatory and non-compliance a nullity: 'a failure to comply denies him the jurisdiction to handle the case'
+217,yes,declared_unconstitutional,no,yes,yes,"No paras; holding is on First Schedule Clause 3 (reached via s.48), not s.48 itself: 'provisions of Clause 3 of the first schedule ... were unconstitutional'; already amended by Act 7 of 2007"
+218,no,none,yes,na,no,No paras; conviction set aside for retrospective charge under SOA (not a holding on s.8): 'substitute therefor conviction under section 145(1) of the Penal Code'
+220,yes,upheld,yes,no,yes,"Final para; challenge to death penalty rejected: 'we have no basis for outlawing it'; ruling bears on death sentence in 296(2) only, so partial/296(2) not total"
+221,no,none,yes,na,no,"Final para; follows Mwaura and reinstates death sentence: 'the Court affirmed that death sentence ... was the only lawful sentence'; sentencing order, not an event on s.296"
+223,no,none,no,na,no,"Final paras; holding is on Broadcasting Regulation 46(3) vires: 'We find that this regulation as well, is properly grounded'; s.46R only background"
+224,no,none,no,na,no,Para 19-21; wrongful-termination finding on facts: 'no justification for additional payment of compensation ... under section 49'; setting aside ELRC judgment is not an event on s.49
+228,no,none,no,na,no,Para 21-24; decided on settlement agreement/discharge: 'the respondent had waived his rights'; s.45 not ruled on
+229,no,none,yes,na,no,Para 17; restates Kittiny: 'As we stated in Wiilam Okungu Kittiny ... can be extended to cover ... 296(2)'; applies prior ruling to resentence
+230,yes,read_down,yes,yes,yes,"Para 31/33; CA's own finding s.8 mandatory life 'too should be considered unconstitutional on the same basis', sentence substituted; borderline with declared_unconstitutional (cf. E11 read_down)"
+237,yes,upheld,yes,yes,no,Para 9; own holding is 'the main ground of appeal - the unconstitutionality of Section 204 ... on the death penalty fails'; quote only characterises SC affirming Chemitei J
+240,no,none,yes,na,no,"Para 24-25; follows Ochieng/Injiri: 'persuaded by the decisions of this Court in Christopher Ochieng'; resentencing, not reversal of any s.8 event"
+244,yes,interpreted,yes,yes,yes,"Para 24; 'the wording of section 8(2) ... does not prescribe life imprisonment as the mandatory sentence' (court construes 'is liable to', para 21-22)"
+260,no,none,yes,na,no,Para 15; applies Ayako: 'In accordance with our recent decision in Evans Nyamari Ayako v R (supra) we translate the life sentence'
+262,yes,upheld,yes,yes,yes,"Para 27(a), 30-32; issue 'Whether Section 8(1) and (3) of the SOA are unconstitutional' rejected: 'failed to demonstrate that her rights ... were violated' (challenge covers 8(1) and 8(3))"
+263,yes,interpreted,yes,yes,yes,Para 13; 'couched in a manner which preserves the discretion of the trial court to impose any sentence between ten years and life'
+267,no,none,yes,na,no,Para 15-16; applies SC Mwangi: 'that wave has since died following the Supreme Court's decision in Republic v Mwangi'
+288,no,none,yes,na,no,"Para 163 order 3 is a generic affirmance; HC (2015) had DECLARED s.20A unconstitutional (HC final order ix), so 'upheld' inverts the effect; CA made no s.20A holding"
+299,no,none,yes,na,no,Para 30-33; applies Kittiny/'current jurisprudence on sentencing' to resentence to 25 years
+307,no,none,yes,na,no,Para 13-14; applies Muruatetu II and SC Mwangi: 'Our hands in the matter are bound'
+313,no,none,yes,na,no,"Para 20; conclusion drawn from Muruatetu 2021 directions: 'Therefore, the mandatory death sentence prescribed by Section 296(2) ... is lawful sentence'; no independent constitutional ruling"
+314,no,none,yes,na,no,Para 19-23; constitutional point refused as new on second appeal ('not allowed in law to raise the issue for the first time'); applies SC Mwangi; quote splices paras 22-23
+317,yes,interpreted,yes,yes,yes,Para 14-15; 'section 333(2) of the Criminal Procedure Code is specifically intended for application during the initial sentencing stage'
+335,yes,upheld,yes,yes,yes,"Para 99-101; ss.8(1),11(1) challenged as to consensual acts between minors: 'The law which seeks to offer them such protection ... is not unconstitutional'; petition dismissed"
+343,yes,read_down,yes,yes,yes,Issues (iv)-(v) paras unnumbered; 'it is not mandatory for the courts to pass a death sentence against persons charged with capital offences' (s.204 expressly challenged); death penalty per se upheld
+347,yes,declared_unconstitutional,yes,yes,yes,Para 169-170(i); 'Sections 43-61A of the Criminal Procedure Code are unconstitutional' (s.46 within range)
+348,yes,declared_unconstitutional,yes,yes,yes,Para 169-170(i); 'Sections 43-61A ... are unconstitutional' (s.47 within range)
+350,yes,declared_unconstitutional,yes,yes,yes,Para 169-170(i); 'Sections 43-61A ... are unconstitutional' (s.53 within range)
+353,yes,declared_unconstitutional,yes,yes,yes,Para 169-170(i); 'Sections 43-61A ... are unconstitutional' (s.58 within range)
+355,yes,interpreted,yes,yes,yes,"Para 11; '""Any criminal proceedings"" in my view includes interlocutory proceedings'"
+366,yes,upheld,yes,yes,yes,Para 378; final order (x): 'Section 29 of SLAA which introduced Section 59A ... is constitutional'
+367,yes,upheld,yes,yes,yes,Para 383; final order (xi): 'Section 31 of SLAA which introduced Section 78A into Evidence Act is Constitutional'
+372,no,none,yes,na,no,"Para 31-32; summary of Muruatetu/Kittiny: 'The law of the land as it stands today, therefore...' then resentences"
+416,no,none,yes,na,no,Para 29-30; quotes Lijodi/Kilwake then exercises discretion: 'I find it appropriate to depart from the sentencing of the trial court'
+417,yes,declared_unconstitutional,yes,yes,yes,Para 87; order 99(1) 'Section 46A i & j and 46H(1) of the Kenya Information and Communications Act is unconstitutional'
+423,yes,declared_unconstitutional,yes,yes,yes,"Final orders; s.84 Finance Act 2023 'unconstitutional, null and void'; s.84 'add[ed] sections 31B and 31C to the Employment Act' (indirect mapping)"
+424,yes,read_down,yes,yes,yes,Para 46-47; 'I interpret the section to prescribe life sentence as the maximum sentence' (8(2) inconsistent 'to the extent that it provides for only a single and mandatory sentence')
+437,yes,declared_unconstitutional,yes,yes,no,Para 39-40; own words 'I find merit in the Petition in so far as the mandatory nature of the death sentence is concerned ... I reiterate those orders'; quoted text is Shaban Salim's order
+443,no,none,yes,na,no,"Para 51-53; 'I agree ... as held by the Supreme Court in ... Muruatetu', follows Kilwake; para 53 '20 year sentence ... was still a legal sentence'; resentencing only"
+445,no,none,yes,na,no,Para 55-60; applies res judicata/issue estoppel to regulation 37 challenge; merely quotes s.7
