@@ -10,10 +10,31 @@ import './globals.css'
 const plex = IBM_Plex_Sans({ subsets: ['latin'], weight: ['400', '500', '600'], variable: '--font-plex' })
 const newsreader = Newsreader({ subsets: ['latin'], style: ['normal', 'italic'], axes: ['opsz'], variable: '--font-newsreader' })
 
+const siteUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL
+  ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+  : process.env.VERCEL_URL
+    ? `https://${process.env.VERCEL_URL}`
+    : 'http://localhost:3000'
+
 export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl),
   title: { default: 'Hakiki: is this section still good law?', template: '%s · Hakiki' },
   description:
     'Hakiki checks Kenyan statutes against the court rulings that limited, upheld or struck them down, in the courts’ own words.',
+  openGraph: {
+    title: 'Hakiki: is this section still good law?',
+    description:
+      'Hakiki checks Kenyan statutes against the court rulings that limited, upheld or struck them down, in the courts’ own words.',
+    siteName: 'Hakiki',
+    locale: 'en_KE',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Hakiki: is this section still good law?',
+    description:
+      'Hakiki checks Kenyan statutes against the court rulings that limited, upheld or struck them down, in the courts’ own words.',
+  },
 }
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
