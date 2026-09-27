@@ -3,7 +3,8 @@
 
   uv run python -m pipeline.classify_events --answer-key   # only the answer-key + negatives judgments (for scoring)
   uv run python -m pipeline.classify_events --limit 100    # the first 100 candidates
-  uv run python -m pipeline.classify_events                # every candidate judgment
+  uv run python -m pipeline.classify_events                # every candidate judgment not yet classified
+  for i in 0 1 2 3 4 5 6 7; do uv run python -m pipeline.classify_events --shard $i/8 & done   # 8 in parallel
 
 Candidates: judgments that cite one of our sections (not Constitution articles: those aren't struck down) and contain
 ruling language anywhere (TRIGGER). The model sees the full text and may only name sections the judgment cites (a JSON
@@ -245,7 +246,10 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--answer-key", action="store_true", help="only the judgments in events.csv and negatives.csv")
     ap.add_argument("--limit", type=int)
+    ap.add_argument("--shard", default="0/1", help="i/N: this worker takes every N-th candidate, offset i")
+    ap.add_argument("--redo", action="store_true", help="also re-run judgments already classified by this model+prompt")
     args = ap.parse_args()
+    shard, shards = map(int, args.shard.split("/"))
     api_key = None if MODEL.startswith("deepseek") else require_env("GEMINI_API_KEY")
     cache = data_dir() / "cache" / "llm"
     cache.mkdir(parents=True, exist_ok=True)
@@ -260,6 +264,12 @@ def main():
         rows = [r for r in rows if TRIGGER.search(
             json.loads((data_dir() / r[4]).read_text(encoding="utf-8"))["text"] or "")]
     rows = rows[:args.limit] if args.limit else rows
+    rows = rows[shard::shards]
+    if not (args.redo or args.answer_key):
+        with connect() as conn:
+            done = {j for (j,) in conn.execute("SELECT judgment_id FROM event_runs WHERE model = %s AND prompt_version = %s",
+                                               (MODEL, PROMPT_VERSION))}
+        rows = [r for r in rows if r[0] not in done]
     print(f"{len(rows)} candidate judgments", flush=True)
     stats = collections.Counter()
     try:

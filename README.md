@@ -509,7 +509,7 @@ What it gets wrong: "sections 25 A (1)" (a space inside the number); a list endi
 
 **Caveat:** the prompt was refined against these same 19 events, so this is optimistic. An honest number needs a review of a random sample of the full run. Known weaknesses: the SC reversals of *Manyeso* and *Ayako* are still missed; partial declarations are sometimes called `read_down`; and some "extras" are sections the court only applied (CPC s.333) or a holding assigned to the wrong section.
 
-**DeepSeek:** its JSON mode doesn't enforce a schema, so every answer is checked in code (section must be one the judgment cites; type, scope and confidence must be allowed values). Labels without the "(heading)" are accepted when unambiguous. Key: `DEEPSEEK_API_KEY` in `.env`. The full run over 2,048 judgments costs about $3–4 off-peak (~5 s per judgment, ~3 h).
+**DeepSeek:** its JSON mode doesn't enforce a schema, so every answer is checked in code (section must be one the judgment cites; type, scope and confidence must be allowed values). Labels without the "(heading)" are accepted when unambiguous. Key: `DEEPSEEK_API_KEY` in `.env`. The full run (2026-09-27): 2,051 judgments in ~37 min with 8 workers (`--shard i/8`; finished judgments are skipped on re-run), 271 events in 196 judgments; about $3–4 off-peak.
 
 **Gemini cost, for reference:** `gemini-3.5-flash` has a free limit of 20 requests a day; `3.5-flash-lite`'s is higher. For all 2,048 judgments with v4's excerpts: ~14M input tokens, about $12 if billing is on; on the free tier, several days at the daily limit.
 
