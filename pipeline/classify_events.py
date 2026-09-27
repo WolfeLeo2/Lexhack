@@ -267,7 +267,8 @@ def main():
         only = sorted({r["judgment_id"] for f in ("events.csv", "negatives.csv")
                        for r in csv.DictReader(open(GT / f, encoding="utf-8"))})
     with connect() as conn:
-        apply_schema(conn)
+        if shards == 1:   # parallel workers applying the schema at once deadlock on its ALTERs; run once first
+            apply_schema(conn)
         rows, labels = candidates(conn, only)
     if not args.answer_key:   # the answer-key judgments are always classified, trigger or not, so scoring is fair
         rows = [r for r in rows if TRIGGER.search(

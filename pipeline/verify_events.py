@@ -74,6 +74,10 @@ def check_many(claims, workers=8):
 
 
 def main():
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--workers", type=int, default=8, help="parallel DeepSeek calls")
+    workers = ap.parse_args().workers
     with connect() as conn:
         apply_schema(conn)
         rows = conn.execute("""
@@ -86,7 +90,7 @@ def main():
     keys = ["event_id", "raw_path", "title", "court", "section", "event_type", "operative_quote", "scope_text"]
     claims = [dict(zip(keys, r)) for r in rows]
     print(f"{len(claims)} extracted events to check", flush=True)
-    results = check_many(claims)
+    results = check_many(claims, workers)
     with connect() as conn:
         conn.cursor().executemany("""UPDATE citation_events SET check_verdict = %s, check_reason = %s, check_version = %s
                                      WHERE event_id = %s""",
