@@ -150,9 +150,14 @@ JSON_SHAPE = """Answer with JSON only, in exactly this shape (an empty list if t
   "scope_text": "", "subsection": "", "operative_quote": "", "appeal_from": "", "confidence": "high|medium|low"}]}"""
 
 
+def prompt_key(prompt, schema):
+    """Fingerprint of one judgment's classification input; also the DeepSeek cache key."""
+    return hashlib.sha256(f"{MODEL}|{PROMPT_VERSION}|{json.dumps(schema, sort_keys=True)}|{prompt}".encode()).hexdigest()
+
+
 def deepseek(prompt, schema, cache):
     """Same contract as llm_resolve.call: (response dict, whether an API call was made); cached by input hash."""
-    key = hashlib.sha256(f"{MODEL}|{PROMPT_VERSION}|{json.dumps(schema, sort_keys=True)}|{prompt}".encode()).hexdigest()
+    key = prompt_key(prompt, schema)
     out, fresh = call_json(prompt + "\n\n" + JSON_SHAPE % ", ".join(EVENT_TYPES), cache, key, model=MODEL)
     return ({"events": [], **out} if "error" in out else out), fresh
 
@@ -195,7 +200,10 @@ def quote_from_source(quote, text):
     return (" [...] ".join(t[a:b] for a, b in spans), spans[0][0]) if spans else None
 
 
-def classify(row, labels, api_key, cache, stats):
+def classify(row, labels, api_key, cache, stats, prior_key=None, redo=False):
+    """-> (events, prompt key), or (None, key) when the prompt is unchanged: nothing to write. Unchanged means equal
+    to prior_key, or, for runs recorded before prompt keys existed, that this exact prompt is already cached (the
+    stored events came from it)."""
     jid, title, court, ddate, raw_path, pids = row
     text = json.loads((data_dir() / raw_path).read_text(encoding="utf-8"))["text"] or ""
     by_label = {}
@@ -207,6 +215,10 @@ def classify(row, labels, api_key, cache, stats):
                                             "provision_id = ANY(%s) AND confidence >= %s",
                                             (jid, list(pids), MIN_LINK_CONFIDENCE))]
     prompt, schema = build(title, court, ddate, text, list(by_label), spots)
+    key = prompt_key(prompt, schema)
+    if redo and (prior_key == key or (prior_key is None and (cache / f"{key}.json").exists())):
+        stats["unchanged"] += 1
+        return None, key
     short = collections.Counter(label.split(" (")[0] for label in by_label)   # models often drop the "(heading)"
     by_label |= {label.split(" (")[0]: pid for label, pid in list(by_label.items()) if short[label.split(" (")[0]] == 1}
     if MODEL.startswith("deepseek"):
@@ -236,7 +248,7 @@ def classify(row, labels, api_key, cache, stats):
                     quote, paragraph_at(markers, start), ddate,
                     CONFIDENCE[e["confidence"]], notes))
         stats[e["event_type"]] += 1
-    return out
+    return out, key
 
 
 def main():
@@ -267,13 +279,20 @@ def main():
             done = {j for (j,) in conn.execute("SELECT judgment_id FROM event_runs WHERE model = %s AND prompt_version = %s",
                                                (MODEL, PROMPT_VERSION))}
         rows = [r for r in rows if r[0] not in done]
+    with connect() as conn:   # what each judgment was last classified from; --redo skips unchanged ones
+        prior = dict(conn.execute("SELECT judgment_id, prompt_key FROM event_runs WHERE model = %s AND prompt_version = %s",
+                                  (MODEL, PROMPT_VERSION)).fetchall())
     print(f"{len(rows)} candidate judgments", flush=True)
     stats = collections.Counter()
     try:
         for n, row in enumerate(rows, 1):
             try:
-                events = classify(row, labels, api_key, cache, stats)
-                write(row, events)
+                events, key = classify(row, labels, api_key, cache, stats, prior.get(row[0]), args.redo)
+                if events is not None:
+                    write(row, events, key)
+                elif prior.get(row[0]) is None:   # record the key so the next --redo is a pure comparison
+                    with connect() as conn:
+                        conn.execute("UPDATE event_runs SET prompt_key = %s WHERE judgment_id = %s", (key, row[0]))
             except psycopg.OperationalError as e:   # a network drop: skip it; a re-run picks the judgment up again
                 stats["skipped_db_error"] += 1
                 print(f"  database error on {row[0]} ({str(e).splitlines()[0][:80]}); skipped", flush=True)
@@ -284,16 +303,21 @@ def main():
         print(f"done: {dict(stats)}")
 
 
-def write(row, events):
-    """Replace this judgment's extracted events and record the run, in one transaction."""
+def write(row, events, key=None):
+    """Replace this judgment's unverified extracted events and record the run, in one transaction. Reviewed events
+    (verified by an agent or a person, pipeline/review_events.py) are kept, and not re-inserted as new leads."""
     with connect() as conn, conn.transaction():
-        conn.execute("DELETE FROM citation_events WHERE method = 'extracted' AND judgment_id = %s", (row[0],))
+        conn.execute("DELETE FROM citation_events WHERE method = 'extracted' AND NOT verified AND judgment_id = %s", (row[0],))
+        kept = set(conn.execute("""SELECT provision_id, event_type FROM citation_events
+                                   WHERE method = 'extracted' AND verified AND judgment_id = %s""", (row[0],)).fetchall())
+        events = [e for e in events if (e[0], e[2]) not in kept]
         conn.cursor().executemany("""INSERT INTO citation_events (provision_id, judgment_id, event_type, scope,
             scope_text, subsection, operative_quote, source_paragraph, effective_date, confidence, notes, method)
             VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'extracted')""", events)
-        conn.execute("""INSERT INTO event_runs (judgment_id, model, prompt_version, events) VALUES (%s,%s,%s,%s)
-            ON CONFLICT (judgment_id) DO UPDATE SET model=EXCLUDED.model, prompt_version=EXCLUDED.prompt_version,
-            events=EXCLUDED.events, run_at=now()""", (row[0], MODEL, PROMPT_VERSION, len(events)))
+        conn.execute("""INSERT INTO event_runs (judgment_id, model, prompt_version, events, prompt_key)
+            VALUES (%s,%s,%s,%s,%s) ON CONFLICT (judgment_id) DO UPDATE SET model=EXCLUDED.model,
+            prompt_version=EXCLUDED.prompt_version, events=EXCLUDED.events, prompt_key=EXCLUDED.prompt_key, run_at=now()""",
+                     (row[0], MODEL, PROMPT_VERSION, len(events), key))
 
 
 if __name__ == "__main__":

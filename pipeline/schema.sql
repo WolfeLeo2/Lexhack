@@ -108,3 +108,4 @@ CREATE TABLE IF NOT EXISTS citation_events (
 ALTER TABLE citation_events ADD COLUMN IF NOT EXISTS check_verdict TEXT;   -- 'pass' | 'fail' | 'unsure' | NULL (not checked)
 ALTER TABLE citation_events ADD COLUMN IF NOT EXISTS check_reason TEXT;
 ALTER TABLE citation_events ADD COLUMN IF NOT EXISTS check_version INT;
+ALTER TABLE event_runs ADD COLUMN IF NOT EXISTS prompt_key TEXT;   -- classify_events --redo skips a judgment whose prompt is unchanged
