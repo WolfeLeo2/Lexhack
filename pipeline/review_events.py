@@ -83,7 +83,7 @@ def key(judgment_id, section, event_type, quote):
 def saved_verdicts():
     """{key: (case, verdict)} over every set reviewed so far."""
     out = {}
-    for root in (data_dir() / "review").glob("*"):
+    for root in (data_dir() / "review" / name for name in ("benchmark", "leads")):   # not status_audit/, statutory/
         got = {v["case_id"]: v for f in sorted((root / "verdicts").glob("*.json")) for v in json.loads(f.read_text())}
         for f in sorted(root.glob("batch_*.json")):
             for c in json.loads(f.read_text()):
@@ -129,8 +129,10 @@ def export(which):
             path.write_text(f"{j.get('title')}\n{j.get('url')}\n\n" + "\n".join(textwrap.wrap(text, 140)), encoding="utf-8")
         c.update(judgment_text=str(path), judgment_url=j.get("url"), quote_found=quote_found(text, c["operative_quote"]))
         del c["raw_path"]
+    # a new round never overwrites an earlier one: apply pairs every batch file with its verdicts file by case_id
+    rnd = 1 + max([int(p.name.split("_r")[1].split("_")[0]) for p in root.glob("batch_r*_*.json")] or [1])
     for n in range(0, len(cases), BATCH):
-        (root / f"batch_{n // BATCH:02d}.json").write_text(json.dumps(cases[n:n + BATCH], indent=1, ensure_ascii=False),
+        (root / f"batch_r{rnd}_{n // BATCH:02d}.json").write_text(json.dumps(cases[n:n + BATCH], indent=1, ensure_ascii=False),
                                                             encoding="utf-8")
     print(f"{len(cases)} cases in {-(-len(cases) // BATCH)} batches -> {root}; "
           f"quote not found verbatim: {sum(not c['quote_found'] for c in cases)}")

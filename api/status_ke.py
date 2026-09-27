@@ -2,7 +2,8 @@
 
 An event stops counting when either
   1. a later event directly reverses it (affects_event: an appeal from that judgment), or
-  2. a later event from a court of equal or higher rank points the other way (precedent: Mwaura (CA 2013) displaces
+  2. a later event from a court of equal or higher rank points the other way ON THE SAME POINT (citation_events.issue;
+     an interpretation counts when it carries a stance) (precedent: Mwaura (CA 2013) displaces
      Mutiso (CA 2010); the Supreme Court's 2024-25 rulings displace Kilwake (CA 2019), which was never appealed).
 "interpreted" events never displace anything; they qualify the events on the same section.
 
@@ -20,6 +21,18 @@ def direction(e):
     return "limits" if e["event_type"] in LIMITING else "validates" if e["event_type"] in VALIDATING else None
 
 
+def pull(e):
+    """Which way an event pushes for displacement. Like direction(), but an interpretation can carry a stance (the
+    2021 Muruatetu directions cut against lower courts that stretched the 2017 ruling to other sections)."""
+    return e.get("stance") if e["event_type"] == "interpreted" and e.get("stance") else direction(e)
+
+
+def same_point(a, b):
+    """Rulings displace each other only on the same legal point (citation_events.issue); unlabelled events are
+    assumed to be on the same point, as before issues existed."""
+    return not a.get("issue") or not b.get("issue") or a["issue"] == b["issue"]
+
+
 def resolve(events):
     """events: dicts with event_id, event_type, scope, court, effective_date, affects_event_id (+ anything else, passed
     through). -> {"status", "summary_events", "history"}; history entries gain "state" and "superseded_by"."""
@@ -34,7 +47,7 @@ def resolve(events):
         if out[e["event_id"]]["state"] != "in effect" or not direction(e) or e["event_type"] in STATUTORY:
             continue
         for later in events[i + 1:]:
-            if (later["event_type"] not in STATUTORY and direction(later) and direction(later) != direction(e)
+            if (later["event_type"] not in STATUTORY and pull(later) and pull(later) != direction(e) and same_point(e, later)
                     and RANK.get(later["court"], 0) >= RANK.get(e["court"], 0)
                     and later.get("effective_date") != e.get("effective_date")):
                 out[e["event_id"]].update(state="displaced by a later ruling", superseded_by=later["event_id"])
@@ -48,10 +61,10 @@ def resolve(events):
         status = "declared unconstitutional"
     elif (limits := [e for e in limits if e["event_type"] not in STATUTORY]):
         status = "limited by a court"
+    elif any(e["event_type"] == "reversed_on_appeal" for e in live):   # the reversal is the news, even if also upheld
+        status = "in force; earlier court limits were reversed"
     elif any(e["event_type"] == "upheld" for e in live):
         status = "in force; its validity has been tested in court"
-    elif any(e["event_type"] == "reversed_on_appeal" for e in live):
-        status = "in force; earlier court limits were reversed"
     elif court:
         status = "in force; interpreted by a court"
     else:

@@ -67,9 +67,22 @@ def main():
     r = resolve([rep, upheld_after])
     if r["status"] != "repealed" or states(r)["REP"] != "in effect":
         fails.append(("repeal", r["status"], states(r)))
+    # issues: a later ruling on a different point doesn't displace; a stance-bearing interpretation does
+    hc = dict(ev[0], event_id=90, event_key="HC", event_type="upheld", court="High Court", effective_date="2014-01-01",
+              affects_event_id=None, issue="consensual adolescent sex")
+    ca = dict(ev[0], event_id=91, event_key="CA", event_type="read_down", court="Court of Appeal",
+              effective_date="2019-01-01", affects_event_id=None, issue="minimum sentence discretion")
+    if states(resolve([hc, ca]))["HC"] != "in effect":
+        fails.append(("different point displaced", states(resolve([hc, ca]))))
+    kit = dict(ca, event_id=92, event_key="KIT", event_type="declared_unconstitutional", effective_date="2018-01-01",
+               issue="mandatory death sentence")
+    dirs = dict(kit, event_id=93, event_key="DIR", event_type="interpreted", court="Supreme Court",
+                effective_date="2021-07-06", stance="validates")
+    if states(resolve([kit, dirs]))["KIT"] != "displaced by a later ruling":
+        fails.append(("stance did not displace", states(resolve([kit, dirs]))))
     for f in fails:
         print("FAIL", *f)
-    print(f"{11 - len(fails)}/11 passed")
+    print(f"{13 - len(fails)}/13 passed")
     raise SystemExit(1 if fails else 0)
 
 

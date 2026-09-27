@@ -4,6 +4,7 @@ The event review checks events one at a time; this checks what the rules (api/st
 
   uv run python -m pipeline.audit_status export     # every section with a checked ruling -> $LEXHACK_DATA/review/status_audit/
   uv run python -m pipeline.audit_status report     # summarise the auditors' findings
+  uv run python -m pipeline.audit_status issues     # load review/issues/labels.json -> citation_events.issue / stance
 
 Auditors (agents) write findings/batch_NN.json; nothing here writes to the database.
 """
@@ -56,7 +57,17 @@ def report():
                   f"{f.get('should_read', '')}\n  cause: {f.get('cause', '')}  events: {f.get('event_ids', [])}\n  why: {f['reason']}")
 
 
+def issues():
+    """The legal point each ruling decides, labelled by an agent, so displacement compares like with like."""
+    labels = json.loads((data_dir() / "review" / "issues" / "labels.json").read_text())
+    with connect() as conn:
+        conn.cursor().executemany("UPDATE citation_events SET issue = %s, stance = %s WHERE event_id = %s",
+                                  [(v["issue"], v.get("stance"), int(k)) for k, v in labels.items()])
+        conn.commit()
+    print(f"labelled {len(labels)} events")
+
+
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("cmd", choices=["export", "report"])
-    export() if ap.parse_args().cmd == "export" else report()
+    ap.add_argument("cmd", choices=["export", "report", "issues"])
+    {"export": export, "report": report, "issues": issues}[ap.parse_args().cmd]()

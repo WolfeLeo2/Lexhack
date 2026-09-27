@@ -112,3 +112,8 @@ ALTER TABLE event_runs ADD COLUMN IF NOT EXISTS prompt_key TEXT;   -- classify_e
 
 -- A judgment Kenya Law published under more than one ID points at the copy we keep (pipeline/dedupe_judgments.py).
 ALTER TABLE judgments ADD COLUMN IF NOT EXISTS duplicate_of TEXT REFERENCES judgments(judgment_id);
+-- The legal point an event decides ('mandatory death sentence', 'vagueness'), comparable within one section: a later
+-- ruling displaces an earlier one only on the same point. stance: for 'interpreted' events that cut for or against
+-- earlier limits ('validates' | 'limits'), e.g. the 2021 Muruatetu directions. Labelled by agents (api/status_ke.py).
+ALTER TABLE citation_events ADD COLUMN IF NOT EXISTS issue TEXT;
+ALTER TABLE citation_events ADD COLUMN IF NOT EXISTS stance TEXT;
