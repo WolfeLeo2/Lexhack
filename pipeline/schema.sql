@@ -69,6 +69,7 @@ CREATE TABLE IF NOT EXISTS citation_mentions (
 -- The cited Act as the judgment names it (canonicalised), so mentions of Acts we don't hold still say what they cite.
 ALTER TABLE citation_mentions ADD COLUMN IF NOT EXISTS act_ref TEXT;      -- 'Penal Code' | 'Constitution (repealed)' | NULL (bare)
 ALTER TABLE citation_mentions ADD COLUMN IF NOT EXISTS section_ref TEXT;  -- '8(1)': the cited number with sub-provisions
+ALTER TABLE citation_mentions ADD COLUMN IF NOT EXISTS llm_model TEXT;    -- method='llm' rows: 'deepseek-flash' | 'gemini-3.5-flash-lite'
 CREATE INDEX IF NOT EXISTS citation_mentions_judgment ON citation_mentions (judgment_id);
 CREATE INDEX IF NOT EXISTS citation_mentions_provision ON citation_mentions (provision_id);
 

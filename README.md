@@ -10,7 +10,7 @@ This file explains the project from scratch: what has been built, how the data f
 | **2. Ground truth** | A hand-checked answer key of what courts did to which sections | Done: 19 events, all verified |
 | **3. Database** | Load Acts, versions and sections into Postgres (Neon), with embeddings | Done: 8 Acts, 1,862 sections, 4,592 section texts, all embedded |
 | **4. Judgments + answer key** | Load judgment metadata and the answer key into Postgres | Done: 16,419 judgments; 19 answer-key events in `citation_events` |
-| **5. Citation extraction** | Find every "section N of the X Act" / "Article N" in the judgments → `citation_mentions` | Regex done: 304,310 mentions in 13,098 judgments, scored on a verified sample (precision 99.5%, recall 98.5%). LLM pass for bare mentions: ~400 of 7,385 judgments done, waiting on the Gemini daily quota |
+| **5. Citation extraction** | Find every "section N of the X Act" / "Article N" in the judgments → `citation_mentions` | Done: 304,310 mentions in 13,098 judgments; 182,571 linked to our sections. Held-out score: precision 98.1%, recall 98.1%, law right 97.8% with the LLM pass (DeepSeek; Gemini for the first ~400 judgments) |
 | 6–9 | Classify events, status resolver, API/UI, filing checker, deploy | Not started |
 
 ---
@@ -74,7 +74,7 @@ Code and data are kept apart. **Data is never committed to git.**
     load_ground_truth.py  ground_truth/events.csv → citation_events
     extract_citations.py  Phase 5: regex citation extraction → citation_mentions
     test_extract.py       offline regression cases for the citation grammar
-    llm_resolve.py        Phase 5: Gemini resolves bare mentions ("section 39", "the Act"); disk-cached
+    llm_resolve.py        Phase 5: DeepSeek (or Gemini) resolves bare mentions ("section 39", "the Act"); disk-cached, --shard i/N
   ground_truth/                      ← Phase 2 (+ Phase 5): the answer keys
     events.csv      19 verified events (the main output)
     negatives.csv   6 judgments that cite a section without affecting it
@@ -84,7 +84,7 @@ Code and data are kept apart. **Data is never committed to git.**
     mention_sample.py     draws the 30-judgment sample → mentions_candidates.csv
     mentions_gold.csv     the verified labels (711 rows, 581 citations)
     mentions_review_*.csv the three verifiers' verdicts, one per court
-    eval_mentions.py      scores the extractor (and, with --llm, the Gemini pass)
+    eval_mentions.py      scores the extractor (and, with --llm [--llm-model M], the LLM pass)
     show_candidate.py     prints judgment text around a candidate, for labelling
     mentions_heldout_*.csv   held-out sample (never tuned on) and its double-labelled answer key
     heldout_labels/       the two independent labellings per court, disagreements, adjudications
@@ -104,7 +104,7 @@ $LEXHACK_DATA  (outside the repo; per machine: /Users/leo/lexhack-data on Leo's 
     source/*.json                    ← text extracted from PDFs
     analysis.md                      ← pilot statistics
   cache/embeddings/*.json           ← one vector per unique text (keyed by model + text hash)
-  cache/llm/*.json                  ← one Gemini answer per prompt (keyed by model + prompt version + prompt hash)
+  cache/llm/*.json                  ← one LLM answer per prompt (keyed by model + prompt version + prompt hash)
   external/hf_ipfs_kenya_laws/       ← a third-party dataset we evaluated
 ```
 
@@ -128,7 +128,7 @@ uv run python -m pipeline.load_judgments                      # judgment metadat
 uv run python -m pipeline.load_ground_truth                   # ground_truth/events.csv -> citation_events (method='manual')
 uv run python -m pipeline.test_extract                        # citation grammar self-check (offline)
 uv run python -m pipeline.extract_citations                   # regex → citation_mentions (rebuilds ALL mention rows)
-uv run python -m pipeline.llm_resolve                         # Gemini for bare mentions; run after every extraction
+uv run python -m pipeline.llm_resolve                         # DeepSeek for bare mentions; run after every extraction (cached)
 uv run python -m ground_truth.eval_mentions --llm             # score extraction against the verified sample
 uv run python -m pipeline.classify_events --answer-key        # step 6 on the answer-key judgments (then: no flag = all)
 uv run python -m ground_truth.eval_events                     # score event classification
@@ -467,7 +467,10 @@ Find every place a judgment cites a section or Article of a law, and link it to 
 
 1. **Regex** (`pipeline/extract_citations.py`) reads each judgment's text from disk and finds citations in two shapes: "section 204 of the Penal Code" (law after) and Kenya Law's headnote lists "Elections Act (Cap 7), sections 34(6B), 35" (law first). It handles lists ("sections 203 and 204", "articles 38(3)(c); 75; 87"), ranges ("sections 3 to 7"), "as read with", sub-provisions ("165 (6) & (7)"), acronyms (SOA, CPC, KICA), Cap numbers, and "the Act"/"the Code" (→ the last Act named earlier in the judgment).
 2. **Every law is recorded** in `act_ref`, not only our 8 Acts, so mentions of other Acts show what to load next. `provision_id` is set only when the citation resolves to a section we hold.
-3. **LLM pass** (`pipeline/llm_resolve.py`, `gemini-3.5-flash-lite`) takes the citations the regex couldn't tie to a law (a bare "section 39") and asks Gemini which law is meant, choosing only from the laws that judgment names (a JSON enum, so it can't invent one), or `unknown` / `not_a_citation`. Resolved rows become `method = 'llm'`.
+3. **LLM pass** (`pipeline/llm_resolve.py`) takes the citations the regex couldn't tie to a law (a bare "section 39") and asks which law is meant, choosing only from the laws that judgment names, or `unknown` / `not_a_citation`. Resolved rows become `method = 'llm'`, with the answering model in `llm_model`.
+   - **Models:** the first ~400 judgments were done with `gemini-3.5-flash-lite` (its JSON mode enforces the list as an enum). The rest used `deepseek-flash` (thinking off), which is far cheaper and faster than Gemini's free tier. DeepSeek's JSON mode doesn't enforce the list, so the prompt spells it out and every answer is validated in code: off-list or malformed answers count as `unknown`. A name written slightly differently ("the Penal Code") is accepted only if it matches exactly one option. An Article is never attributed to the repealed Constitution.
+   - **Re-runs are free:** a judgment's prompt is always rebuilt as it was first asked, including rows already resolved, so a re-run hits the cache. A chunk with a cached Gemini answer keeps it.
+   - **Parallel:** `--shard i/N`. Each worker updates only its own judgments' rows. Database connections use keepalives and timeouts, and a dropped connection is retried.
 
 **Rules the extractor applies:**
 - "section N of the Constitution" is the **repealed** (pre-2010) Constitution; the 2010 Constitution has Articles.
@@ -475,17 +478,19 @@ Find every place a judgment cites a section or Article of a law, and link it to 
 - In a mixed list ("article 178(1) as read with section 21(1) of the Elections Act"), the named law applies only to the items of the same kind as the one next to it.
 - The Employment Act's two eId schemes are picked by decision date (§4.6).
 
-`confidence` describes how the law was identified: 0.95 named in full, 0.9 acronym or Cap, 0.85 bare Article, 0.6 "the Act", 0.4–0.8 Gemini (low/medium/high), 0 unresolved.
+`confidence` describes how the law was identified: 0.95 named in full, 0.9 acronym or Cap, 0.85 bare Article, 0.6 "the Act", 0.4–0.8 LLM (low/medium/high), 0 unresolved.
 
-### 7.3 Results (2026-09-27)
+### 7.3 Results (2026-09-27, LLM pass complete)
 
 | | Mentions |
 |---|---|
 | Total | 304,310 in 13,098 judgments |
-| Resolved to one of our sections | 173,014 |
-| Still unresolved (no law) | 43,814 (LLM pass pending) |
-| Resolved by Gemini so far | 2,754 |
-| In one of our Acts, but the section number doesn't exist | 366 |
+| Resolved to one of our sections | 182,571 (173,014 before the LLM pass) |
+| Resolved by the LLM | 41,382: 38,366 by `deepseek-flash`, 3,016 by `gemini-3.5-flash-lite` |
+| Still unresolved (no law) | 5,186 (the LLM said `unknown` or `not_a_citation`; the verdicts are in the cache) |
+| In one of our Acts, but the section number doesn't exist | 366 (before the LLM pass) |
+
+The LLM pass made 200 more judgments eligible for step 6 (they now cite one of our non-Constitution sections at confidence ≥ 0.8). The DeepSeek run took ~5 h with 8 workers on an unstable connection, at a cost of roughly $1.50–2 (off-peak).
 
 ### 7.4 How it was scored
 
@@ -497,8 +502,9 @@ Find every place a judgment cites a section or Article of a law, and link it to 
 | Recall | 98.5% (572/581) |
 | Law right / wrong / unresolved (regex only) | 93.5% / 0% / 6.5% |
 | Law right / wrong / unresolved (with Gemini) | 99.3% / 0% / 0.7% |
+| Law right / wrong / unresolved (with DeepSeek) | 99.0% / 0% / 1.0% |
 
-**Caveat:** the regex was fixed using this same sample (recall was 90.2% before), so its scores are optimistic. The Gemini prompt was not tuned on it. A fresh held-out sample would give numbers to quote.
+**Caveat:** the regex was fixed using this same sample (recall was 90.2% before), so its scores are optimistic. The LLM prompt was not tuned on it. The held-out sample below gives numbers to quote.
 
 **Held-out score (2026-09-27), the numbers to quote.** A second, disjoint sample of 30 judgments (seed 777, none from the tuning sample; `mentions_heldout_*`). Two independent labellers per court, each blind to the extractor and to the other: they agreed on 469 of 471 candidates; the 2 disagreements were settled by the rule above (`heldout_labels/resolved.csv`). The regex was **not** changed after scoring.
 
@@ -507,8 +513,12 @@ Find every place a judgment cites a section or Article of a law, and link it to 
 | Precision | 98.1% (410/418) |
 | Recall | 98.1% (410/418) |
 | Law right / wrong / unresolved | 88.8% / 0.5% / 10.7% |
+| … with the Gemini LLM pass | 98.3% / 1.0% / 0.7% |
+| … with the DeepSeek LLM pass (used for the full run) | **97.8% / 1.0% / 1.2%** |
 
-What it gets wrong: "sections 25 A (1)" (a space inside the number); a list ending "…50 and 51 were violated"; sections of a private document ("Section 1" of an insurance policy); treaty articles taken for the Constitution ("article 13" of the ICCPR); "Article 21(A)" of the Supreme Court Act taken for the Constitution. `uv run python -m ground_truth.eval_mentions --set heldout --errors` lists them all. The LLM pass wasn't scored on this sample (its cache is on the other machine).
+The two LLMs make the same 2 mistakes (ss.1A and 1B attributed to the Appellate Jurisdiction Act instead of the Civil Procedure Act, in one judgment); DeepSeek leaves 2 more citations unresolved. Score one model at a time with `eval_mentions --set heldout --llm [--llm-model gemini-3.5-flash-lite]`.
+
+What the regex gets wrong: "sections 25 A (1)" (a space inside the number); a list ending "…50 and 51 were violated"; sections of a private document ("Section 1" of an insurance policy); treaty articles taken for the Constitution ("article 13" of the ICCPR); "Article 21(A)" of the Supreme Court Act taken for the Constitution. `uv run python -m ground_truth.eval_mentions --set heldout --errors` lists them all.
 
 ## 7b. Phase 6: event classification (in progress)
 
@@ -641,7 +651,7 @@ The product is called **Hakiki** (Swahili for "verify"); LexHack is the hackatho
 
 ### Finish step 5
 
-- **The LLM pass:** ~400 of 7,385 judgments done. The free tier allows ~500 requests a day for `gemini-3.5-flash-lite` (~15 days at that rate). Options: re-run `uv run python -m pipeline.llm_resolve` daily; enable billing on the Gemini key (~$5–8 standard, ~$2.65 via the Batch API, which needs code; measured 2026-09-27 at $0.30 / $2.50 per 1M tokens); or pack several judgments per request. Nothing downstream is blocked by it.
+- **The LLM pass: done** (2026-09-27, §7.3).
 - ~~Held-out sample~~ done (§7.4): precision 98.1%, recall 98.1% on unseen judgments.
 - ~~Embeddings~~ done: all 4,592 section texts.
 
@@ -665,7 +675,8 @@ For the front end (step 7): the UI can start now against mock JSON shaped like t
 - **Other laws' names are not normalised.** `act_ref` for Acts we don't hold is the name as written: "Retirement Benefits Authority Act", "CDF Act" and misspellings are separate values. Normalise before using them to choose which Acts to load next.
 - **What the extractor ignores:** rules, orders and regulations ("Order 42 rule 6 of the Civil Procedure Rules"), and schedule paragraphs. The filing checker won't recognise those either.
 - **Weaker spots not measured separately:** "the Act" resolved to the last named Act (confidence 0.6), and bare "Article N" → 2010 Constitution (~95% in a 40-mention spot check; treaty articles are the usual error).
-- **Unresolved rows stay in the table.** Mentions Gemini called `not_a_citation` or `unknown` are left with no law (the verdict is in the cache). 366 citations name one of our Acts with a section number that doesn't exist there: typos, sections from versions we lack, or fake. Worth a look for the filing checker.
+- **Unresolved rows stay in the table.** Mentions the LLM called `not_a_citation` or `unknown` (5,186) are left with no law (the verdict is in the cache).
+- **Database connections have no timeout (`pipeline/db.py`).** On a flaky network a connection can die silently and the worker hangs forever (it happened 4 times in the step-5 run). `llm_resolve` now opens its own connections with keepalives, a connect timeout and a 2-minute statement timeout; `classify_events` / `verify_events` still use `db.connect()` and can hang the same way. 366 citations name one of our Acts with a section number that doesn't exist there: typos, sections from versions we lack, or fake. Worth a look for the filing checker.
 - **Windows needs `PYTHONUTF8=1`** (§3), because the code reads files without naming an encoding.
 - **Free-tier Gemini:** Google may use free-tier prompts to improve its products. The judgments are public, so this is acceptable, but don't send anything private through the free key.
 
