@@ -1,0 +1,107 @@
+@import "tailwindcss";
+
+@theme {
+  --color-paper: #f1f3ee;
+  --color-panel: #e6eae2;
+  --color-ink: #18212b;
+  --color-ink-2: #4d5a66;
+  --color-rule: #c9d0c6;
+  --color-gazette: #1e5b47;
+  --color-mark: #f5d76e;
+  --color-seal: #8e2c48;
+
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Newsreader Variable", Georgia, serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+}
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 5rem;
+}
+
+body {
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 1.0625rem;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+::selection {
+  background: var(--color-mark);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-gazette);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* The law's own words: serif. The court's words: serif italic on highlighter. Our explanations: sans. */
+.statute {
+  font-family: var(--font-serif);
+  font-optical-sizing: auto;
+  line-height: 1.5;
+}
+
+.court {
+  font-family: var(--font-serif);
+  font-style: italic;
+  line-height: 1.55;
+}
+
+mark,
+.hl {
+  background: linear-gradient(transparent 12%, var(--color-mark) 12%, var(--color-mark) 88%, transparent 88%);
+  color: inherit;
+  padding: 0 0.1em;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
+.prose-body p + p {
+  margin-top: 0.9em;
+}
+
+.prose-body a,
+a.link {
+  color: var(--color-gazette);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+}
+
+.paper-grain {
+  background-image: radial-gradient(rgba(24, 33, 43, 0.045) 1px, transparent 1px);
+  background-size: 3px 3px;
+}
+
+/* The hero's one orchestrated moment: the phrase is marked, then the missing court note is pinned on. */
+.hero-mark {
+  background: linear-gradient(transparent 58%, rgba(142, 44, 72, 0.3) 58%, rgba(142, 44, 72, 0.3) 92%, transparent 92%) no-repeat;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  animation: mark-in 0.7s 0.9s both cubic-bezier(0.22, 1, 0.36, 1);
+}
+.hero-note {
+  animation: note-in 0.6s 1.7s both cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes mark-in {
+  from { background-size: 0% 100%; }
+  to { background-size: 100% 100%; }
+}
+@keyframes note-in {
+  from { opacity: 0; transform: translateY(10px) rotate(-0.6deg); }
+  to { opacity: 1; transform: translateY(0) rotate(-0.6deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-mark, .hero-note { animation: none; }
+}
