@@ -66,6 +66,11 @@ CREATE TABLE IF NOT EXISTS citation_mentions (
   method        TEXT NOT NULL,               -- 'regex' | 'llm'
   confidence    REAL
 );
+-- The cited Act as the judgment names it (canonicalised), so mentions of Acts we don't hold still say what they cite.
+ALTER TABLE citation_mentions ADD COLUMN IF NOT EXISTS act_ref TEXT;      -- 'Penal Code' | 'Constitution (repealed)' | NULL (bare)
+ALTER TABLE citation_mentions ADD COLUMN IF NOT EXISTS section_ref TEXT;  -- '8(1)': the cited number with sub-provisions
+CREATE INDEX IF NOT EXISTS citation_mentions_judgment ON citation_mentions (judgment_id);
+CREATE INDEX IF NOT EXISTS citation_mentions_provision ON citation_mentions (provision_id);
 
 -- What a court (or Parliament) actually DID to a section. Definitions: README.md §5.4-5.5.
 CREATE TABLE IF NOT EXISTS citation_events (
