@@ -132,6 +132,8 @@ uv run python -m pipeline.llm_resolve                         # Gemini for bare 
 uv run python -m ground_truth.eval_mentions --llm             # score extraction against the verified sample
 uv run python -m pipeline.classify_events --answer-key        # step 6 on the answer-key judgments (then: no flag = all)
 uv run python -m ground_truth.eval_events                     # score event classification
+uv run python -m pipeline.verify_events                       # second-pass check of extracted events
+uv run python -m ground_truth.eval_checker                    # score the checker on the blind reviews
 uv run python -m api.test_status                              # status rules, offline
 uv run uvicorn api.main:app --reload                          # the API; spec at /docs
 
@@ -538,6 +540,18 @@ What it gets wrong: "sections 25 A (1)" (a space inside the number); a list endi
 **Round 2 (fresh sample: seed 11, 40 events from judgments round 1 never saw; `eval_events_review --round 2`): 28 of 36 agreed events right, about 78%** (70–78% counting the 4 split cases either way). Remaining errors: courts restating the *Muruatetu* directions or SC *Mwangi* without reasoning of their own, recorded as upheld/interpreted (6); two wrong types; `upheld` scope defaulting to total when one subsection was argued. Also, one judgment (*Kahinga*, Petition 618 of 2010) exists under two judgment IDs, so its events are double-counted.
 
 **How they're used:** the API returns only verified events by default (`include_unverified=false`). Extracted events are machine-found leads, shown as unverified, never as a section's status.
+
+**Prompt v6 and round 3 (fresh sample, seed 13).** v6 adds: restating a higher court is not an event; read_down vs interpreted; scope for upheld. Round 3 scored 17/37 (46%); 9 of its 20 errors were real rulings pinned on the **wrong Act** ("sections 22, 23… of the Act" in a Computer Misuse Act case linked to KICA by the step-5 "last named Act" rule). Fix: the classifier is only offered sections linked at confidence ≥ 0.8 (`MIN_LINK_CONFIDENCE`; "the Act" guesses are 0.6). Re-run: 143 events.
+
+**Second-pass checker (`pipeline/verify_events.py`).** One DeepSeek call per extracted event, **thinking mode on**, asking only: is this the court's OWN holding, and on the claimed section of the claimed Act? Verdict in `citation_events.check_verdict`; the API never returns `fail` events. Scored on all 111 reviewed events where the two reviewers agreed (`uv run python -m ground_truth.eval_checker`):
+
+| | Before the check | After the check |
+|---|---|---|
+| Precision, all 3 rounds | 65/111 (59%) | **61/76 (80%)** |
+| Wrong events caught | | 31/46 (67%) |
+| Right events kept | | 61/65 (94%) |
+
+Caveat: the checker's rules were written (as general rules) after reading the reviewers' reports, so 80% may be slightly generous; call it 75–80%. What still slips through: courts *stating* a sentencing rule while applying higher-court law. On the live data: 119 pass, 23 fail, 1 unsure → **120 extracted events shown as unverified leads** (60 declared, 34 upheld, 16 interpreted, 6 read down, 4 reversed).
 
 **DeepSeek:** its JSON mode doesn't enforce a schema, so every answer is checked in code (section must be one the judgment cites; type, scope and confidence must be allowed values). Labels without the "(heading)" are accepted when unambiguous. Key: `DEEPSEEK_API_KEY` in `.env`. The full run (2026-09-27): 2,051 judgments in ~37 min with 8 workers (`--shard i/8`; finished judgments are skipped on re-run), 271 events in 196 judgments; about $3–4 off-peak.
 

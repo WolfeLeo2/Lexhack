@@ -28,10 +28,12 @@ from crawler.config import data_dir, require_env
 
 from .db import apply_schema, connect
 from .extract_citations import paragraph_at, paragraph_markers
+from .deepseek import call_json
 from .llm_resolve import call
 
 MODEL, PROMPT_VERSION = "deepseek-flash", 6   # "gemini-3.5-flash-lite" also works (via llm_resolve.call)
 DEEPSEEK_URL = "https://api.deepseek.com/chat/completions"
+MIN_LINK_CONFIDENCE = 0.8   # citation links the classifier may use: named Act 0.95, acronym/Cap 0.9, LLM high 0.8
 WINDOW, TAIL = 1500, 12_000   # chars kept around each relevant spot, and from the end (the orders)
 GT = Path(__file__).resolve().parent.parent / "ground_truth"
 TRIGGER = re.compile(
@@ -101,10 +103,11 @@ def candidates(conn, only):
                array_agg(DISTINCT m.provision_id) AS pids
         FROM judgments j JOIN citation_mentions m USING (judgment_id)
         WHERE m.provision_id IS NOT NULL AND m.provision_id NOT LIKE 'ke/act/constitution/%%'
+          AND m.confidence >= %(min_conf)s   -- not "the Act" guesses (0.6): they pinned other Acts' rulings on ours
           AND (%(only)s::text[] IS NULL OR j.judgment_id = ANY(%(only)s))
         GROUP BY 1, 2, 3, 4, 5
         ORDER BY array_position(ARRAY['Supreme Court', 'Court of Appeal', 'High Court'], j.court), j.judgment_id""",
-                        {"only": only}).fetchall()
+                        {"only": only, "min_conf": MIN_LINK_CONFIDENCE}).fetchall()
     labels = {pid: (act, num, head) for pid, act, num, head in conn.execute(
         "SELECT p.provision_id, a.title, p.number, p.heading FROM provisions p JOIN acts a USING (act_id)")}
     return rows, labels
@@ -150,35 +153,8 @@ JSON_SHAPE = """Answer with JSON only, in exactly this shape (an empty list if t
 def deepseek(prompt, schema, cache):
     """Same contract as llm_resolve.call: (response dict, whether an API call was made); cached by input hash."""
     key = hashlib.sha256(f"{MODEL}|{PROMPT_VERSION}|{json.dumps(schema, sort_keys=True)}|{prompt}".encode()).hexdigest()
-    path = cache / f"{key}.json"
-    if path.exists():
-        return json.loads(path.read_text(encoding="utf-8")), False
-    body = {"model": MODEL, "messages": [{"role": "user", "content": prompt + "\n\n" + JSON_SHAPE % ", ".join(EVENT_TYPES)}],
-            "response_format": {"type": "json_object"}, "thinking": {"type": "disabled"}, "temperature": 0}
-    for attempt in range(8):
-        wait = min(120, 10 * 2 ** attempt)
-        try:
-            r = requests.post(DEEPSEEK_URL, json=body, timeout=300,
-                              headers={"Authorization": f"Bearer {require_env('DEEPSEEK_API_KEY')}"})
-        except (requests.ConnectionError, requests.Timeout) as e:
-            print(f"  network error ({type(e).__name__}); retrying in {wait}s", flush=True)
-            time.sleep(wait)
-            continue
-        if r.status_code == 402:
-            raise SystemExit("DeepSeek balance is empty (HTTP 402): top up; answers so far are cached.")
-        if r.status_code in (429, 500, 502, 503):
-            print(f"  HTTP {r.status_code}; retrying in {wait}s", flush=True)
-            time.sleep(wait)
-            continue
-        r.raise_for_status()
-        msg = r.json()["choices"][0]["message"]["content"]
-        try:
-            out = json.loads(msg)
-        except json.JSONDecodeError:
-            out = {"events": [], "error": "unparseable", "raw": msg[:2000]}
-        path.write_text(json.dumps(out), encoding="utf-8")
-        return out, True
-    raise RuntimeError("DeepSeek call failed after 8 attempts")
+    out, fresh = call_json(prompt + "\n\n" + JSON_SHAPE % ", ".join(EVENT_TYPES), cache, key, model=MODEL)
+    return ({"events": [], **out} if "error" in out else out), fresh
 
 
 def valid(e, sections):
@@ -228,7 +204,8 @@ def classify(row, labels, api_key, cache, stats):
         by_label.setdefault(f"{act} s.{num} ({head})", pid)
     with connect() as conn:
         spots = [s for (s,) in conn.execute("SELECT char_start FROM citation_mentions WHERE judgment_id = %s AND "
-                                            "provision_id = ANY(%s)", (jid, list(pids)))]
+                                            "provision_id = ANY(%s) AND confidence >= %s",
+                                            (jid, list(pids), MIN_LINK_CONFIDENCE))]
     prompt, schema = build(title, court, ddate, text, list(by_label), spots)
     short = collections.Counter(label.split(" (")[0] for label in by_label)   # models often drop the "(heading)"
     by_label |= {label.split(" (")[0]: pid for label, pid in list(by_label.items()) if short[label.split(" (")[0]] == 1}

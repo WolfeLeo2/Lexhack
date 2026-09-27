@@ -16,13 +16,14 @@ def load_events(conn, provision_id, include_unverified=False):
 
 
 def load_events_many(conn, provision_ids, include_unverified=False):
-    """{provision_id: events} for many provisions in ONE query (search results)."""
+    """{provision_id: events} for many provisions in ONE query (search results). Extracted events the second-pass
+    checker failed (pipeline/verify_events.py) are never returned."""
     rows = conn.execute("""
         SELECT e.provision_id, e.event_id, e.event_key, e.event_type, e.scope, e.scope_text, e.subsection, e.operative_quote,
                e.source_paragraph, e.effective_date::text, e.affects_event_id, e.method, e.verified, e.confidence,
                j.judgment_id, j.title, j.court, j.neutral_citation, j.source_url
         FROM citation_events e LEFT JOIN judgments j USING (judgment_id)
-        WHERE e.provision_id = ANY(%s) AND (e.verified OR %s)
+        WHERE e.provision_id = ANY(%s) AND (e.verified OR (%s AND e.check_verdict IS DISTINCT FROM 'fail'))
         ORDER BY e.method = 'manual' DESC, e.event_id""", (list(provision_ids), include_unverified)).fetchall()
     cols = ["event_id", "event_key", "event_type", "scope", "scope_text", "subsection", "operative_quote",
             "source_paragraph", "effective_date", "affects_event_id", "method", "verified", "confidence",

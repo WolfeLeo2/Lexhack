@@ -103,3 +103,8 @@ CREATE TABLE IF NOT EXISTS citation_events (
   confidence        REAL,
   notes             TEXT
 );
+
+-- Second-pass check of extracted events (pipeline/verify_events.py): own holding, right section?
+ALTER TABLE citation_events ADD COLUMN IF NOT EXISTS check_verdict TEXT;   -- 'pass' | 'fail' | 'unsure' | NULL (not checked)
+ALTER TABLE citation_events ADD COLUMN IF NOT EXISTS check_reason TEXT;
+ALTER TABLE citation_events ADD COLUMN IF NOT EXISTS check_version INT;
