@@ -4,6 +4,7 @@ all regex and LLM rows (then re-run pipeline.llm_resolve, which re-applies its c
 
   uv run python -m pipeline.extract_citations            # all judgments with text
   uv run python -m pipeline.extract_citations --dry-run  # extract + report, write nothing
+  uv run python -m pipeline.extract_citations --paragraphs-only  # recompute `paragraph` in place; keeps LLM rows
 
 Every Act is recorded (act_ref), not only the 8 we hold; provision_id is set only when the mention resolves
 to a section in `provisions`. char_start/char_end index into the parsed JSON's "text" field as stored.
@@ -14,6 +15,7 @@ Confidence is about the *resolution* (which Act), not whether a citation exists:
   0.0  unresolved: a bare "section N" (left for the LLM pass) or "the Act" with nothing named before it
 """
 import argparse
+import bisect
 import collections
 import json
 import re
@@ -76,7 +78,15 @@ CITATION = re.compile(
     rf"{PRE}?(?P<head>{HEAD})(?P<list>{NUM}(?:{SEP}(?:{HEAD})?{NUM}{ENDS})*)(?:{CONN}{ACT})?")
 ITEM = re.compile(rf"(?P<head>{HEAD})?(?P<num>{NUM})")
 ACT_GROUPS = ("old", "cap", "capno", "acro", "name", "pre")
-PARA = re.compile(r"(?:^|(?<=\s))(\d{1,3})\.\s+(?=[A-Z\"“‘(])")
+# Paragraph numbering styles: "1. The", "[1] The", "1) The". One style per judgment (see paragraph_markers).
+PARA_STYLES = {
+    "dot": re.compile(r"(?:^|(?<=\s))(\d{1,3})\.\s+(?=[A-Z\"“‘(])"),
+    "bracket": re.compile(r"(?:^|(?<=\s))\[(\d{1,3})\]\s+(?=[A-Z\"“‘(])"),
+    "paren": re.compile(r"(?:^|(?<=\s))(\d{1,3})\)\s+(?=[A-Z\"“‘(])"),
+}
+MIN_ALT_MARKERS = 5   # "[n]" / "n)" also number prayer lists ("1) Spent 2) An order"); a real scheme runs longer
+MIN_ALT_SPAN = 0.5    # ... and runs through the judgment; footnote lists and element lists sit in one stretch
+MAX_GAP = 2           # "dot" style only: a paragraph the pattern misses ("40. the …", a dropped "20.") mustn't end the sequence
 
 
 def norm_ref(s):
@@ -95,15 +105,28 @@ def canonical(name):
 
 
 def paragraph_markers(text):
-    """(offset, number) of inline paragraph numbers, accepting only the sequence 1, 2, 3... so that a sentence
-    ending "...section 204. The court" isn't taken for paragraph 204."""
-    out, want = [], 1
-    for m in PARA.finditer(text):
-        n = int(m.group(1))
-        if n == want:
-            out.append((m.start(), n))
-            want += 1
-    return out
+    """(offset, number) of paragraph numbers, accepting only the sequence 1, 2, 3... (skipping at most MAX_GAP missed
+    numbers) so that a sentence ending "...section 204. The court" isn't taken for paragraph 204. Each style is tried; the longest sequence wins,
+    "dot" on ties, and the other styles only with at least MIN_ALT_MARKERS paragraphs."""
+    best = []
+    for style, pattern in PARA_STYLES.items():
+        out, want = [], 1
+        for m in pattern.finditer(text):
+            n = int(m.group(1))
+            gap = MAX_GAP if out and style == "dot" else 0   # "[n]" gaps are usually footnote references
+            if want <= n <= want + gap:
+                out.append((m.start(), n))
+                want = n + 1
+        spans = bool(out) and out[-1][0] - out[0][0] >= MIN_ALT_SPAN * len(text)
+        if len(out) > len(best) and (style == "dot" or (len(out) >= MIN_ALT_MARKERS and spans)):
+            best = out
+    return best
+
+
+def paragraph_at(markers, offset):
+    """The paragraph number in force at a character offset, or None before the first marker."""
+    i = bisect.bisect_right([o for o, _ in markers], offset)
+    return str(markers[i - 1][1]) if i else None
 
 
 def is_article_head(head):
@@ -202,11 +225,40 @@ def pick_provision(lookup, slug, section_ref, decision_date):
     return cands[0][1] if len(cands) == 1 else None
 
 
+def update_paragraphs():
+    """Re-derive `paragraph` for every stored mention from its char_start, without deleting any row."""
+    with connect() as conn:
+        rows = conn.execute("""SELECT m.mention_id, m.char_start, m.paragraph, j.raw_path FROM citation_mentions m
+                               JOIN judgments j USING (judgment_id) ORDER BY j.raw_path""").fetchall()
+    changes, markers, current = [], [], None
+    for mid, start, old, raw_path in rows:
+        if raw_path != current:
+            current = raw_path
+            markers = paragraph_markers(json.loads((data_dir() / raw_path).read_text(encoding="utf-8"))["text"] or "")
+        new = paragraph_at(markers, start)
+        if new != old:
+            changes.append((mid, new))
+    with connect() as conn:
+        with conn.transaction():
+            conn.execute("CREATE TEMP TABLE para_fix (mention_id INT PRIMARY KEY, paragraph TEXT) ON COMMIT DROP")
+            with conn.cursor().copy("COPY para_fix FROM STDIN") as cp:
+                for r in changes:
+                    cp.write_row(r)
+            conn.execute("""UPDATE citation_mentions m SET paragraph = f.paragraph FROM para_fix f
+                            WHERE m.mention_id = f.mention_id""")
+        null = conn.execute("SELECT count(*) FILTER (WHERE paragraph IS NULL), count(*) FROM citation_mentions").fetchone()
+    print(f"{len(changes)} paragraphs changed; now {null[0]} of {null[1]} mentions have no paragraph")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--limit", type=int)
+    ap.add_argument("--paragraphs-only", action="store_true",
+                    help="recompute the paragraph of existing rows in place (keeps LLM rows); nothing else changes")
     args = ap.parse_args()
+    if args.paragraphs_only:
+        return update_paragraphs()
 
     with connect() as conn:
         if not args.dry_run:

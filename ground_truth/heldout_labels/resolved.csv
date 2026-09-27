@@ -1,0 +1,7 @@
+judgment_id,cand,section_ref,act_ref,note
+ke/judgment/kesc/2017/42,39,35,Constitution of Kenya,"adjudicated: list continues past the last candidate; per mentions_README, numbers without their own candidate go at the first"
+ke/judgment/kesc/2017/42,39,201,Constitution of Kenya,"""article 201"" has no own candidate (window ends at cand 39) | adjudicated: list continues past the last candidate; per mentions_README, numbers without their own candidate go at the first"
+ke/judgment/kehc/2022/10569,0,50(1),Constitution of Kenya,"adjudicated: list continues past the last candidate; per mentions_README, numbers without their own candidate go at the first"
+ke/judgment/kehc/2022/10569,0,1A,Civil Procedure Act,"written ""IA"" (OCR for 1A); no separate candidate | adjudicated: list continues past the last candidate; per mentions_README, numbers without their own candidate go at the first"
+ke/judgment/kehc/2022/10569,0,1B,Civil Procedure Act,"no separate candidate | adjudicated: list continues past the last candidate; per mentions_README, numbers without their own candidate go at the first"
+ke/judgment/kehc/2022/10569,0,34,Civil Procedure Act,"no separate candidate | adjudicated: list continues past the last candidate; per mentions_README, numbers without their own candidate go at the first"

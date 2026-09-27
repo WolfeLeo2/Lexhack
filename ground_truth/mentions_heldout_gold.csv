@@ -1,0 +1,611 @@
+judgment_id,cand,section_ref,act_ref,status,note
+ke/judgment/kesc/2014/31,0,21(2),Supreme Court Act,verified,
+ke/judgment/kesc/2014/31,1,27(1),Civil Procedure Act,verified,
+ke/judgment/kesc/2014/31,2,21(2),Supreme Court Act,verified,
+ke/judgment/kesc/2014/31,3,27(1),Civil Procedure Act,verified,"relevant-provisions block, follows Supreme Court Rules; text is CPA s.27(1)"
+ke/judgment/kesc/2014/31,4,21(2),Supreme Court Act,verified,
+ke/judgment/kesc/2014/31,5,27(1),Civil Procedure Act,verified,
+ke/judgment/kesc/2014/31,6,21(1),Civil Procedure Act,verified,as written in headnote (likely meant 27(1))
+ke/judgment/kesc/2014/31,7,50(1),Constitution of Kenya,verified,
+ke/judgment/kesc/2014/31,8,14,Supreme Court Act,verified,
+ke/judgment/kesc/2014/31,8,21(2),Supreme Court Act,verified,
+ke/judgment/kesc/2014/31,9,-,-,verified,
+ke/judgment/kesc/2014/31,10,14,Supreme Court Act,verified,
+ke/judgment/kesc/2014/31,11,-,-,verified,
+ke/judgment/kesc/2014/31,12,-,-,verified,
+ke/judgment/kesc/2014/31,13,21(2),Supreme Court Act,verified,
+ke/judgment/kesc/2014/31,14,27(1),Civil Procedure Act,verified,
+ke/judgment/kesc/2014/31,15,14,Supreme Court Act,verified,
+ke/judgment/kesc/2014/31,16,50(1),Constitution of Kenya,verified,
+ke/judgment/kesc/2017/42,0,39(1C),Elections Act,verified,
+ke/judgment/kesc/2017/42,1,-,-,verified,
+ke/judgment/kesc/2017/42,2,86,Constitution of Kenya,verified,
+ke/judgment/kesc/2017/42,3,-,-,verified,
+ke/judgment/kesc/2017/42,4,-,-,verified,
+ke/judgment/kesc/2017/42,5,-,-,verified,
+ke/judgment/kesc/2017/42,6,44,Elections Act,verified,
+ke/judgment/kesc/2017/42,7,81,Constitution of Kenya,verified,
+ke/judgment/kesc/2017/42,7,86,Constitution of Kenya,verified,
+ke/judgment/kesc/2017/42,8,4(m),Independent Electoral and Boundaries Commission Act,verified,"written ""IEBC Act"""
+ke/judgment/kesc/2017/42,9,44(8),Elections Act,verified,
+ke/judgment/kesc/2017/42,10,44(1),Elections Act,verified,
+ke/judgment/kesc/2017/42,11,44,Elections Act,verified,
+ke/judgment/kesc/2017/42,12,44(5),Elections Act,verified,
+ke/judgment/kesc/2017/42,13,44(2),Elections Act,verified,
+ke/judgment/kesc/2017/42,14,81e(iv),Constitution of Kenya,verified,"""article 81 e(iv) and (v)"""
+ke/judgment/kesc/2017/42,15,-,-,verified,
+ke/judgment/kesc/2017/42,16,-,-,verified,
+ke/judgment/kesc/2017/42,17,38,Constitution of Kenya,verified,
+ke/judgment/kesc/2017/42,18,-,-,verified,
+ke/judgment/kesc/2017/42,19,-,-,verified,
+ke/judgment/kesc/2017/42,20,-,-,verified,
+ke/judgment/kesc/2017/42,21,-,-,verified,
+ke/judgment/kesc/2017/42,22,-,-,verified,
+ke/judgment/kesc/2017/42,23,-,-,verified,
+ke/judgment/kesc/2017/42,24,-,-,verified,
+ke/judgment/kesc/2017/42,25,86,Constitution of Kenya,verified,
+ke/judgment/kesc/2017/42,26,-,-,verified,
+ke/judgment/kesc/2017/42,27,-,-,verified,
+ke/judgment/kesc/2017/42,28,-,-,verified,
+ke/judgment/kesc/2017/42,29,-,-,verified,
+ke/judgment/kesc/2017/42,30,-,-,verified,
+ke/judgment/kesc/2017/42,31,-,-,verified,
+ke/judgment/kesc/2017/42,32,81,Constitution of Kenya,verified,
+ke/judgment/kesc/2017/42,32,86,Constitution of Kenya,verified,
+ke/judgment/kesc/2017/42,33,-,-,verified,
+ke/judgment/kesc/2017/42,34,-,-,verified,
+ke/judgment/kesc/2017/42,35,-,-,verified,
+ke/judgment/kesc/2017/42,36,-,-,verified,
+ke/judgment/kesc/2017/42,37,-,-,verified,
+ke/judgment/kesc/2017/42,38,14,Election Offences Act,verified,
+ke/judgment/kesc/2017/42,39,35,Constitution of Kenya,adjudicated,"adjudicated: list continues past the last candidate; per mentions_README, numbers without their own candidate go at the first"
+ke/judgment/kesc/2017/42,39,201,Constitution of Kenya,adjudicated,"""article 201"" has no own candidate (window ends at cand 39) | adjudicated: list continues past the last candidate; per mentions_README, numbers without their own candidate go at the first"
+ke/judgment/kesc/2019/90,0,21(2),Supreme Court Act,verified,
+ke/judgment/kesc/2019/90,0,23(2)(b),Supreme Court Act,verified,
+ke/judgment/kesc/2021/43,0,62,Kenya Ports Authority Act,verified,
+ke/judgment/kesc/2021/43,1,33,Kenya Airports Authority Act,verified,
+ke/judgment/kesc/2021/43,2,62,Kenya Ports Authority Act,verified,
+ke/judgment/kesc/2021/43,3,159(2)(c),Constitution of Kenya,verified,
+ke/judgment/kesc/2021/43,4,7,Civil Procedure Act,verified,
+ke/judgment/kesc/2021/43,5,2(4),Constitution of Kenya,verified,
+ke/judgment/kesc/2021/43,5,159(2)(d),Constitution of Kenya,verified,
+ke/judgment/kesc/2021/43,5,163(4)(a),Constitution of Kenya,verified,
+ke/judgment/kesc/2021/43,6,3,Constitution (repealed),verified,
+ke/judgment/kesc/2021/43,6,75,Constitution (repealed),verified,
+ke/judgment/kesc/2021/43,6,77(9),Constitution (repealed),verified,
+ke/judgment/kesc/2021/43,6,78,Constitution (repealed),verified,
+ke/judgment/kesc/2021/43,6,82,Constitution (repealed),verified,
+ke/judgment/kesc/2021/43,6,84,Constitution (repealed),verified,
+ke/judgment/kesc/2021/43,6,85,Constitution (repealed),verified,
+ke/judgment/kesc/2021/43,7,76(1)(a),Elections Act,verified,
+ke/judgment/kesc/2021/43,8,32,Intergovernmental Relations Act,verified,
+ke/judgment/kesc/2021/43,9,12,Kenya Airports Authority Act,verified,
+ke/judgment/kesc/2021/43,9,14,Kenya Airports Authority Act,verified,
+ke/judgment/kesc/2021/43,9,15,Kenya Airports Authority Act,verified,
+ke/judgment/kesc/2021/43,9,33(1),Kenya Airports Authority Act,verified,
+ke/judgment/kesc/2021/43,9,34(a),Kenya Airports Authority Act,verified,
+ke/judgment/kesc/2021/43,10,62,Kenya Ports Authority Act,verified,
+ke/judgment/kesc/2021/43,11,83(1),Kenya Railways Corporation Act,verified,
+ke/judgment/kesc/2021/43,12,15(2),Supreme Court Act,verified,
+ke/judgment/kesc/2021/43,13,15(2),Supreme Court Act,verified,
+ke/judgment/kesc/2021/43,14,2(4),Constitution of Kenya,verified,
+ke/judgment/kesc/2021/43,14,163(4)(a),Constitution of Kenya,verified,
+ke/judgment/kesc/2021/43,15,-,-,verified,
+ke/judgment/kesc/2021/43,16,75,Constitution (repealed),verified,
+ke/judgment/kesc/2021/43,17,82,Constitution (repealed),verified,
+ke/judgment/kesc/2021/43,18,75,Constitution (repealed),verified,
+ke/judgment/kesc/2021/43,19,77,Constitution (repealed),verified,repealed Constitution from context (pre-2010 suit)
+ke/judgment/kesc/2021/43,20,78,Constitution (repealed),verified,
+ke/judgment/kesc/2021/43,20,82,Constitution (repealed),verified,
+ke/judgment/kesc/2021/43,21,34(a),Kenya Airports Authority Act,verified,
+ke/judgment/kesc/2021/43,22,33(1),Kenya Airports Authority Act,verified,"""cap 395"""
+ke/judgment/kesc/2021/43,23,-,-,verified,
+ke/judgment/kesc/2021/43,24,33,Kenya Airports Authority Act,verified,
+ke/judgment/kesc/2021/43,25,34(a),Kenya Airports Authority Act,verified,
+ke/judgment/kesc/2021/43,26,33,Kenya Airports Authority Act,verified,
+ke/judgment/kesc/2021/43,26,34,Kenya Airports Authority Act,verified,
+ke/judgment/kesc/2021/43,27,84,Constitution (repealed),verified,
+ke/judgment/kesc/2021/43,28,34,Kenya Airports Authority Act,verified,
+ke/judgment/kesc/2021/43,29,33,Kenya Airports Authority Act,verified,
+ke/judgment/kesc/2021/43,29,34,Kenya Airports Authority Act,verified,
+ke/judgment/kesc/2021/43,30,33(1),Kenya Airports Authority Act,verified,
+ke/judgment/kesc/2021/43,31,-,-,verified,
+ke/judgment/kesc/2021/43,32,33(1),Kenya Airports Authority Act,verified,
+ke/judgment/kesc/2021/43,32,34,Kenya Airports Authority Act,verified,
+ke/judgment/kesc/2021/43,33,84,Constitution (repealed),verified,
+ke/judgment/kesc/2021/43,34,33(1),Kenya Airports Authority Act,verified,
+ke/judgment/kesc/2021/43,34,34,Kenya Airports Authority Act,verified,
+ke/judgment/kesc/2021/43,35,33,Kenya Airports Authority Act,verified,
+ke/judgment/kesc/2021/43,36,75,Constitution (repealed),verified,
+ke/judgment/kesc/2021/43,36,77,Constitution (repealed),verified,
+ke/judgment/kesc/2021/43,36,82,Constitution (repealed),verified,
+ke/judgment/kesc/2021/43,37,163(4)(a),Constitution of Kenya,verified,
+ke/judgment/kesc/2021/43,38,-,-,verified,
+ke/judgment/kesc/2021/43,39,75,Constitution (repealed),verified,
+ke/judgment/kesc/2023/1,0,21(A),Supreme Court Act,verified,
+ke/judgment/kesc/2023/1,1,21(A),Supreme Court Act,verified,
+ke/judgment/kesc/2023/1,2,21(A),Supreme Court Act,verified,"headnote says ""Article 21(A)"" of the Supreme Court Act"
+ke/judgment/kesc/2023/1,3,21(A),Supreme Court Act,verified,
+ke/judgment/kesc/2023/1,4,-,-,verified,
+ke/judgment/kesc/2023/1,5,-,-,verified,
+ke/judgment/kesc/2023/38,0,-,-,verified,
+ke/judgment/kesc/2023/38,1,35,Constitution of Kenya,verified,
+ke/judgment/kesc/2023/38,2,35,Constitution of Kenya,verified,
+ke/judgment/kesc/2023/38,3,27,Independent Electoral and Boundaries Commission Act,verified,"written ""IEBC Act"""
+ke/judgment/kesc/2023/38,4,50(4),Constitution of Kenya,verified,
+ke/judgment/kesc/2023/38,5,35,Constitution of Kenya,verified,
+ke/judgment/kesc/2023/38,6,35,Constitution of Kenya,verified,
+ke/judgment/kesc/2023/38,7,50(4),Constitution of Kenya,verified,
+ke/judgment/kesc/2023/38,8,31,Constitution of Kenya,verified,
+ke/judgment/kesc/2023/38,9,80,Evidence Act,verified,
+ke/judgment/kesc/2023/38,9,81,Evidence Act,verified,
+ke/judgment/kesc/2023/38,10,35,Constitution of Kenya,verified,
+ke/judgment/kesc/2023/38,11,117,Constitution of Kenya,verified,
+ke/judgment/kesc/2023/38,12,117(2),Constitution of Kenya,verified,
+ke/judgment/kesc/2023/38,13,125,Constitution of Kenya,verified,
+ke/judgment/kesc/2023/38,14,35,Evidence Act,verified,
+ke/judgment/kesc/2023/38,14,107,Evidence Act,verified,
+ke/judgment/kesc/2023/38,14,109,Evidence Act,verified,
+ke/judgment/kesc/2023/38,15,22,Constitution of Kenya,verified,
+ke/judgment/kesc/2023/38,15,258(1),Constitution of Kenya,verified,
+ke/judgment/kesc/2023/38,16,3(1),Constitution of Kenya,verified,
+ke/judgment/kesc/2023/38,17,3(1),Constitution of Kenya,verified,
+ke/judgment/kesc/2023/38,18,79,Constitution of Kenya,verified,
+ke/judgment/kesc/2023/38,19,11(1),Ethics and Anti-Corruption Commission Act,verified,
+ke/judgment/kesc/2023/38,20,3A,Witness Protection Act,verified,
+ke/judgment/kesc/2023/38,21,3B(1),Witness Protection Act,verified,
+ke/judgment/kesc/2023/38,22,-,-,verified,
+ke/judgment/kesc/2023/38,23,22,Constitution of Kenya,verified,
+ke/judgment/kesc/2023/38,24,258,Constitution of Kenya,verified,
+ke/judgment/kesc/2023/38,25,22,Constitution of Kenya,verified,
+ke/judgment/kesc/2023/38,25,258,Constitution of Kenya,verified,
+ke/judgment/kesc/2023/38,26,22,Constitution of Kenya,verified,
+ke/judgment/kesc/2023/38,26,258,Constitution of Kenya,verified,
+ke/judgment/kesc/2023/38,27,58,Environmental Management and Coordination Act,verified,
+ke/judgment/kesc/2023/38,28,59,Environmental Management and Coordination Act,verified,
+ke/judgment/kesc/2023/38,29,-,-,verified,
+ke/judgment/kesc/2023/38,30,42,Constitution of Kenya,verified,
+ke/judgment/kesc/2023/38,31,69,Constitution of Kenya,verified,
+ke/judgment/kesc/2023/38,32,70,Constitution of Kenya,verified,
+ke/judgment/kesc/2023/38,33,69,Constitution of Kenya,verified,
+ke/judgment/kesc/2023/38,34,70,Constitution of Kenya,verified,
+ke/judgment/kesc/2023/38,35,42,Constitution of Kenya,verified,
+ke/judgment/kesc/2023/38,36,58,Environmental Management and Coordination Act,verified,
+ke/judgment/kesc/2023/38,37,129(1),Environmental Management and Coordination Act,verified,
+ke/judgment/kesc/2023/38,38,125,Environmental Management and Coordination Act,verified,
+ke/judgment/kesc/2023/38,39,-,-,verified,
+ke/judgment/kesc/2023/69,0,163(4)(a),Constitution of Kenya,verified,
+ke/judgment/kesc/2023/69,1,163(4)(a),Constitution of Kenya,verified,
+ke/judgment/kesc/2023/69,2,163(4)(a),Constitution of Kenya,verified,
+ke/judgment/kesc/2023/69,3,1,Constitution of Kenya,verified,
+ke/judgment/kesc/2023/69,3,2,Constitution of Kenya,verified,
+ke/judgment/kesc/2023/69,3,3(1),Constitution of Kenya,verified,
+ke/judgment/kesc/2023/69,3,22,Constitution of Kenya,verified,
+ke/judgment/kesc/2023/69,3,23,Constitution of Kenya,verified,
+ke/judgment/kesc/2023/69,3,43,Constitution of Kenya,verified,
+ke/judgment/kesc/2023/69,3,47,Constitution of Kenya,verified,
+ke/judgment/kesc/2023/69,3,48,Constitution of Kenya,verified,
+ke/judgment/kesc/2023/69,3,50,Constitution of Kenya,verified,
+ke/judgment/kesc/2023/69,3,73,Constitution of Kenya,verified,
+ke/judgment/kesc/2023/69,3,75,Constitution of Kenya,verified,
+ke/judgment/kesc/2023/69,3,110(3),Constitution of Kenya,verified,
+ke/judgment/kesc/2023/69,3,114,Constitution of Kenya,verified,
+ke/judgment/kesc/2023/69,3,129,Constitution of Kenya,verified,
+ke/judgment/kesc/2023/69,3,153(4)(a),Constitution of Kenya,verified,
+ke/judgment/kesc/2023/69,3,159,Constitution of Kenya,verified,
+ke/judgment/kesc/2023/69,3,163(4)(a),Constitution of Kenya,verified,
+ke/judgment/kesc/2023/69,3,201(d),Constitution of Kenya,verified,
+ke/judgment/kesc/2023/69,3,210(1),Constitution of Kenya,verified,
+ke/judgment/kesc/2023/69,3,226(5),Constitution of Kenya,verified,
+ke/judgment/kesc/2023/69,3,227(1),Constitution of Kenya,verified,
+ke/judgment/kesc/2023/69,3,259,Constitution of Kenya,verified,
+ke/judgment/kesc/2023/69,4,3,Supreme Court Act,verified,
+ke/judgment/kesc/2023/69,5,1,Constitution of Kenya,verified,
+ke/judgment/kesc/2023/69,5,2,Constitution of Kenya,verified,
+ke/judgment/kesc/2023/69,5,3(1),Constitution of Kenya,verified,
+ke/judgment/kesc/2023/69,5,22,Constitution of Kenya,verified,
+ke/judgment/kesc/2023/69,5,43,Constitution of Kenya,verified,
+ke/judgment/kesc/2023/69,5,47,Constitution of Kenya,verified,
+ke/judgment/kesc/2023/69,5,73,Constitution of Kenya,verified,
+ke/judgment/kesc/2023/69,5,75,Constitution of Kenya,verified,
+ke/judgment/kesc/2023/69,5,129,Constitution of Kenya,verified,
+ke/judgment/kesc/2023/69,5,153(4)(a),Constitution of Kenya,verified,
+ke/judgment/kesc/2023/69,5,159,Constitution of Kenya,verified,
+ke/judgment/kesc/2023/69,5,163(4)(a),Constitution of Kenya,verified,
+ke/judgment/kesc/2023/69,5,201(d),Constitution of Kenya,verified,
+ke/judgment/kesc/2023/69,5,210(1),Constitution of Kenya,verified,
+ke/judgment/kesc/2023/69,5,226(5),Constitution of Kenya,verified,
+ke/judgment/kesc/2023/69,5,227(1),Constitution of Kenya,verified,
+ke/judgment/kesc/2023/69,5,259,Constitution of Kenya,verified,
+ke/judgment/kesc/2023/69,6,110(3),Constitution of Kenya,verified,
+ke/judgment/kesc/2023/69,7,114,Constitution of Kenya,verified,
+ke/judgment/kesc/2023/69,8,165(4),Constitution of Kenya,verified,
+ke/judgment/kesc/2023/69,9,-,-,verified,
+ke/judgment/kesc/2023/69,10,-,-,verified,
+ke/judgment/kesc/2023/69,11,-,-,verified,
+ke/judgment/kesc/2023/69,12,163(4)(a),Constitution of Kenya,verified,
+ke/judgment/kesc/2023/69,13,23(3)(c),Constitution of Kenya,verified,
+ke/judgment/kesc/2023/69,14,23(3),Constitution of Kenya,verified,
+ke/judgment/kesc/2023/69,15,164(3),Constitution of Kenya,verified,
+ke/judgment/kesc/2023/69,16,-,-,verified,
+ke/judgment/kesc/2023/69,17,3,Supreme Court Act,verified,
+ke/judgment/kesc/2023/69,18,25(c),Constitution of Kenya,verified,
+ke/judgment/kesc/2023/69,18,50(1),Constitution of Kenya,verified,
+ke/judgment/kesc/2023/69,18,48,Constitution of Kenya,verified,
+ke/judgment/kesc/2023/69,19,163(7),Constitution of Kenya,verified,
+ke/judgment/kesc/2023/69,20,-,-,verified,
+ke/judgment/kesc/2023/69,21,-,-,verified,
+ke/judgment/kesc/2023/69,22,163(4),Constitution of Kenya,verified,
+ke/judgment/kesc/2023/69,23,163(4)(a),Constitution of Kenya,verified,
+ke/judgment/kesc/2023/69,24,163(4)(a),Constitution of Kenya,verified,
+ke/judgment/kesc/2023/69,25,-,-,verified,
+ke/judgment/kesc/2024/51,0,48,Constitution of Kenya,verified,
+ke/judgment/kesc/2024/51,1,2,Supreme Court Act,verified,
+ke/judgment/kesc/2024/51,2,-,-,verified,
+ke/judgment/kesc/2024/51,3,-,-,verified,
+ke/judgment/kesc/2026/27,0,99(3),Land Act,verified,
+ke/judgment/kesc/2026/27,1,99(3),Land Act,verified,
+ke/judgment/kesc/2026/27,2,99(3),Land Act,verified,
+ke/judgment/kesc/2026/27,3,26(1),Land Registration Act,verified,
+ke/judgment/kesc/2026/27,4,163(4)(b),Constitution of Kenya,verified,"""163(4)(b) and (5)"" one section"
+ke/judgment/kesc/2026/27,5,15B,Supreme Court Act,verified,
+ke/judgment/kesc/2026/27,6,163(4)(b),Constitution of Kenya,verified,
+ke/judgment/keca/1996/70,0,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/1996/70,1,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/1996/70,2,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/1996/70,3,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/1996/70,4,6,Arbitration Act,verified,
+ke/judgment/keca/1996/70,5,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/1996/70,6,-,-,verified,policy clause
+ke/judgment/keca/1996/70,7,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/1996/70,8,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/1996/70,9,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/1996/70,10,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/1996/70,11,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/1996/70,12,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/1996/70,13,6(1)(a),Arbitration Act,verified,
+ke/judgment/keca/1996/70,14,6,Arbitration Act,verified,the Act = Arbitration Act
+ke/judgment/keca/1996/70,15,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/1996/70,16,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/1996/70,17,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/1996/70,18,-,-,verified,policy clause
+ke/judgment/keca/1996/70,19,-,-,verified,policy clause
+ke/judgment/keca/1996/70,20,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/2000/321,0,296(2),Penal Code,verified,
+ke/judgment/keca/2000/321,1,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/2000/321,2,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/2000/321,3,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/2000/321,4,211,Criminal Procedure Code,verified,
+ke/judgment/keca/2000/321,5,215,Criminal Procedure Code,verified,
+ke/judgment/keca/2015/78,0,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/2015/78,1,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/2015/78,2,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/2015/78,3,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/2015/78,4,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/2015/78,5,296(2),Penal Code,verified,
+ke/judgment/keca/2015/78,6,25A(1),Evidence Act,verified,
+ke/judgment/keca/2015/78,7,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/2015/78,8,296(2),Penal Code,verified,
+ke/judgment/keca/2015/78,9,26,Constitution of Kenya,verified,
+ke/judgment/keca/2018/17,0,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/2018/17,1,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/2018/17,2,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/2018/17,3,40,Constitution of Kenya,verified,
+ke/judgment/keca/2018/17,4,142,Registered Land Act,verified,
+ke/judgment/keca/2018/17,4,143,Registered Land Act,verified,
+ke/judgment/keca/2018/17,5,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/2018/17,6,24(1)(b),Constitution of Kenya,verified,
+ke/judgment/keca/2018/17,7,10,Constitution of Kenya,verified,
+ke/judgment/keca/2018/17,7,73(1),Constitution of Kenya,verified,
+ke/judgment/keca/2018/17,8,40(6),Constitution of Kenya,verified,
+ke/judgment/keca/2018/17,9,159(2),Constitution of Kenya,verified,
+ke/judgment/keca/2018/17,10,7,Fair Administrative Action Act,verified,
+ke/judgment/keca/2018/17,11,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/2018/17,12,50,Constitution of Kenya,verified,
+ke/judgment/keca/2018/17,13,47,Constitution of Kenya,verified,
+ke/judgment/keca/2018/17,14,7,Fair Administrative Action Act,verified,
+ke/judgment/keca/2018/17,15,47,Constitution of Kenya,verified,
+ke/judgment/keca/2018/17,16,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/2018/17,17,143(1),Registered Land Act,verified,
+ke/judgment/keca/2018/17,18,7(2)(1),Fair Administrative Action Act,verified,provisions of Fair Administrative Action
+ke/judgment/keca/2018/17,19,11(1),Fair Administrative Action Act,verified,
+ke/judgment/keca/2018/17,20,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/2018/17,21,259,Constitution of Kenya,verified,
+ke/judgment/keca/2018/17,22,10,Constitution of Kenya,verified,
+ke/judgment/keca/2018/17,22,73(1),Constitution of Kenya,verified,
+ke/judgment/keca/2018/17,23,40(6),Constitution of Kenya,verified,
+ke/judgment/keca/2018/17,24,47,Constitution of Kenya,verified,
+ke/judgment/keca/2018/17,25,7(2)(f),Fair Administrative Action Act,verified,the Act = FAA Act
+ke/judgment/keca/2018/17,26,7(2)(j),Fair Administrative Action Act,verified,
+ke/judgment/keca/2018/17,27,7(2)(k),Fair Administrative Action Act,verified,
+ke/judgment/keca/2018/17,28,7(2)(i),Fair Administrative Action Act,verified,
+ke/judgment/keca/2018/17,29,7(2),Fair Administrative Action Act,verified,the Act = FAA Act
+ke/judgment/keca/2018/17,30,11,Fair Administrative Action Act,verified,the Act = FAA Act
+ke/judgment/keca/2018/17,31,3,Government Lands Act,verified,
+ke/judgment/keca/2018/17,31,7,Government Lands Act,verified,
+ke/judgment/keca/2018/17,31,9,Government Lands Act,verified,
+ke/judgment/keca/2018/17,32,50,Constitution of Kenya,verified,
+ke/judgment/keca/2018/17,33,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/2018/255,0,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/2018/255,1,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/2018/255,2,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/2018/255,3,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/2018/255,4,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/2018/255,5,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/2018/255,6,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/2018/255,7,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/2018/255,8,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/2018/255,9,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/2018/255,10,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/2018/255,11,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/2018/255,12,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/2018/255,13,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/2018/255,14,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/2018/255,15,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/2018/255,16,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/2018/255,17,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/2018/255,18,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/2018/255,19,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/2018/255,20,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/2018/255,21,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/2018/255,22,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/2018/255,23,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/2018/255,24,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/2018/255,25,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/2018/255,26,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/2018/255,27,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/2018/255,28,41,Employment Act,verified,
+ke/judgment/keca/2018/255,29,43,Employment Act,verified,
+ke/judgment/keca/2018/255,29,45,Employment Act,verified,
+ke/judgment/keca/2018/255,30,45(4)(b),Employment Act,verified,
+ke/judgment/keca/2018/255,31,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/2018/255,32,41,Employment Act,verified,
+ke/judgment/keca/2018/255,32,43,Employment Act,verified,
+ke/judgment/keca/2018/255,32,45,Employment Act,verified,
+ke/judgment/keca/2018/255,33,107,Evidence Act,verified,
+ke/judgment/keca/2018/255,34,41,Constitution of Kenya,verified,
+ke/judgment/keca/2018/255,35,41,Employment Act,verified,
+ke/judgment/keca/2018/255,35,43,Employment Act,verified,
+ke/judgment/keca/2018/255,35,44,Employment Act,verified,
+ke/judgment/keca/2018/255,35,45,Employment Act,verified,
+ke/judgment/keca/2018/255,36,-,-,verified,SPA = service provision agreement (contract)
+ke/judgment/keca/2018/255,37,-,-,verified,SPA = service provision agreement (contract)
+ke/judgment/keca/2018/255,38,-,-,verified,SPA = service provision agreement (contract)
+ke/judgment/keca/2025/1788,0,8(l),Sexual Offences Act,verified,"written 8(l), i.e. 8(1); read with 8(3) = same section"
+ke/judgment/keca/2026/851,0,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/2026/851,1,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/2026/851,2,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/2026/851,3,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/2026/851,4,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/2026/851,5,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/2026/851,6,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/2026/851,7,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/2026/851,8,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/2026/851,9,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/2026/851,10,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/2026/851,11,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/2026/851,12,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/2026/851,13,45,Employment Act,verified,
+ke/judgment/keca/2026/851,14,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/2026/851,15,44(4)(c),Employment Act,verified,
+ke/judgment/keca/2026/851,15,41,Employment Act,verified,
+ke/judgment/keca/2026/851,16,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/2026/851,17,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/2026/851,18,45,Employment Act,verified,
+ke/judgment/keca/2026/851,19,41,Employment Act,verified,
+ke/judgment/keca/2026/851,20,43,Employment Act,verified,
+ke/judgment/keca/2026/851,20,45,Employment Act,verified,
+ke/judgment/keca/2026/851,21,41,Employment Act,verified,
+ke/judgment/keca/2026/851,21,43,Employment Act,verified,
+ke/judgment/keca/2026/851,21,45,Employment Act,verified,
+ke/judgment/keca/2026/851,22,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/2026/851,23,49(4),Employment Act,verified,
+ke/judgment/keca/2026/851,24,41,Employment Act,verified,
+ke/judgment/keca/2026/851,24,43,Employment Act,verified,
+ke/judgment/keca/2026/851,24,45,Employment Act,verified,
+ke/judgment/keca/2026/851,25,-,-,verified,not a citation (Kshs./word ending in s.)
+ke/judgment/keca/2026/851,26,59(3),Labour Relations Act,verified,
+ke/judgment/keca/2026/851,27,59(1),Labour Relations Act,verified,
+ke/judgment/keca/2026/851,28,59(3),Labour Relations Act,verified,
+ke/judgment/keca/2026/851,29,47(5),Employment Act,verified,
+ke/judgment/keca/2026/851,30,45,Employment Act,verified,
+ke/judgment/keca/2026/851,31,49,Employment Act,verified,the Act = Employment Act
+ke/judgment/keca/2026/851,32,59(1)(b),Labour Relations Act,verified,
+ke/judgment/keca/2026/851,33,26(2),Employment Act,verified,
+ke/judgment/keca/2026/851,34,49(1)(c),Employment Act,verified,
+ke/judgment/keca/2026/851,35,49(4),Employment Act,verified,
+ke/judgment/keca/2026/851,36,49,Employment Act,verified,
+ke/judgment/keca/2026/851,37,49(4)(k),Employment Act,verified,
+ke/judgment/kehc/2012/2830,0,3A,Appellate Jurisdiction Act,verified,quoted CA dictum
+ke/judgment/kehc/2012/2830,0,3B,Appellate Jurisdiction Act,verified,
+ke/judgment/kehc/2012/2830,1,3A,Appellate Jurisdiction Act,verified,
+ke/judgment/kehc/2012/2830,1,3B,Appellate Jurisdiction Act,verified,
+ke/judgment/kehc/2012/2830,2,1A(2),Civil Procedure Act,verified,"""the Act"" unnamed; HC civil suit under CPR, text quoted is CPA s.1A(2)"
+ke/judgment/kehc/2012/2830,3,1B,Civil Procedure Act,verified,as cand 2
+ke/judgment/kehc/2013/3195,0,280,Penal Code,verified,
+ke/judgment/kehc/2013/3195,1,-,-,verified,
+ke/judgment/kehc/2013/3195,2,77(5),Constitution (repealed),verified,
+ke/judgment/kehc/2013/3195,3,77(5),Constitution (repealed),verified,
+ke/judgment/kehc/2013/3195,4,50(2)(o),Constitution of Kenya,verified,
+ke/judgment/kehc/2013/3195,5,77(5),Constitution (repealed),verified,
+ke/judgment/kehc/2013/3195,6,77(5),Constitution (repealed),verified,
+ke/judgment/kehc/2013/3195,7,50(2)(o),Constitution of Kenya,verified,
+ke/judgment/kehc/2013/3195,8,138,Criminal Procedure Code,verified,
+ke/judgment/kehc/2013/3195,9,77(5),Constitution (repealed),verified,
+ke/judgment/kehc/2013/3195,10,50(2)(o),Constitution of Kenya,verified,in summary of another case; Constitution implied
+ke/judgment/kehc/2013/3195,11,60,Advocates Act,verified,
+ke/judgment/kehc/2013/3195,12,77(5),Constitution (repealed),verified,
+ke/judgment/kehc/2013/3195,13,50(2)(o),Constitution of Kenya,verified,
+ke/judgment/kehc/2017/2856,0,50,Constitution of Kenya,verified,
+ke/judgment/kehc/2017/2856,0,159,Constitution of Kenya,verified,
+ke/judgment/kehc/2017/2856,1,1A,Civil Procedure Act,verified,
+ke/judgment/kehc/2017/2856,1,1B,Civil Procedure Act,verified,
+ke/judgment/kehc/2017/2856,1,3A,Civil Procedure Act,verified,
+ke/judgment/kehc/2017/2856,2,238,Companies Act,verified,
+ke/judgment/kehc/2017/2856,3,-,-,verified,
+ke/judgment/kehc/2017/2856,4,-,-,verified,
+ke/judgment/kehc/2017/2856,5,-,-,verified,
+ke/judgment/kehc/2017/2856,6,-,-,verified,
+ke/judgment/kehc/2017/2856,7,238,Companies Act,verified,
+ke/judgment/kehc/2017/2856,8,10,Constitution of Kenya,verified,
+ke/judgment/kehc/2017/2856,8,47,Constitution of Kenya,verified,
+ke/judgment/kehc/2017/2856,8,50,Constitution of Kenya,verified,
+ke/judgment/kehc/2017/2856,9,-,-,verified,
+ke/judgment/kehc/2017/2856,10,239,Companies Act,verified,"""(sic)"" in text"
+ke/judgment/kehc/2017/2856,11,3,Companies Act,verified,
+ke/judgment/kehc/2017/2856,12,238,Companies Act,verified,
+ke/judgment/kehc/2017/2856,13,50,Constitution of Kenya,verified,
+ke/judgment/kehc/2017/2856,14,159(2)(d),Constitution of Kenya,verified,
+ke/judgment/kehc/2017/2856,15,-,-,verified,
+ke/judgment/kehc/2017/2856,16,-,-,verified,
+ke/judgment/kehc/2017/2856,17,-,-,verified,
+ke/judgment/kehc/2017/2856,18,238,Companies Act,verified,
+ke/judgment/kehc/2017/2856,19,239,Companies Act,verified,
+ke/judgment/kehc/2017/2856,20,239(2)(3),Companies Act,verified,"""(2) and (3)"""
+ke/judgment/kehc/2017/2856,21,-,-,verified,
+ke/judgment/kehc/2017/2856,22,239(3),Companies Act,verified,
+ke/judgment/kehc/2020/2788,0,48(1)(a),Anti-Corruption and Economic Crimes Act,verified,Counts under ACECA (named at para 6)
+ke/judgment/kehc/2020/2788,1,-,-,verified,
+ke/judgment/kehc/2020/2788,2,-,-,verified,
+ke/judgment/kehc/2020/2788,3,-,-,verified,
+ke/judgment/kehc/2020/2788,4,48(2)(a),Anti-Corruption and Economic Crimes Act,verified,
+ke/judgment/kehc/2020/2788,5,-,-,verified,
+ke/judgment/kehc/2020/2788,6,-,-,verified,
+ke/judgment/kehc/2020/2788,7,-,-,verified,
+ke/judgment/kehc/2020/2788,8,48(1)(a),Anti-Corruption and Economic Crimes Act,verified,
+ke/judgment/kehc/2020/2788,9,-,-,verified,
+ke/judgment/kehc/2020/2788,10,-,-,verified,
+ke/judgment/kehc/2020/2788,11,-,-,verified,
+ke/judgment/kehc/2020/2788,12,48(2)(a),Anti-Corruption and Economic Crimes Act,verified,
+ke/judgment/kehc/2020/2788,13,-,-,verified,
+ke/judgment/kehc/2020/2788,14,-,-,verified,
+ke/judgment/kehc/2020/2788,15,-,-,verified,
+ke/judgment/kehc/2020/2788,16,-,-,verified,
+ke/judgment/kehc/2020/2788,17,48(1)(a),Anti-Corruption and Economic Crimes Act,verified,
+ke/judgment/kehc/2020/2788,18,-,-,verified,
+ke/judgment/kehc/2020/2788,19,-,-,verified,
+ke/judgment/kehc/2020/2788,20,-,-,verified,
+ke/judgment/kehc/2020/2788,21,48(2)(a),Anti-Corruption and Economic Crimes Act,verified,
+ke/judgment/kehc/2020/2788,22,48(2)(b),Anti-Corruption and Economic Crimes Act,verified,
+ke/judgment/kehc/2020/2788,23,-,-,verified,
+ke/judgment/kehc/2020/2788,24,-,-,verified,
+ke/judgment/kehc/2020/2788,25,63(1),Anti-Corruption and Economic Crimes Act,verified,"""ACECA 2003"""
+ke/judgment/kehc/2020/2788,26,-,-,verified,
+ke/judgment/kehc/2020/2788,27,-,-,verified,
+ke/judgment/kehc/2020/2788,28,-,-,verified,
+ke/judgment/kehc/2020/2788,29,-,-,verified,
+ke/judgment/kehc/2020/2788,30,-,-,verified,
+ke/judgment/kehc/2020/2788,31,-,-,verified,
+ke/judgment/kehc/2020/2788,32,-,-,verified,
+ke/judgment/kehc/2020/2788,33,-,-,verified,
+ke/judgment/kehc/2020/2788,34,-,-,verified,
+ke/judgment/kehc/2020/2788,35,-,-,verified,
+ke/judgment/kehc/2020/2788,36,-,-,verified,
+ke/judgment/kehc/2020/2788,37,-,-,verified,
+ke/judgment/kehc/2020/2788,38,-,-,verified,
+ke/judgment/kehc/2020/2788,39,-,-,verified,
+ke/judgment/kehc/2022/10569,0,50(1),Constitution of Kenya,adjudicated,"adjudicated: list continues past the last candidate; per mentions_README, numbers without their own candidate go at the first"
+ke/judgment/kehc/2022/10569,0,1A,Civil Procedure Act,adjudicated,"written ""IA"" (OCR for 1A); no separate candidate | adjudicated: list continues past the last candidate; per mentions_README, numbers without their own candidate go at the first"
+ke/judgment/kehc/2022/10569,0,1B,Civil Procedure Act,adjudicated,"no separate candidate | adjudicated: list continues past the last candidate; per mentions_README, numbers without their own candidate go at the first"
+ke/judgment/kehc/2022/10569,0,34,Civil Procedure Act,adjudicated,"no separate candidate | adjudicated: list continues past the last candidate; per mentions_README, numbers without their own candidate go at the first"
+ke/judgment/kehc/2022/10569,1,-,-,verified,
+ke/judgment/kehc/2022/10569,2,5(1),Judicature Act,verified,
+ke/judgment/kehc/2022/10569,3,-,-,verified,
+ke/judgment/kehc/2022/10569,4,-,-,verified,
+ke/judgment/kehc/2022/16429,0,-,-,verified,
+ke/judgment/kehc/2022/16429,1,5(b)(iv),Insurance (Motor Vehicles Third Party Risks) Act,verified,
+ke/judgment/kehc/2022/16429,2,-,-,verified,
+ke/judgment/kehc/2022/16429,3,-,-,verified,
+ke/judgment/kehc/2022/16429,4,-,-,verified,
+ke/judgment/kehc/2022/16429,5,-,-,verified,
+ke/judgment/kehc/2022/16429,6,-,-,verified,
+ke/judgment/kehc/2022/16429,7,-,-,verified,
+ke/judgment/kehc/2022/16429,8,65,Civil Procedure Act,verified,"""Section 65 & ... section 78 CPA"""
+ke/judgment/kehc/2022/16429,9,78,Civil Procedure Act,verified,
+ke/judgment/kehc/2022/16429,10,-,-,verified,
+ke/judgment/kehc/2022/16429,11,-,-,verified,
+ke/judgment/kehc/2022/16429,12,-,-,verified,
+ke/judgment/kehc/2023/2423,0,22(1),Constitution of Kenya,verified,
+ke/judgment/kehc/2023/2423,0,23,Constitution of Kenya,verified,
+ke/judgment/kehc/2023/2423,0,165(1)(2)(b),Constitution of Kenya,verified,
+ke/judgment/kehc/2023/2423,1,33(1),Kenya Citizenship and Immigration Act,verified,"written ""Citizenship and Immigration Act"""
+ke/judgment/kehc/2023/2423,1,43(1),Kenya Citizenship and Immigration Act,verified,
+ke/judgment/kehc/2023/2423,2,19,Constitution of Kenya,verified,
+ke/judgment/kehc/2023/2423,2,22,Constitution of Kenya,verified,
+ke/judgment/kehc/2023/2423,2,23,Constitution of Kenya,verified,
+ke/judgment/kehc/2023/2423,2,25,Constitution of Kenya,verified,
+ke/judgment/kehc/2023/2423,2,27(1),Constitution of Kenya,verified,
+ke/judgment/kehc/2023/2423,2,28,Constitution of Kenya,verified,
+ke/judgment/kehc/2023/2423,2,29(d),Constitution of Kenya,verified,
+ke/judgment/kehc/2023/2423,2,30,Constitution of Kenya,verified,
+ke/judgment/kehc/2023/2423,2,31,Constitution of Kenya,verified,
+ke/judgment/kehc/2023/2423,3,22,Constitution of Kenya,verified,
+ke/judgment/kehc/2023/2423,3,25,Constitution of Kenya,verified,
+ke/judgment/kehc/2023/2423,3,27,Constitution of Kenya,verified,
+ke/judgment/kehc/2023/2423,3,35,Constitution of Kenya,verified,
+ke/judgment/kehc/2023/2423,3,47,Constitution of Kenya,verified,
+ke/judgment/kehc/2023/2423,3,50,Constitution of Kenya,verified,
+ke/judgment/kehc/2023/2423,3,51,Constitution of Kenya,verified,
+ke/judgment/kehc/2023/2423,4,33(1)(f),Kenya Citizenship and Immigration Act,verified,
+ke/judgment/kehc/2023/2423,5,43(1),Kenya Citizenship and Immigration Act,verified,
+ke/judgment/kehc/2023/2423,6,39,Constitution of Kenya,verified,
+ke/judgment/kehc/2023/2423,7,22(1)(a),Kenya Citizenship and Immigration Act,verified,
+ke/judgment/kehc/2023/2423,8,33,Kenya Citizenship and Immigration Act,verified,
+ke/judgment/kehc/2023/2423,8,43,Kenya Citizenship and Immigration Act,verified,
+ke/judgment/kehc/2023/2423,9,43,Kenya Citizenship and Immigration Act,verified,
+ke/judgment/kehc/2023/2423,10,47,Constitution of Kenya,verified,
+ke/judgment/kehc/2023/2423,11,22,Constitution of Kenya,verified,
+ke/judgment/kehc/2023/2423,11,25,Constitution of Kenya,verified,
+ke/judgment/kehc/2023/2423,11,27,Constitution of Kenya,verified,
+ke/judgment/kehc/2023/2423,11,35,Constitution of Kenya,verified,
+ke/judgment/kehc/2023/2423,11,47,Constitution of Kenya,verified,
+ke/judgment/kehc/2023/2423,11,50,Constitution of Kenya,verified,
+ke/judgment/kehc/2023/2423,11,51,Constitution of Kenya,verified,
+ke/judgment/kehc/2023/2423,12,107,Evidence Act,verified,
+ke/judgment/kehc/2023/2423,13,34(2),Kenya Citizenship and Immigration Act,verified,
+ke/judgment/kehc/2023/2423,14,22,Constitution of Kenya,verified,Constitution implied (petition under Constitution)
+ke/judgment/kehc/2023/2423,14,25,Constitution of Kenya,verified,Constitution implied (petition under Constitution)
+ke/judgment/kehc/2023/2423,14,27,Constitution of Kenya,verified,Constitution implied (petition under Constitution)
+ke/judgment/kehc/2023/2423,14,35,Constitution of Kenya,verified,Constitution implied (petition under Constitution)
+ke/judgment/kehc/2023/2423,14,47,Constitution of Kenya,verified,Constitution implied (petition under Constitution)
+ke/judgment/kehc/2023/2423,14,50,Constitution of Kenya,verified,Constitution implied (petition under Constitution)
+ke/judgment/kehc/2023/2423,14,51,Constitution of Kenya,verified,Constitution implied (petition under Constitution)
+ke/judgment/kehc/2023/2423,15,22,Constitution of Kenya,verified,
+ke/judgment/kehc/2023/2423,15,25,Constitution of Kenya,verified,
+ke/judgment/kehc/2023/2423,15,27,Constitution of Kenya,verified,
+ke/judgment/kehc/2023/2423,15,35,Constitution of Kenya,verified,
+ke/judgment/kehc/2023/2423,15,47,Constitution of Kenya,verified,
+ke/judgment/kehc/2023/2423,15,50,Constitution of Kenya,verified,
+ke/judgment/kehc/2023/2423,15,51,Constitution of Kenya,verified,
+ke/judgment/kehc/2023/2423,16,20(1)(2),Constitution of Kenya,verified,
+ke/judgment/kehc/2023/2423,17,12,International Covenant on Civil and Political Rights,verified,treaty
+ke/judgment/kehc/2023/2423,18,2(5)(6),Constitution of Kenya,verified,
+ke/judgment/kehc/2023/2423,19,13,International Covenant on Civil and Political Rights,verified,"treaty, continues ICCPR discussion"
+ke/judgment/kehc/2023/2423,20,2,Kenya Citizenship and Immigration Act,verified,"""the Act"""
+ke/judgment/kehc/2023/2423,21,43,Kenya Citizenship and Immigration Act,verified,"""the Act"""
+ke/judgment/kehc/2023/2423,22,26A,Penal Code,verified,inside quoted s.43 KCIA
+ke/judgment/kehc/2023/2423,23,-,-,verified,
+ke/judgment/kehc/2023/2423,24,47,Constitution of Kenya,verified,
+ke/judgment/kehc/2023/2423,25,10,Constitution of Kenya,verified,inside quoted dictum
+ke/judgment/kehc/2023/2423,26,33,Kenya Citizenship and Immigration Act,verified,
+ke/judgment/kehc/2023/2423,27,33(1)(b)-(v),Kenya Citizenship and Immigration Act,verified,range of paragraphs within s.33
+ke/judgment/kehc/2023/2423,28,-,-,verified,
+ke/judgment/kehc/2023/2423,29,33(5),Kenya Citizenship and Immigration Act,verified,
+ke/judgment/kehc/2023/2423,30,34,Kenya Citizenship and Immigration Act,verified,inside quoted s.33(5)
+ke/judgment/kehc/2023/2423,31,33(8),Kenya Citizenship and Immigration Act,verified,
+ke/judgment/kehc/2023/2423,32,108,Evidence Act,verified,inside quoted SC dictum
+ke/judgment/kehc/2023/2423,33,109,Evidence Act,verified,"""the Act"""
+ke/judgment/kehc/2023/2423,34,33,Kenya Citizenship and Immigration Act,verified,
+ke/judgment/kehc/2023/2423,35,22,Constitution of Kenya,verified,
+ke/judgment/kehc/2023/2423,35,25,Constitution of Kenya,verified,
+ke/judgment/kehc/2023/2423,35,27,Constitution of Kenya,verified,
+ke/judgment/kehc/2023/2423,35,35,Constitution of Kenya,verified,
+ke/judgment/kehc/2023/2423,35,47,Constitution of Kenya,verified,
+ke/judgment/kehc/2023/2423,35,50,Constitution of Kenya,verified,
+ke/judgment/kehc/2023/2423,35,51,Constitution of Kenya,verified,
+ke/judgment/kehc/2025/205,0,-,-,verified,
+ke/judgment/kehc/2025/205,1,-,-,verified,
+ke/judgment/kehc/2025/205,2,-,-,verified,
+ke/judgment/kehc/2025/205,3,65,Marriage Act,verified,
+ke/judgment/kehc/2025/205,4,-,-,verified,
+ke/judgment/kehc/2025/205,5,27(1),Civil Procedure Act,verified,

@@ -64,7 +64,18 @@ def main():
     if x["paragraph"] != "2":
         fails += 1
         print(f"FAIL: paragraph {x['paragraph']!r}, want '2'")
-    print(f"{len(CASES) + 2 - fails}/{len(CASES) + 2} passed")
+    # "[n]" and "n)" numbering; a short "1) 2)" prayer list is not a paragraph scheme
+    body = " The facts and the law are set out at length here. "   # real paragraphs are long
+    for text, want in [("".join(f"[{i}]{body}" for i in range(1, 5)) + " [5] Section 204 of the Penal Code applies.", "5"),
+                       ("35) Next. 36) We declare that section 204 of the Penal Code is void.", None),
+                       ("".join(f"{i}){body}" for i in range(1, 5)) + " 5) Section 204 of the Penal Code applies.", "5"),
+                       # a footnote list at the end is not a paragraph scheme
+                       ("Section 204 of the Penal Code applies. " + "x " * 200 + "[1] Cap 63 [2] Ibid [3] Ibid [4] Supra [5] Ibid", None)]:
+        got = next(extract(text, None))["paragraph"]
+        if got != want:
+            fails += 1
+            print(f"FAIL: paragraph {got!r}, want {want!r} in {text!r}")
+    print(f"{len(CASES) + 6 - fails}/{len(CASES) + 6} passed")
     raise SystemExit(1 if fails else 0)
 
 

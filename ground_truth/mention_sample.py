@@ -1,6 +1,7 @@
 """Draw the hand-checked sample for scoring citation extraction (step 5). Deterministic (fixed seed).
 
-  uv run python -m ground_truth.mention_sample
+  uv run python -m ground_truth.mention_sample                 # the tuning sample -> mentions_candidates.csv
+  uv run python -m ground_truth.mention_sample --set heldout   # a fresh sample, disjoint from it, never tuned on
 
 Writes ground_truth/mentions_candidates.csv: every place in the sampled judgments where a citation *could* be,
 found by a deliberately broader pattern than the extractor's, so the answer key doesn't inherit its blind spots.
@@ -9,6 +10,7 @@ Each candidate is then labelled by hand in mentions_gold.csv (see decisions in m
 Sample: 10 judgments per court (kesc, keca, kehc) with text. A judgment with more than WINDOW candidates is
 annotated on one random contiguous window of WINDOW candidates; scoring counts only that span.
 """
+import argparse
 import csv
 import json
 import random
@@ -19,15 +21,26 @@ from crawler.config import data_dir
 from pipeline.db import connect
 
 HERE = Path(__file__).parent
-SEED, PER_COURT, WINDOW, CTX = 2026, 10, 40, 220
+PER_COURT, WINDOW, CTX = 10, 40, 220
+SETS = {"": 2026, "heldout": 777}   # --set name -> seed; files are mentions_{name_}candidates.csv
 BROAD = re.compile(r"(?i)(sections?|secs?\.?|ss?\.|articles?|arts?\.?)\s*\d")
 
 
+def candidates_file(name):
+    return HERE / f"mentions_{name + '_' if name else ''}candidates.csv"
+
+
 def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--set", default="", choices=list(SETS))
+    name = ap.parse_args().set
     with connect() as conn:
         rows = conn.execute("""SELECT judgment_id, raw_path FROM judgments WHERE has_full_text
                                ORDER BY judgment_id""").fetchall()
-    rnd = random.Random(SEED)
+    if name:   # never reuse a judgment the extractor was tuned on
+        used = {c["judgment_id"] for c in csv.DictReader(open(candidates_file(""), encoding="utf-8"))}
+        rows = [r for r in rows if r[0] not in used]
+    rnd = random.Random(SETS[name])
     sample = []
     for court in ("kesc", "keca", "kehc"):
         sample += rnd.sample([r for r in rows if f"/{court}/" in r[0]], PER_COURT)
@@ -45,11 +58,11 @@ def main():
         if not cands:
             out.append({"judgment_id": jid, "cand": -1, "char_start": "", "span_start": 0, "span_end": 0,
                         "context": "(no candidates)"})
-    with open(HERE / "mentions_candidates.csv", "w", newline="", encoding="utf-8") as f:
+    with open(candidates_file(name), "w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=list(out[0]))
         w.writeheader()
         w.writerows(out)
-    print(f"{len(sample)} judgments, {sum(r['cand'] >= 0 for r in out)} candidates -> mentions_candidates.csv")
+    print(f"{len(sample)} judgments, {sum(r['cand'] >= 0 for r in out)} candidates -> {candidates_file(name).name}")
 
 
 if __name__ == "__main__":

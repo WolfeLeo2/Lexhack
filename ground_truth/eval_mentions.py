@@ -35,6 +35,7 @@ def base(ref):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--errors", action="store_true")
+    ap.add_argument("--set", default="", help="'heldout' scores mentions_heldout_{candidates,gold}.csv")
     ap.add_argument("--llm", action="store_true", help="also apply pipeline.llm_resolve to unresolved citations")
     args = ap.parse_args()
     if args.llm:
@@ -43,7 +44,8 @@ def main():
         api_key, cache = require_env("GEMINI_API_KEY"), data_dir() / "cache" / "llm"
         cache.mkdir(parents=True, exist_ok=True)
 
-    cands = list(csv.DictReader(open(HERE / "mentions_candidates.csv", encoding="utf-8")))
+    prefix = f"mentions_{args.set + '_' if args.set else ''}"
+    cands = list(csv.DictReader(open(HERE / f"{prefix}candidates.csv", encoding="utf-8")))
     offset = {(c["judgment_id"], c["cand"]): int(c["char_start"]) for c in cands if c["cand"] != "-1"}
     spans = {}   # judgment -> (first, last) candidate offset: extractions outside it weren't annotated
     for (jid, _), off in offset.items():
@@ -51,7 +53,7 @@ def main():
         spans[jid] = (min(lo, off), max(hi, off))
     spans.update({c["judgment_id"]: (0, -1) for c in cands if c["cand"] == "-1"})
     gold = collections.defaultdict(list)   # judgment -> [(offset, base number, act_ref, row)]
-    for g in csv.DictReader(open(HERE / "mentions_gold.csv", encoding="utf-8")):
+    for g in csv.DictReader(open(HERE / f"{prefix}gold.csv", encoding="utf-8")):
         if g["section_ref"] != "-":
             gold[g["judgment_id"]].append((offset[(g["judgment_id"], g["cand"])], base(g["section_ref"]), g["act_ref"], g))
     with connect() as conn:
@@ -107,7 +109,7 @@ def main():
         print(f"Act, of {scored} matched citations: {s['act_right']} right ({s['act_right'] / scored:.1%}), "
               f"{s['act_wrong']} wrong ({s['act_wrong'] / scored:.1%}), {s['act_unresolved']} unresolved "
               f"({s['act_unresolved'] / scored:.1%}, for the LLM pass); {s['act_unscored']} gold 'unknown' not scored")
-    unverified = sum(g["status"] == "draft" for g in csv.DictReader(open(HERE / "mentions_gold.csv", encoding="utf-8")))
+    unverified = sum(g["status"] == "draft" for g in csv.DictReader(open(HERE / f"{prefix}gold.csv", encoding="utf-8")))
     if unverified:
         print(f"UNVERIFIED: {unverified} gold rows are still drafts")
     if args.errors:

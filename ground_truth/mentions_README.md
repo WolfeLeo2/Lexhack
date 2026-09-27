@@ -43,5 +43,7 @@ split sub-provisions of one section into separate rows (decided above: one row p
 **Caveat:** the extractor was tuned on this same sample, so its scores here are optimistic. A fresh held-out
 sample (another seed) gives an honest number.
 
+**Held-out set (2026-09-27):** `mentions_heldout_candidates.csv` (seed 777, 30 judgments disjoint from the tuning sample, 471 candidates). Labelled twice per court by independent labellers blind to the extractor (`heldout_labels/{court}_{A,B}.csv`), merged by `heldout_merge.py`: 469 agreed, 2 adjudicated (`heldout_labels/resolved.csv`). Result: `mentions_heldout_gold.csv`. Score with `eval_mentions --set heldout`. **Don't tune the extractor on this set**, or it stops being held out.
+
 **`status`:** `draft` (drafted by Claude from context) | `verified` (confirmed against the full judgment) |
 `corrected` (changed by the verifier; old value in `note`).

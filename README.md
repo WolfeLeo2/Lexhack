@@ -8,7 +8,7 @@ This file explains the project from scratch: what has been built, how the data f
 |---|---|---|
 | **1. Data acquisition** | Get the statutes and judgments onto disk, legally and reproducibly | Done: 8 Acts, 16,824 judgments |
 | **2. Ground truth** | A hand-checked answer key of what courts did to which sections | Done: 19 events, all verified |
-| **3. Database** | Load Acts, versions and sections into Postgres (Neon), with embeddings | Done: 8 Acts, 1,862 sections, 4,592 section texts. Embeddings: 3,043 of 4,592 stored (the original 4 Acts); the 4 new Acts finish after tomorrow's free quota |
+| **3. Database** | Load Acts, versions and sections into Postgres (Neon), with embeddings | Done: 8 Acts, 1,862 sections, 4,592 section texts, all embedded |
 | **4. Judgments + answer key** | Load judgment metadata and the answer key into Postgres | Done: 16,419 judgments; 19 answer-key events in `citation_events` |
 | **5. Citation extraction** | Find every "section N of the X Act" / "Article N" in the judgments → `citation_mentions` | Regex done: 304,310 mentions in 13,098 judgments, scored on a verified sample (precision 99.5%, recall 98.5%). LLM pass for bare mentions: ~400 of 7,385 judgments done, waiting on the Gemini daily quota |
 | 6–9 | Classify events, status resolver, API/UI, filing checker, deploy | Not started |
@@ -86,6 +86,9 @@ Code and data are kept apart. **Data is never committed to git.**
     mentions_review_*.csv the three verifiers' verdicts, one per court
     eval_mentions.py      scores the extractor (and, with --llm, the Gemini pass)
     show_candidate.py     prints judgment text around a candidate, for labelling
+    mentions_heldout_*.csv   held-out sample (never tuned on) and its double-labelled answer key
+    heldout_labels/       the two independent labellings per court, disagreements, adjudications
+    heldout_merge.py      merges the two labellings into mentions_heldout_gold.csv
   letters/
     kenyalaw_bulk_request.md   draft letter asking Kenya Law for bulk data
 
@@ -472,6 +475,16 @@ Find every place a judgment cites a section or Article of a law, and link it to 
 
 **Caveat:** the regex was fixed using this same sample (recall was 90.2% before), so its scores are optimistic. The Gemini prompt was not tuned on it. A fresh held-out sample would give numbers to quote.
 
+**Held-out score (2026-09-27), the numbers to quote.** A second, disjoint sample of 30 judgments (seed 777, none from the tuning sample; `mentions_heldout_*`). Two independent labellers per court, each blind to the extractor and to the other: they agreed on 469 of 471 candidates; the 2 disagreements were settled by the rule above (`heldout_labels/resolved.csv`). The regex was **not** changed after scoring.
+
+| Regex only, held-out | Score |
+|---|---|
+| Precision | 98.1% (410/418) |
+| Recall | 98.1% (410/418) |
+| Law right / wrong / unresolved | 88.8% / 0.5% / 10.7% |
+
+What it gets wrong: "sections 25 A (1)" (a space inside the number); a list ending "…50 and 51 were violated"; sections of a private document ("Section 1" of an insurance policy); treaty articles taken for the Constitution ("article 13" of the ICCPR); "Article 21(A)" of the Supreme Court Act taken for the Constitution. `uv run python -m ground_truth.eval_mentions --set heldout --errors` lists them all. The LLM pass wasn't scored on this sample (its cache is on the other machine).
+
 ## 8. Glossary
 
 | Term | Meaning |
@@ -502,8 +515,8 @@ Find every place a judgment cites a section or Article of a law, and link it to 
 ### Finish step 5
 
 - **The LLM pass:** ~400 of 7,385 judgments done. The free tier allows ~500 requests a day for `gemini-3.5-flash-lite` (~15 days at that rate). Options: re-run `uv run python -m pipeline.llm_resolve` daily; enable billing on the Gemini key (~$5–8 standard, ~$2.65 via the Batch API, which needs code; measured 2026-09-27 at $0.30 / $2.50 per 1M tokens); or pack several judgments per request. Nothing downstream is blocked by it.
-- **Held-out sample** (optional): score the regex on a fresh sample for an honest number.
-- **Embeddings:** 3,043 of 4,592 stored; 1,549 texts (445 unique) wait on the daily quota. Run `uv run python -m pipeline.embed`. Needed for search in step 7.
+- ~~Held-out sample~~ done (§7.4): precision 98.1%, recall 98.1% on unseen judgments.
+- ~~Embeddings~~ done: all 4,592 section texts.
 
 ### Steps 6–9 (from `CLAUDE.md`)
 
@@ -519,7 +532,7 @@ For the front end (step 7): the UI can start now against mock JSON shaped like t
 - **Shared database, destructive re-runs.** Both teammates' `.env` point at the same Neon `production` branch. `extract_citations` deletes and rebuilds *every* mention row, and `llm_resolve` must then be re-run. Agree who runs pipeline steps, or give each person a Neon branch.
 - **The Gemini cache lives on one machine.** `$LEXHACK_DATA/cache/llm/` (and `cache/embeddings/`) are what make re-runs free. If Leo re-runs the LLM pass on his Mac without a copy, the requests are made (and paid for) again. Keep the data folders in sync.
 - **Neon storage:** 215 MB of ~512 MB. Step 6's events are small, but embedding *judgments* (for search over judgments) would not fit on the free plan.
-- **Paragraph numbers are missed in some formats.** `paragraph` is filled only for inline "1. … 2. …" numbering; judgments numbered "[1] … [2]" get NULL. Step 6 needs `source_paragraph`, so fix this first.
+- **Paragraph numbers (fixed 2026-09-27).** Detection now reads "1.", "[1]" and "1)" numbering, tolerates up to 2 missed "1." numbers, and rejects footnote and element lists (the "[n]"/"n)" styles must run strictly in order, have 5+ paragraphs and span half the judgment). It matches the hand-recorded paragraph for all 19 answer-key events (16/19 before). Applied in place with `extract_citations --paragraphs-only`, which keeps the LLM rows. 23% of mentions still have no paragraph, mostly because the judgment isn't numbered at all (older judgments especially).
 - **Character offsets depend on the parsed text.** `char_start`/`char_end` index the stored JSON's `text`. If `crawler.parse` is re-run and the text changes, re-run extraction.
 - **"section N of the Constitution" is always treated as the repealed Constitution.** The 2010 Constitution's Schedules do have sections (e.g. the Sixth Schedule's transitional provisions); those are misattributed.
 - **Other laws' names are not normalised.** `act_ref` for Acts we don't hold is the name as written: "Retirement Benefits Authority Act", "CDF Act" and misspellings are separate values. Normalise before using them to choose which Acts to load next.

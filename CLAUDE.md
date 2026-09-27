@@ -232,11 +232,11 @@ Done:
 5. **Citation extraction, regex (done) + LLM (in progress)** → `citation_mentions` (README §7).
    - Regex: `pipeline/extract_citations.py`, 304,310 mentions in 13,098 judgments; every law recorded in `act_ref`, `provision_id` set for our 8 Acts (173,014). Tests: `pipeline.test_extract`.
    - LLM: `pipeline/llm_resolve.py` (`gemini-3.5-flash-lite`, cached in `$LEXHACK_DATA/cache/llm/`) resolves bare mentions. ~400 of 7,385 judgments done; the free tier allows ~500 requests/day. Re-run daily, or enable billing (~$5–8).
-   - Scored on a verified 30-judgment sample (`ground_truth/mentions_README.md`; `uv run python -m ground_truth.eval_mentions --llm`): precision 99.5%, recall 98.5%, law right 99.3% / wrong 0%. Regex scores are optimistic (it was tuned on that sample); a held-out sample is optional.
+   - Scored on a verified 30-judgment sample (`ground_truth/mentions_README.md`; `uv run python -m ground_truth.eval_mentions --llm`): precision 99.5%, recall 98.5%, law right 99.3% / wrong 0%. Those regex scores are optimistic (tuned on that sample). **Held-out score, the one to quote:** 30 unseen judgments, double-labelled blind (469/471 agreement): precision 98.1%, recall 98.1%, law right 88.8% / wrong 0.5% / unresolved 10.7% (regex only). `eval_mentions --set heldout`.
    - **Order matters:** `extract_citations` rebuilds all mention rows (regex and LLM); always run `llm_resolve` after it.
 
 Next:
-- **Finish step 5:** the LLM pass (above) and the embeddings (1,549 texts wait on the daily quota: `uv run python -m pipeline.embed`; needed for search).
+- **Finish step 5:** the LLM pass (above). Embeddings are done (all 4,592).
 6. **Event classification** → `citation_events` (`method='extracted'`); measure against the ground truth and `negatives.csv`. Also turn the Acts' amendment notes into `amended_by_statute` / `repealed_by_statute` events.
 7. **Status resolver** (per-jurisdiction rules; `affects_event_id` = direct reversal only, precedent handled by rules), then API, then UI. The front end can start now against mock JSON; defining the API response shape comes first.
 8. **Synthetic demo filings and the filing checker.**
@@ -248,7 +248,7 @@ Blind spots to keep in mind (details in README §9):
 - **One shared Neon branch:** both teammates write to `production`, and pipeline re-runs are destructive. Agree who runs them, or use Neon branches.
 - **Caches are per machine:** `cache/llm/` and `cache/embeddings/` make re-runs free. Copy them between machines, or the API calls are made (and paid for) again.
 - **Neon storage:** 215 MB of ~512 MB used.
-- **Paragraph numbers:** "[1]"-style numbering isn't detected, so `paragraph` is NULL there. Fix this before step 6 needs `source_paragraph`.
+- **Paragraph numbers:** fixed 2026-09-27 ("1.", "[1]", "1)" styles; 19/19 answer-key paragraphs right). To re-derive them without losing LLM rows: `extract_citations --paragraphs-only`. ~23% of mentions have none because the judgment is unnumbered.
 - **Constitution:** "section N of the Constitution" is always treated as the repealed Constitution, so 2010 Schedule sections are misattributed.
 - **`act_ref` for laws we don't hold is not normalised.**
 - **Not extracted:** rules, orders and regulations.
