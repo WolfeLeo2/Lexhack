@@ -30,6 +30,13 @@ const EXTRACTORS = {
 }
 type Key = keyof typeof EXTRACTORS
 
+const JOURNEY: [string, string, string][] = [
+  ['53%', 'First random sample of 40 events.', 'Most errors: a court merely following another ruling (Muruatetu, Kilwake) counted as its own event; every ordinary "appeal allowed" called a reversal; "all other findings upheld" read as upholding a section. The instructions got explicit rules for all three.'],
+  ['78%', 'Second sample, new instructions.', 'Remaining errors: courts restating the Supreme Court without reasoning of their own.'],
+  ['46%', 'Third sample, one more rule.', 'A new problem: 9 of 20 errors were real rulings pinned on the wrong Act, because "section 22 of the Act" had been guessed from the last Act named. Fix: only citations linked with high confidence are offered to the classifier.'],
+  ['80%', 'A second-pass checker on all 111 reviewed events.', 'A second LLM call re-reads each event and asks only: is this the court\'s own holding, on the section claimed? It caught 31 of 46 wrong events and kept 61 of 65 right ones. Events it fails are hidden.'],
+]
+
 const pct = (n: number, d: number) => (d ? Math.round((100 * n) / d) : 0)
 
 export function Scoring() {
@@ -124,9 +131,14 @@ export function Scoring() {
               <td className="py-3 text-ink-2">Honest: 30 judgments the code had never seen, each labelled by two people independently (they agreed on 469 of 471).</td>
             </tr>
             <tr>
-              <td className="py-3 pr-4">Finding events (step 6)</td>
-              <td className="py-3 pr-4">19 of 19 answer-key events found, 18 with the right type</td>
-              <td className="py-3 text-ink-2">Optimistic: the instructions were refined on these same 19. A review of random results from the full run will give the honest number.</td>
+              <td className="py-3 pr-4">Machine-found events are right (step 6)</td>
+              <td className="py-3 pr-4">About 80% (61 of 76 kept by the checker)</td>
+              <td className="py-3 text-ink-2">Fairly honest: 111 events from three fresh random samples, each judged blind by two reviewers. The checker's rules were written after reading their reports, so call it 75–80%.</td>
+            </tr>
+            <tr>
+              <td className="py-3 pr-4">Answer-key events found (step 6)</td>
+              <td className="py-3 pr-4">18 of 19, all with the right type</td>
+              <td className="py-3 text-ink-2">Optimistic: the instructions were refined on these same 19 events.</td>
             </tr>
             <tr>
               <td className="py-3 pr-4">False alarms (step 6)</td>
@@ -136,6 +148,28 @@ export function Scoring() {
           </tbody>
         </table>
       </div>
+
+      <h3 className="statute mt-16 text-2xl">How the event score went from 53% to about 80%</h3>
+      <p className="mt-3 max-w-[68ch] text-ink-2">
+        Scoring on the answer key alone said the classifier was nearly perfect. Random samples said otherwise. Each round
+        used fresh judgments, so fixes couldn't be tuned to the sample they were scored on.
+      </p>
+      <ol className="mt-6 max-w-[72ch] space-y-5 border-l-2 border-rule pl-6">
+        {JOURNEY.map(([score, what, fix]) => (
+          <li key={what} className="relative">
+            <span className="absolute top-2 -left-[31px] h-3 w-3 rounded-full border-2 border-ink bg-paper" aria-hidden />
+            <p>
+              <span className="statute mr-2 text-2xl">{score}</span>
+              {what}
+            </p>
+            <p className="mt-1 text-ink-2">{fix}</p>
+          </li>
+        ))}
+      </ol>
+      <p className="mt-6 max-w-[68ch]">
+        What's left: courts <em>stating</em> a sentencing rule while applying a higher court's law still slip through. So
+        machine-found events stay labelled unverified until a person checks them, which is what the review queue is for.
+      </p>
     </Part>
   )
 }

@@ -1,0 +1,360 @@
+[
+ {
+  "term": "Act (statute)",
+  "group": "Law",
+  "def": "A law passed by Parliament. Each Act is divided into numbered sections.",
+  "eg": "The Penal Code is an Act."
+ },
+ {
+  "term": "Penal Code (Cap. 63)",
+  "group": "Law",
+  "def": "Kenya's main criminal law. It defines offences such as murder, theft and criminal defamation, and sets their punishments.",
+  "eg": "Section 204 sets the punishment for murder."
+ },
+ {
+  "term": "Sexual Offences Act (Cap. 63A)",
+  "group": "Law",
+  "def": "The 2006 Act that defines sexual offences and their sentences, many of them minimum sentences.",
+  "eg": "Section 8 is defilement (sexual offences against children)."
+ },
+ {
+  "term": "KICA (Cap. 411A)",
+  "group": "Law",
+  "def": "The Kenya Information and Communications Act, which regulates telecoms and broadcasting.",
+  "eg": "Section 29 (improper use of a telecom system) was struck down in Andare, 2016."
+ },
+ {
+  "term": "Constitution of Kenya, 2010",
+  "group": "Law",
+  "def": "The supreme law. Any Act that conflicts with it can be declared invalid by a court. Its parts are called Articles, not sections.",
+  "eg": "Article 33 protects freedom of expression."
+ },
+ {
+  "term": "Section / subsection",
+  "group": "Law",
+  "def": "A numbered paragraph of an Act, and a numbered part inside it. Courts often rule on just one subsection.",
+  "eg": "s.8(2) is subsection 2 of section 8."
+ },
+ {
+  "term": "Cap. (Chapter)",
+  "group": "Law",
+  "def": "The number an Act has in the Laws of Kenya collection. We use it in our IDs.",
+  "eg": "Cap. 63 is the Penal Code, so its ID is ke/act/cap-63."
+ },
+ {
+  "term": "Consolidated text",
+  "group": "Law",
+  "def": "The current wording of an Act with all amendments folded in. Kenya Law publishes it, but it doesn't record court rulings. That gap is why this project exists."
+ },
+ {
+  "term": "Amendment / repeal",
+  "group": "Law",
+  "def": "Parliament changing a section's words (amendment) or removing it altogether (repeal). Kenya Law does record these, in editorial notes."
+ },
+ {
+  "term": "Good law",
+  "group": "Law",
+  "def": "A lawyer's phrase for a law or case you can still rely on: it hasn't been struck down, overruled or repealed."
+ },
+ {
+  "term": "Declared unconstitutional",
+  "group": "Law",
+  "def": "A court finds that a section conflicts with the Constitution, and so it has no force. It can be the whole section or only part of it.",
+  "eg": "KICA s.29 in Andare (whole section)."
+ },
+ {
+  "term": "\"To the extent that\"",
+  "group": "Law",
+  "def": "The standard wording of a partial declaration. Only the part the court describes is invalid; the rest of the section still stands.",
+  "eg": "Okuta: s.194 is invalid \"to the extent that it covers offences other than…\""
+ },
+ {
+  "term": "Read down",
+  "group": "Law",
+  "def": "Instead of striking words out, the court gives them a narrower meaning so that they fit the Constitution. The section survives, but not as its plain words suggest.",
+  "eg": "Kilwake: the minimum sentences in SOA s.8 \"must be interpreted so as not to take away the discretion of the court\"."
+ },
+ {
+  "term": "Severed",
+  "group": "Law",
+  "def": "The court cuts specific words out of a section and keeps the rest."
+ },
+ {
+  "term": "Upheld",
+  "group": "Law",
+  "def": "Someone challenged the section and the court found it constitutional. It is still in force, and now it has been tested.",
+  "eg": "EG (2019): Penal Code ss.162 and 165."
+ },
+ {
+  "term": "Operative order",
+  "group": "Law",
+  "def": "The part of a judgment that actually decides the case: the declarations and orders, usually at the end. It's the part we quote."
+ },
+ {
+  "term": "Mandatory sentence",
+  "group": "Law",
+  "def": "A sentence the law says a judge must give, with no choice. Muruatetu held the mandatory death sentence for murder unconstitutional."
+ },
+ {
+  "term": "Minimum sentence",
+  "group": "Law",
+  "def": "The lowest sentence a law allows. The Sexual Offences Act sets many, which is what the s.8 cases were about."
+ },
+ {
+  "term": "Legal advice",
+  "group": "Law",
+  "def": "Telling someone what they should do about their own legal situation. LexHack never does this. It reports what published sources say."
+ },
+ {
+  "term": "High Court",
+  "group": "Courts",
+  "def": "The court that hears most constitutional petitions in the first instance. It can declare an Act unconstitutional.",
+  "eg": "Code in our IDs: kehc."
+ },
+ {
+  "term": "Court of Appeal",
+  "group": "Courts",
+  "def": "Hears appeals from the High Court. Its rulings bind the High Court.",
+  "eg": "Code in our IDs: keca."
+ },
+ {
+  "term": "Supreme Court",
+  "group": "Courts",
+  "def": "Kenya's highest court. Its rulings bind every other court.",
+  "eg": "Code in our IDs: kesc."
+ },
+ {
+  "term": "Judgment",
+  "group": "Courts",
+  "def": "A court's written decision, with its reasons and its orders."
+ },
+ {
+  "term": "Petition",
+  "group": "Courts",
+  "def": "How a case asking the court to declare a law unconstitutional usually starts.",
+  "eg": "Okuta was HC Petition 397 of 2016."
+ },
+ {
+  "term": "Reversed on appeal",
+  "group": "Courts",
+  "def": "A higher court, hearing an appeal in the same case, sets the lower court's decision aside. The earlier ruling stops counting.",
+  "eg": "The Supreme Court reversed the Court of Appeal in Mwangi (2024)."
+ },
+ {
+  "term": "Precedent (stare decisis)",
+  "group": "Courts",
+  "def": "Lower courts must follow higher courts' rulings. So a Supreme Court ruling in one case can cancel a Court of Appeal reading from another case, with no appeal between them."
+ },
+ {
+  "term": "Per incuriam",
+  "group": "Courts",
+  "def": "Latin for \"through lack of care\". A court's finding that an earlier decision overlooked binding law, so it need not be followed.",
+  "eg": "Mwaura (2013) held Mutiso (2010) per incuriam."
+ },
+ {
+  "term": "Directions",
+  "group": "Courts",
+  "def": "Further instructions a court gives later in the same case, often to explain how far its ruling reaches.",
+  "eg": "The 2021 Muruatetu directions limit the 2017 ruling to murder."
+ },
+ {
+  "term": "Neutral citation",
+  "group": "Courts",
+  "def": "A standard reference for a judgment: year, court and number.",
+  "eg": "[2017] KESC 2 (KLR) is Muruatetu."
+ },
+ {
+  "term": "eKLR",
+  "group": "Courts",
+  "def": "Kenya Law's older citation format. It gives the year but not the court or number, so matching one to a judgment means using the party names.",
+  "eg": "Francis Karioko Muruatetu & another v Republic [2017] eKLR"
+ },
+ {
+  "term": "Following a ruling",
+  "group": "Courts",
+  "def": "A court applying a higher court's decision without deciding anything new itself. It's the classifier's most common mistake: it isn't an event on the section.",
+  "eg": "A sentencing appeal that applies Muruatetu."
+ },
+ {
+  "term": "Citator",
+  "group": "Project",
+  "def": "A tool that tells you whether a law or case is still good law, and which later decisions affected it. The US has Shepard's and KeyCite. Kenya has none; LexHack is one."
+ },
+ {
+  "term": "Kenya Law",
+  "group": "Project",
+  "def": "The official publisher of Kenya's laws and judgments (new.kenyalaw.org). Its statute pages are our source text."
+ },
+ {
+  "term": "Filing",
+  "group": "Project",
+  "def": "A document given to a court: submissions, pleadings, a petition. The filing checker reads these."
+ },
+ {
+  "term": "Filing checker",
+  "group": "Project",
+  "def": "Reads a legal document and runs three checks on each citation: does the case exist, is the quote really in it, and is the section still good law."
+ },
+ {
+  "term": "Hallucinated citation",
+  "group": "Project",
+  "def": "A case or quote that an AI tool made up. It looks real but doesn't exist. Courts in several countries have sanctioned lawyers for filing them."
+ },
+ {
+  "term": "Mention",
+  "group": "Project",
+  "def": "One place a judgment cites a section. A mention says nothing about what the court did to the section.",
+  "eg": "A murder trial mentions s.204 in almost every judgment."
+ },
+ {
+  "term": "Event",
+  "group": "Project",
+  "def": "Something a court (or Parliament) actually did to a section: declared it unconstitutional, read it down, upheld it, reversed an earlier ruling. Events are the heart of the project."
+ },
+ {
+  "term": "Status",
+  "group": "Project",
+  "def": "Where a section stands today. It's never stored: it's worked out from the section's events each time, using Kenya's rules.",
+  "eg": "\"limited by a court\""
+ },
+ {
+  "term": "Answer key (ground truth)",
+  "group": "Project",
+  "def": "A small, hand-checked set of correct answers. We use it to score the automatic pipeline and as reliable demo data.",
+  "eg": "ground_truth/events.csv: 19 events."
+ },
+ {
+  "term": "Negative",
+  "group": "Project",
+  "def": "A judgment that mentions a section but does nothing to it. It catches the easiest mistake: treating a mention as an event."
+ },
+ {
+  "term": "Verified / extracted",
+  "group": "Project",
+  "def": "Verified rows were checked by a person against the judgment. Extracted rows were found by the pipeline. The API leaves extracted rows out unless asked, and then labels them unverified."
+ },
+ {
+  "term": "Held-out set",
+  "group": "Project",
+  "def": "Test data kept aside and never used to tune the code, so the score on it is honest."
+ },
+ {
+  "term": "Jurisdiction",
+  "group": "Project",
+  "def": "The country whose law it is. Every ID starts with it (ke), so the design can extend beyond Kenya."
+ },
+ {
+  "term": "Unverified lead",
+  "group": "Project",
+  "def": "An event the pipeline found that no person has checked yet. It's shown with a warning, never used as a section's status by default.",
+  "eg": "120 leads so far, about 80% of them right."
+ },
+ {
+  "term": "Second-pass checker",
+  "group": "Project",
+  "def": "A second LLM call that re-reads each extracted event and asks only: is this the court's own holding, and on the section claimed? Events it fails are hidden. It lifted precision from 59% to about 80%."
+ },
+ {
+  "term": "Blind review",
+  "group": "Project",
+  "def": "Two people judge the same sample without seeing each other's answers or the machine's reasoning. Where they agree, that's the answer; where they don't, it's counted as unclear."
+ },
+ {
+  "term": "Review queue",
+  "group": "Project",
+  "def": "The next piece of the website: a list of unverified leads where a person confirms or rejects each one, turning good leads into verified events."
+ },
+ {
+  "term": "Internet Archive (Wayback Machine)",
+  "group": "Data & tech",
+  "def": "A non-profit that saves copies of web pages. All our bulk data came from its copies of Kenya Law, not from Kenya Law directly."
+ },
+ {
+  "term": "WARC",
+  "group": "Data & tech",
+  "def": "The standard file format for storing fetched web pages byte for byte. We keep the raw pages so we can re-parse without fetching again."
+ },
+ {
+  "term": "AKN (Akoma Ntoso)",
+  "group": "Data & tech",
+  "def": "An international format for legal documents. Kenya Law uses it, which is why every section has a machine-readable ID."
+ },
+ {
+  "term": "eId",
+  "group": "Data & tech",
+  "def": "The ID of a section in Kenya Law's pages. It stays the same across versions, which lets us follow one section through time.",
+  "eg": "part_II__chp_XVIII__sec_194 is Penal Code s.194."
+ },
+ {
+  "term": "Version (expression)",
+  "group": "Data & tech",
+  "def": "The text of an Act on one date. The Penal Code has three versions we hold: 2014, 2022 and 2023."
+ },
+ {
+  "term": "provision_id",
+  "group": "Data & tech",
+  "def": "Our ID for one section: jurisdiction, Act and eId joined together.",
+  "eg": "ke/act/cap-63/part_II__chp_XVIII__sec_194"
+ },
+ {
+  "term": "CSV",
+  "group": "Data & tech",
+  "def": "A plain spreadsheet file: one row per line, columns separated by commas. Our answer keys are CSVs so people can read and edit them."
+ },
+ {
+  "term": "JSON",
+  "group": "Data & tech",
+  "def": "A plain-text format for structured data. The API answers in JSON, and this site's demo data is JSON."
+ },
+ {
+  "term": "Postgres / Neon",
+  "group": "Data & tech",
+  "def": "Postgres is the database. Neon is the company hosting it for us."
+ },
+ {
+  "term": "Regex",
+  "group": "Data & tech",
+  "def": "A text pattern. We use them to find citations like \"section 204 of the Penal Code\" in judgment text."
+ },
+ {
+  "term": "LLM",
+  "group": "Data & tech",
+  "def": "A large language model. We use one for what patterns can't do: working out which law a bare \"section 39\" means, and what a court did to a section (DeepSeek, with a second pass that checks each answer). Every quote it returns is checked word for word."
+ },
+ {
+  "term": "Embedding",
+  "group": "Data & tech",
+  "def": "A list of numbers that captures what a text means, so similar meanings sit close together. It lets search find \"sentence for killing a person\" → s.204."
+ },
+ {
+  "term": "Hybrid search",
+  "group": "Data & tech",
+  "def": "Searching by exact words and by meaning at once, then merging the two lists (reciprocal rank fusion)."
+ },
+ {
+  "term": "Precision",
+  "group": "Data & tech",
+  "def": "Of everything the extractor found, the share that was right."
+ },
+ {
+  "term": "Recall",
+  "group": "Data & tech",
+  "def": "Of everything that was really there, the share the extractor found."
+ },
+ {
+  "term": "API",
+  "group": "Data & tech",
+  "def": "The door the website uses to ask the database questions. Ours is built with FastAPI; this site uses a copy of its answers.",
+  "eg": "GET /api/provisions/{provision_id}"
+ },
+ {
+  "term": "Cache",
+  "group": "Data & tech",
+  "def": "Saved answers from the LLM and embedding services, so re-running costs nothing. It lives in $LEXHACK_DATA, which the team shares through Cloudflare R2, not git."
+ },
+ {
+  "term": "Cloudflare R2",
+  "group": "Data & tech",
+  "def": "Online file storage the team uses to share $LEXHACK_DATA (raw pages, parsed files, caches). scripts/sync.sh pulls and pushes; pull before working, push after."
+ }
+]

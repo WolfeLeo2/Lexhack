@@ -1,0 +1,74 @@
+[
+  {
+    "title": "Collect the laws and judgments",
+    "state": "done",
+    "plain": "Copy Kenya Law's statute pages and judgments from the Internet Archive, and keep the raw pages so we never have to fetch them twice.",
+    "in": "Archived Kenya Law pages",
+    "out": "8 Acts in 31 versions, and 16,419 judgments on disk",
+    "files": "crawler/"
+  },
+  {
+    "title": "Write the answer key",
+    "state": "done",
+    "plain": "Read the landmark judgments by hand and record exactly what each court did to which section, in the court's own words.",
+    "in": "The key judgments (Andare, Okuta, Muruatetu and 13 more)",
+    "out": "events.csv: 19 verified events, and negatives.csv: 6 non-events",
+    "files": "ground_truth/"
+  },
+  {
+    "title": "Load the statutes",
+    "state": "done",
+    "plain": "Put every Act, version and section into the database, with search data for each section's text.",
+    "in": "Parsed Act pages",
+    "out": "1,862 sections, 4,592 section texts, all searchable by words and meaning",
+    "files": "pipeline/load_acts.py, embed.py"
+  },
+  {
+    "title": "Load the judgments",
+    "state": "done",
+    "plain": "Record each judgment's details (court, date, citation) and the answer key in the database. Full texts stay on disk.",
+    "in": "Parsed judgments, events.csv",
+    "out": "16,419 judgment rows; 19 events",
+    "files": "pipeline/load_judgments.py, load_ground_truth.py"
+  },
+  {
+    "title": "Find every citation",
+    "state": "running",
+    "plain": "Scan every judgment for \"section N of the X Act\" and similar, and link each one to the exact section. Patterns do nearly all of it. An LLM pass works out the bare ones like \"section 39\"; that pass is still running.",
+    "in": "Judgment texts",
+    "out": "304,310 mentions. 98.1% precision and recall on unseen judgments. LLM pass for bare mentions: ~400 of 7,385 judgments so far",
+    "files": "pipeline/extract_citations.py, llm_resolve.py"
+  },
+  {
+    "title": "Decide what each court did",
+    "state": "done",
+    "plain": "For judgments that cite our sections and use ruling language, an LLM (DeepSeek) reads the relevant parts and records events. Every quote must appear word for word in the judgment, or it is thrown away. A second LLM pass then checks each event: is this the court's own holding, and on the right section? Events that fail are hidden.",
+    "in": "2,051 candidate judgments",
+    "out": "143 extracted events; the checker passed 119 and failed 23. 120 are shown as unverified leads. About 80% of them are right (blind review of 111)",
+    "files": "pipeline/classify_events.py, verify_events.py"
+  },
+  {
+    "title": "Work out each section's status",
+    "state": "done",
+    "plain": "Apply Kenya's rules to a section's events: appeals cancel earlier rulings, and a later ruling from an equal or higher court displaces an earlier one. The API serves the result, and by default it uses only events a person has verified.",
+    "in": "A section's events",
+    "out": "A status, plus the events and quotes behind it. Four API endpoints, including hybrid search",
+    "files": "api/status_ke.py, api/main.py"
+  },
+  {
+    "title": "Build the website, review queue and filing checker",
+    "state": "next",
+    "plain": "The search and status pages; a review queue where a person confirms or rejects the machine-found events, so they can become verified; and the checker that reads a filing and flags fake cases, misquotes and struck-down sections.",
+    "in": "The API",
+    "out": "What users see, and a way to turn leads into verified events",
+    "files": "web/"
+  },
+  {
+    "title": "Deploy",
+    "state": "next",
+    "plain": "Put it all online for the LexHack presentation, on a server near the database in Frankfurt so pages load quickly.",
+    "in": "Everything above",
+    "out": "A live demo",
+    "files": ""
+  }
+]

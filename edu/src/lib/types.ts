@@ -28,7 +28,9 @@ export interface CourtEvent {
   state: 'in effect' | 'reversed on appeal' | 'displaced by a later ruling'
   superseded_by: number | null
   affects_event_id?: number | null
-  notes?: string
+  method?: 'manual' | 'extracted'
+  check_verdict?: 'pass' | 'fail' | 'unsure' | null   // second-pass checker, extracted events only
+  check_reason?: string | null
 }
 
 export interface Provision {
@@ -44,12 +46,26 @@ export interface Provision {
   remarks: string[]
 }
 
-export interface ProvisionStatus {
-  provision: Provision
+export interface StatusView {
   status: string
   summary_events: CourtEvent[]
   history: CourtEvent[]
+}
+
+export interface ProvisionStatus extends StatusView {
+  provision: Provision
   disclaimer: string
+  // teaching extras: the API's ?include_unverified=true answer, and what the second-pass checker hid
+  with_leads: StatusView
+  rejected: {
+    event_type: string
+    operative_quote: string
+    effective_date: string
+    court: string
+    title: string
+    source_url: string
+    check_reason: string | null
+  }[]
 }
 
 export interface Judgment {

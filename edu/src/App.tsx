@@ -106,7 +106,7 @@ export default function App() {
               and were checked by hand.
             </p>
             <p className="mt-3">
-              Demo data is regenerated from the answer key with{' '}
+              Demo data is exported from the database (verified events, unverified leads, and what the checker hid) with{' '}
               <span className="font-mono text-ink">uv run python edu/scripts/export_data.py</span>.
             </p>
           </footer>

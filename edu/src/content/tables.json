@@ -1,0 +1,468 @@
+[
+ {
+  "id": "acts",
+  "kind": "table",
+  "rows": "8",
+  "group": "Statutes",
+  "what": "One row per Act we hold.",
+  "why": "Everything about a law hangs off its Act: its versions and its sections.",
+  "madeBy": "pipeline/load_acts.py, from the Archive copies of Kenya Law's pages",
+  "columns": [
+   [
+    "act_id",
+    "Our ID for the Act",
+    "ke/act/cap-63"
+   ],
+   [
+    "title",
+    "Its name",
+    "Penal Code"
+   ],
+   [
+    "cap_number",
+    "Its Cap. number in the Laws of Kenya",
+    "63"
+   ],
+   [
+    "frbr_uri",
+    "Kenya Law's own address for the Act",
+    "/akn/ke/act/1930/10"
+   ]
+  ],
+  "links": []
+ },
+ {
+  "id": "act_versions",
+  "kind": "table",
+  "rows": "31",
+  "group": "Statutes",
+  "what": "One row per dated version of an Act.",
+  "why": "Acts change over time. Keeping every version lets us show that s.204's words never changed after Muruatetu.",
+  "madeBy": "pipeline/load_acts.py",
+  "columns": [
+   [
+    "version_id",
+    "Act ID plus the date",
+    "ke/act/cap-63@2023-12-11"
+   ],
+   [
+    "act_id",
+    "Which Act",
+    "ke/act/cap-63"
+   ],
+   [
+    "version_date",
+    "The date of this version",
+    "2023-12-11"
+   ],
+   [
+    "source",
+    "Where we got it",
+    "wayback"
+   ],
+   [
+    "raw_path",
+    "The parsed file on disk",
+    "parsed/act/akn_ke_act_1930_10_eng@2023-12-11.json"
+   ]
+  ],
+  "links": [
+   "acts"
+  ]
+ },
+ {
+  "id": "provisions",
+  "kind": "table",
+  "rows": "1,862",
+  "group": "Statutes",
+  "what": "One row per section, the same across versions.",
+  "why": "Events attach to a section, not to one version's text, so a ruling in 2017 still applies to the 2023 version.",
+  "madeBy": "pipeline/load_acts.py",
+  "columns": [
+   [
+    "provision_id",
+    "Our ID: jurisdiction + Act + eId",
+    "ke/act/cap-63/part_II__chp_XVIII__sec_194"
+   ],
+   [
+    "act_id",
+    "Which Act",
+    "ke/act/cap-63"
+   ],
+   [
+    "eid",
+    "Kenya Law's stable section ID",
+    "part_II__chp_XVIII__sec_194"
+   ],
+   [
+    "number",
+    "The section number",
+    "194"
+   ],
+   [
+    "heading",
+    "Its heading",
+    "Definition of libel"
+   ]
+  ],
+  "links": [
+   "acts"
+  ]
+ },
+ {
+  "id": "provision_texts",
+  "kind": "table",
+  "rows": "4,592",
+  "group": "Statutes",
+  "what": "A section's words in one version, plus search data.",
+  "why": "Search runs over these: by exact words (tsv) and by meaning (embedding).",
+  "madeBy": "pipeline/load_acts.py; embeddings by pipeline/embed.py",
+  "columns": [
+   [
+    "provision_id",
+    "Which section",
+    "…/sec_204"
+   ],
+   [
+    "version_id",
+    "Which version",
+    "ke/act/cap-63@2023-12-11"
+   ],
+   [
+    "text",
+    "The words",
+    "Any person convicted of murder shall be sentenced to death."
+   ],
+   [
+    "tsv",
+    "Word index for exact search",
+    "'convict':3 'death':9 'murder':5 …"
+   ],
+   [
+    "embedding",
+    "1,536 numbers capturing the meaning",
+    "[0.012, -0.044, …]"
+   ]
+  ],
+  "links": [
+   "provisions",
+   "act_versions"
+  ]
+ },
+ {
+  "id": "judgments",
+  "kind": "table",
+  "rows": "16,419",
+  "group": "Judgments",
+  "what": "One row per court judgment: details only, the full text stays on disk.",
+  "why": "The filing checker needs to know whether a cited case exists. Events need to say which judgment did what.",
+  "madeBy": "pipeline/load_judgments.py",
+  "columns": [
+   [
+    "judgment_id",
+    "Our ID: jurisdiction + court + year + number",
+    "ke/judgment/kesc/2017/2"
+   ],
+   [
+    "neutral_citation",
+    "Its official reference",
+    "[2017] KESC 2 (KLR)"
+   ],
+   [
+    "title",
+    "Case name",
+    "Muruatetu & another v Republic"
+   ],
+   [
+    "court",
+    "Which court",
+    "Supreme Court"
+   ],
+   [
+    "decision_date",
+    "When it was decided",
+    "2017-12-14"
+   ],
+   [
+    "raw_path",
+    "Where the full text is on disk",
+    "parsed/judgment/…kesc_2017_2….json"
+   ]
+  ],
+  "links": []
+ },
+ {
+  "id": "citation_mentions",
+  "kind": "table",
+  "rows": "304,310",
+  "group": "Judgments",
+  "what": "Every place a judgment cites a section: step 5's output.",
+  "why": "It narrows 16,419 judgments down to the ones worth reading for events, and tells us where in each judgment to look.",
+  "madeBy": "pipeline/extract_citations.py (patterns), then pipeline/llm_resolve.py (LLM, for bare mentions)",
+  "columns": [
+   [
+    "judgment_id",
+    "Which judgment",
+    "ke/judgment/kesc/2017/2"
+   ],
+   [
+    "provision_id",
+    "Which section, if it's one of our 8 Acts",
+    "…/sec_204"
+   ],
+   [
+    "raw_text",
+    "The words as written",
+    "section 204 of the Penal Code"
+   ],
+   [
+    "act_ref",
+    "Which law it cites, even if we don't hold it",
+    "Penal Code"
+   ],
+   [
+    "paragraph",
+    "The judgment's own paragraph number",
+    "69"
+   ],
+   [
+    "method",
+    "Found by a pattern or by the LLM",
+    "regex"
+   ],
+   [
+    "confidence",
+    "How sure we are which law it is",
+    "0.95"
+   ]
+  ],
+  "links": [
+   "judgments",
+   "provisions"
+  ]
+ },
+ {
+  "id": "citation_events",
+  "kind": "table",
+  "rows": "19 verified + 143 extracted",
+  "group": "Events",
+  "what": "What a court (or Parliament) actually did to a section. This table is the project.",
+  "why": "Status is worked out from these events. Each one carries the court's exact words, so every answer can show its source. Machine-found rows stay unverified until a person checks them, and the API leaves them out unless asked.",
+  "madeBy": "The answer key (method = manual), then pipeline/classify_events.py (method = extracted, unverified), checked by pipeline/verify_events.py",
+  "columns": [
+   [
+    "provision_id",
+    "The section affected",
+    "…/sec_204"
+   ],
+   [
+    "judgment_id",
+    "The judgment that did it (empty for Acts of Parliament)",
+    "ke/judgment/kesc/2017/2"
+   ],
+   [
+    "event_type",
+    "What the court did",
+    "declared_unconstitutional"
+   ],
+   [
+    "scope",
+    "Whole section or only part",
+    "partial"
+   ],
+   [
+    "scope_text",
+    "The court's limiting words, exactly",
+    "to the extent that it provides for the mandatory death sentence"
+   ],
+   [
+    "operative_quote",
+    "The court's words making the order, exactly",
+    "The mandatory nature of the death sentence … is hereby declared unconstitutional."
+   ],
+   [
+    "source_paragraph",
+    "Where in the judgment",
+    "112(a)"
+   ],
+   [
+    "affects_event_id",
+    "The earlier event this one directly acts on (an appeal)",
+    "E11 (for E13)"
+   ],
+   [
+    "method / verified",
+    "Who made it, and whether a person checked it",
+    "manual / true"
+   ],
+   [
+    "check_verdict",
+    "The second-pass checker's verdict on an extracted event (fail = hidden)",
+    "pass"
+   ]
+  ],
+  "links": [
+   "provisions",
+   "judgments",
+   "citation_events"
+  ]
+ },
+ {
+  "id": "event_runs",
+  "kind": "table",
+  "rows": "one per classified judgment",
+  "group": "Events",
+  "what": "Which judgments the event classifier has already read.",
+  "why": "It tells \"read, and found nothing\" apart from \"not read yet\". Without it, a missing event is ambiguous.",
+  "madeBy": "pipeline/classify_events.py",
+  "columns": [
+   [
+    "judgment_id",
+    "Which judgment",
+    "ke/judgment/kehc/2017/8382"
+   ],
+   [
+    "model",
+    "Which model read it",
+    "deepseek-flash"
+   ],
+   [
+    "events",
+    "How many events it found",
+    "1"
+   ]
+  ],
+  "links": [
+   "judgments"
+  ]
+ },
+ {
+  "id": "events.csv",
+  "kind": "csv",
+  "rows": "19",
+  "group": "Answer keys",
+  "what": "The answer key: 19 events on 11 sections, each checked by hand against the judgment.",
+  "why": "It's both reliable demo data and the benchmark the automatic classifier is scored against. A check script confirms every quote appears word for word in the judgment.",
+  "madeBy": "Drafted, audited blind by a second model, verified by a third, final call by Leo. ground_truth/check.py re-verifies it",
+  "columns": [
+   [
+    "event_key",
+    "Stable row name",
+    "E07"
+   ],
+   [
+    "event_type, scope, scope_text",
+    "As in citation_events",
+    "declared_unconstitutional, partial, …"
+   ],
+   [
+    "operative_quote",
+    "The court's exact words",
+    "…is hereby declared unconstitutional"
+   ],
+   [
+    "affects_event",
+    "The row this one directly acts on",
+    "E07 (for E08)"
+   ],
+   [
+    "verified_by",
+    "Who checked it",
+    "human:leo 2026-09-23"
+   ],
+   [
+    "notes",
+    "Context: related paragraphs, appeal status",
+    "Narrows E07 …"
+   ]
+  ],
+  "links": [
+   "citation_events"
+  ]
+ },
+ {
+  "id": "negatives.csv",
+  "kind": "csv",
+  "rows": "6",
+  "group": "Answer keys",
+  "what": "Six judgments that mention a focus section but do nothing to it.",
+  "why": "The easiest mistake is \"this judgment mentions s.204, so it changed s.204\". These catch it. So far the classifier raises 0 of 6 false alarms.",
+  "madeBy": "By hand",
+  "columns": [
+   [
+    "judgment_id",
+    "The judgment",
+    "ke/judgment/kehc/2017/8027"
+   ],
+   [
+    "provision_id",
+    "The section it mentions",
+    "…/sec_204"
+   ],
+   [
+    "why_no_event",
+    "Why it isn't an event",
+    "murder trial; s.204 only recited in the charge"
+   ]
+  ],
+  "links": []
+ },
+ {
+  "id": "events_review.csv",
+  "kind": "csv",
+  "rows": "120 (3 rounds of 40)",
+  "group": "Answer keys",
+  "what": "Random samples of machine-found events, each judged by two reviewers who couldn't see each other's answers.",
+  "why": "The answer key only covers 19 events the prompt was tuned on, so it flatters the classifier. Fresh random samples give the honest number: about 53% right at first, about 80% after the fixes and the second-pass checker.",
+  "madeBy": "ground_truth/events_review_sample.py draws each sample; eval_events_review.py and eval_checker.py score them",
+  "columns": [
+   [
+    "judgment_id, provision_id",
+    "The event being judged",
+    "ke/judgment/keca/2023/…, …/sec_8"
+   ],
+   [
+    "verdict",
+    "Is it a real event on the right section?",
+    "not_event"
+   ],
+   [
+    "why",
+    "The reviewer's reason",
+    "follows Muruatetu; no holding of its own"
+   ]
+  ],
+  "links": [
+   "citation_events"
+  ]
+ },
+ {
+  "id": "mentions_gold.csv",
+  "kind": "csv",
+  "rows": "711 (+ held-out)",
+  "group": "Answer keys",
+  "what": "Hand-labelled citations from 30 random judgments, and a second 30 kept aside (the held-out set).",
+  "why": "It measures step 5. The held-out set was never used to tune the patterns, so its score (98.1% precision and recall) is the honest one.",
+  "madeBy": "Labelled, then checked by independent reviewers who never saw the extractor",
+  "columns": [
+   [
+    "judgment_id",
+    "The judgment",
+    "ke/judgment/keca/2019/5"
+   ],
+   [
+    "raw_text",
+    "The citation as written",
+    "section 8(1) of the Sexual Offences Act"
+   ],
+   [
+    "provision_id",
+    "The section it really is",
+    "ke/act/cap-63a/sec_8"
+   ]
+  ],
+  "links": [
+   "citation_mentions"
+  ]
+ }
+]

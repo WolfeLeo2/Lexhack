@@ -1,7 +1,7 @@
 // Runnable self-check: `pnpm check` (node strips the types). Fails loudly if the TS rules drift from the Python ones
 // (the exported statuses came from api/status_ke.py) or if the checker stops catching the demo filings' problems.
 import assert from 'node:assert/strict'
-import filings from '../data/filings.json' with { type: 'json' }
+import filings from '../content/filings.json' with { type: 'json' }
 import judgments from '../data/judgments.json' with { type: 'json' }
 import provisions from '../data/provisions.json' with { type: 'json' }
 import { check, diffWords } from './checker.ts'
@@ -12,6 +12,9 @@ const P = provisions as unknown as ProvisionStatus[]
 const J = judgments as Judgment[]
 
 for (const p of P) {
+  const leads = p.with_leads ?? p   // older exports have no leads view
+  assert.equal(resolve(leads.history).status, leads.status, `status with leads of s.${p.provision.number}`)
+  assert.ok(p.history.every((e) => e.verified), 'default view is verified only')
   const r = resolve(p.history)
   assert.equal(r.status, p.status, `status of s.${p.provision.number}`)
   assert.deepEqual(

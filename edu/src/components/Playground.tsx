@@ -21,9 +21,10 @@ export function Playground() {
       title="Try it"
       lede={
         <p>
-          The API isn't online yet, so this runs in your browser on demo data: the 19 verified answer-key events on 13
-          sections, passed through the same status rules and shaped exactly like the real API's answers. The live
-          version will cover all 1,862 sections and 16,419 judgments.
+          The API is built but not deployed yet, so this runs in your browser on a copy of its answers for 13
+          sections, exported from the database and passed through the same status rules. By default you see only
+          verified events, as the API does; switch on unverified leads to see what the pipeline found on its own. The
+          live version will cover all 1,862 sections and 16,419 judgments.
         </p>
       }
     >

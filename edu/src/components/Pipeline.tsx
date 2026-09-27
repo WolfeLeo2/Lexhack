@@ -17,9 +17,9 @@ export function Pipeline() {
       lede={
         <p>
           Nine steps, each feeding the next. Every step saves its output, so any one of them can be re-run without
-          redoing the rest. The team splits the work in two: Leo owns the statutes, the database and the status
-          rules; the other teammate owns the document side: reading judgments, pulling citations out of filings, and
-          the evidence trail.
+          redoing the rest. The team splits the work in two: Leo owns the statutes, the database, the status
+          rules and the API; Jackie owns the document side: citations in judgments and filings, the LLM pass for bare
+          citations, and the evidence trail.
         </p>
       }
     >

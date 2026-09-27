@@ -1,0 +1,16 @@
+web/
+edu/
+node_modules/
+*/node_modules/
+.venv/
+ground_truth/
+letters/
+.tokensave/
+.claude/
+.idea/
+.git/
+parsed/
+data/
+*.warc
+*.warc.gz
+*.db

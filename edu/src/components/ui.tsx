@@ -16,7 +16,7 @@ export const EVENT_LABEL: Record<string, string> = {
 export const year = (d: string | null) => (d ?? '').slice(0, 4)
 
 export const shortCase = (e: Pick<CourtEvent, 'title'>) =>
-  (e.title ?? '').replace(/\s*\(.*$/, '').replace(/\s*\[.*$/, '')
+  (e.title ?? '').replace(/\s*[([;].*$/, '')
 
 export function fmtDate(d: string | null) {
   if (!d) return ''

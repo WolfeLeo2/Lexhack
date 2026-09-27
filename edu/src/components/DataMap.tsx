@@ -14,7 +14,8 @@ const POS: Record<string, [number, number]> = {
   'events.csv': [300, 60],
   'negatives.csv': [470, 60],
   citation_events: [385, 200],
-  event_runs: [385, 340],
+  event_runs: [470, 330],
+  'events_review.csv': [270, 330],
   judgments: [650, 130],
   citation_mentions: [650, 250],
   'mentions_gold.csv': [650, 370],
@@ -23,6 +24,7 @@ const LABEL: Record<string, string> = {
   'events.csv': 'answer key',
   'negatives.csv': 'non-events',
   'mentions_gold.csv': 'citation key',
+  'events_review.csv': 'blind reviews',
 }
 const W = 150
 const H = 38
@@ -43,6 +45,14 @@ const QUESTIONS = [
   [
     'Why put "ke" in every ID?',
     'Every ID starts with the country, so other countries\' laws could be added later without clashing with Kenya\'s.',
+  ],
+  [
+    'Why hide the machine-found events by default?',
+    'About one in five is wrong, and a wrong event can flip a section\'s status. A tool people trust about the law can\'t show guesses as facts. So the API returns only verified events unless asked, labels the rest unverified, and never returns events the second-pass checker failed. A review queue will let a person promote good leads to verified.',
+  ],
+  [
+    'Where does the data live for each of us?',
+    'Code is in git. Data is in $LEXHACK_DATA on each laptop (about 880 MB: raw pages, parsed files, LLM and embedding caches), shared through Cloudflare R2 with scripts/sync.sh (sync.ps1 on Windows). Pull before working, push after; it only copies, never deletes. The shared Neon database holds the tables.',
   ],
   [
     'Why do judgments stay on disk?',

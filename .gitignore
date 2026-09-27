@@ -3,6 +3,8 @@
 *.warc.gz
 *.db
 data/
+# the edu site's demo data: small exports (13 sections, 20 judgments), needed to build it
+!edu/src/data/
 parsed/
 .venv/
 __pycache__/
