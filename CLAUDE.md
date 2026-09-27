@@ -229,16 +229,35 @@ Done:
 2. **Ground truth:** 19 events, all verified. `ground_truth/`.
 3. **Database:** Neon Postgres. `pipeline/schema.sql`; `load_acts.py` (1,862 sections, 4,592 texts); `embed.py`.
 4. **Judgments and answer key in the database:** `load_judgments.py` (16,419 rows, metadata only), `load_ground_truth.py` (19 events).
+5. **Citation extraction, regex (done) + LLM (in progress)** → `citation_mentions` (README §7).
+   - Regex: `pipeline/extract_citations.py`, 304,310 mentions in 13,098 judgments; every law recorded in `act_ref`, `provision_id` set for our 8 Acts (173,014). Tests: `pipeline.test_extract`.
+   - LLM: `pipeline/llm_resolve.py` (`gemini-3.5-flash-lite`, cached in `$LEXHACK_DATA/cache/llm/`) resolves bare mentions. ~400 of 7,385 judgments done; the free tier allows ~500 requests/day. Re-run daily, or enable billing (~$5–8).
+   - Scored on a verified 30-judgment sample (`ground_truth/mentions_README.md`; `uv run python -m ground_truth.eval_mentions --llm`): precision 99.5%, recall 98.5%, law right 99.3% / wrong 0%. Regex scores are optimistic (it was tuned on that sample); a held-out sample is optional.
+   - **Order matters:** `extract_citations` rebuilds all mention rows (regex and LLM); always run `llm_resolve` after it.
 
 Next:
-- **Before step 5:** finish the embeddings. 1,549 texts from the 4 new Acts (445 unique still to call) wait on the daily quota: re-run `uv run python -m pipeline.embed`.
-5. **Citation extraction** (regex first, LLM for messy cases) → `citation_mentions`; measure against a hand-checked sample. Must handle "Article N of the Constitution" as well as "section N of the X Act".
+- **Finish step 5:** the LLM pass (above) and the embeddings (1,549 texts wait on the daily quota: `uv run python -m pipeline.embed`; needed for search).
 6. **Event classification** → `citation_events` (`method='extracted'`); measure against the ground truth and `negatives.csv`. Also turn the Acts' amendment notes into `amended_by_statute` / `repealed_by_statute` events.
-7. **Status resolver** (per-jurisdiction rules; `affects_event_id` = direct reversal only, precedent handled by rules), then API, then UI.
+7. **Status resolver** (per-jurisdiction rules; `affects_event_id` = direct reversal only, precedent handled by rules), then API, then UI. The front end can start now against mock JSON; defining the API response shape comes first.
 8. **Synthetic demo filings and the filing checker.**
 9. **Deploy** end to end.
 
 Known gaps: 286 PDF-only judgments have no text; Archive coverage is ~10% of judgments; the Employment Act's eIds changed in 2022; appeals of *EG*, *Alai* and *Andama* are unchecked. Before the presentation, confirm the live Kenya Law pages still lack court notes.
+
+Blind spots to keep in mind (details in README §9):
+- **One shared Neon branch:** both teammates write to `production`, and pipeline re-runs are destructive. Agree who runs them, or use Neon branches.
+- **Caches are per machine:** `cache/llm/` and `cache/embeddings/` make re-runs free. Copy them between machines, or the API calls are made (and paid for) again.
+- **Neon storage:** 215 MB of ~512 MB used.
+- **Paragraph numbers:** "[1]"-style numbering isn't detected, so `paragraph` is NULL there. Fix this before step 6 needs `source_paragraph`.
+- **Constitution:** "section N of the Constitution" is always treated as the repealed Constitution, so 2010 Schedule sections are misattributed.
+- **`act_ref` for laws we don't hold is not normalised.**
+- **Not extracted:** rules, orders and regulations.
+
+## Windows setup notes
+
+- **Set `PYTHONUTF8=1` on Windows** (`setx PYTHONUTF8 1`, then restart the terminal). The code calls `read_text()` / `open()` without an encoding, so Windows falls back to cp1252 and crashes with `UnicodeDecodeError` on judgment files (seen in `ground_truth.check`). We chose not to patch the code; the env var is the fix. Macs default to UTF-8 and are unaffected.
+- `uv` is at `C:\Users\user\.local\bin`; restart the shell if `uv` isn't found.
+- `LEXHACK_DATA` in `.env` uses forward slashes (`C:/Users/user/lexhack-data`). It is machine-specific; each teammate sets their own.
 
 ## Rules for working in this repo
 
