@@ -19,7 +19,7 @@ const STATUSES: [string, string][] = [
     'In force; no recorded court rulings',
     'None of the rulings checked so far limits, upholds or strikes down the section. Most sections are like this: courts apply them every day without ruling on them.',
   ],
-  ['Repealed', 'Parliament removed the section.'],
+  ['Repealed', 'Parliament removed the whole section, according to the reviser’s note in Kenya Law’s own text.'],
 ]
 
 export default async function AboutPage() {
@@ -88,8 +88,8 @@ export default async function AboutPage() {
         ))}
       </dl>
       <p className="mt-3 text-[0.95rem] text-ink-2">
-        “In force” means no ruling we hold says otherwise. Hakiki doesn’t yet track Parliament’s amendments as events;
-        the text shown is the latest version we hold.
+        “In force” means no ruling we hold says otherwise. Parliament’s amendments and repeals come from the reviser’s notes in
+        Kenya Law’s text, which give only the year; the text shown is the latest version we hold.
       </p>
 
       <h2 className="statute mt-14 text-[1.9rem] font-medium">Where the information comes from</h2>
