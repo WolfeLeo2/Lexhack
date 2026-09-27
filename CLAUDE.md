@@ -237,8 +237,9 @@ Done:
 
 Next:
 - **Finish step 5:** the LLM pass (above). Embeddings are done (all 4,592).
-6. **Event classification** → `citation_events` (`method='extracted'`); measure against the ground truth and `negatives.csv`. Also turn the Acts' amendment notes into `amended_by_statute` / `repealed_by_statute` events.
-7. **Status resolver** (per-jurisdiction rules; `affects_event_id` = direct reversal only, precedent handled by rules), then API, then UI. The front end can start now against mock JSON; defining the API response shape comes first.
+6. **Event classification (README §7b):** `pipeline/classify_events.py` → `citation_events` (`method='extracted'`, unverified). Model: **`deepseek-flash`** (`DEEPSEEK_API_KEY`), thinking off, JSON mode, answers validated in code. `ground_truth/eval_events.py`: 19/19 answer-key events found, 18/19 right type, 0/6 false alarms (optimistic: the prompt was tuned on those events). Full run over 2,048 candidate judgments started 2026-09-27. After it: review a random sample for an honest score.
+7. **Status resolver + API (README §7c):** `api/status_ke.py` (rules: direct reversal; precedent = later equal-or-higher court pointing the other way), `api/test_status.py`, `api/main.py` (FastAPI: `/api/acts`, `/api/provisions/{id}`, `/api/search`; the Pydantic models are the UI's contract). **Next:** the UI (Next.js, `web/`). Also turn the Acts' amendment notes into `amended_by_statute` / `repealed_by_statute` events.
+   - Still to do in step 7: the **UI** (Next.js, `web/`) against the API above.
 8. **Synthetic demo filings and the filing checker.**
 9. **Deploy** end to end.
 

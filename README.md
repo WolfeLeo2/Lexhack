@@ -130,6 +130,10 @@ uv run python -m pipeline.test_extract                        # citation grammar
 uv run python -m pipeline.extract_citations                   # regex → citation_mentions (rebuilds ALL mention rows)
 uv run python -m pipeline.llm_resolve                         # Gemini for bare mentions; run after every extraction
 uv run python -m ground_truth.eval_mentions --llm             # score extraction against the verified sample
+uv run python -m pipeline.classify_events --answer-key        # step 6 on the answer-key judgments (then: no flag = all)
+uv run python -m ground_truth.eval_events                     # score event classification
+uv run python -m api.test_status                              # status rules, offline
+uv run uvicorn api.main:app --reload                          # the API; spec at /docs
 
 # the bulk judgment pull (3 parallel workers; re-running resumes where it stopped)
 for i in 0 1 2; do nohup uv run python -m crawler.crawl run \
@@ -484,6 +488,58 @@ Find every place a judgment cites a section or Article of a law, and link it to 
 | Law right / wrong / unresolved | 88.8% / 0.5% / 10.7% |
 
 What it gets wrong: "sections 25 A (1)" (a space inside the number); a list ending "…50 and 51 were violated"; sections of a private document ("Section 1" of an insurance policy); treaty articles taken for the Constitution ("article 13" of the ICCPR); "Article 21(A)" of the Supreme Court Act taken for the Constitution. `uv run python -m ground_truth.eval_mentions --set heldout --errors` lists them all. The LLM pass wasn't scored on this sample (its cache is on the other machine).
+
+## 7b. Phase 6: event classification (in progress)
+
+**Aim:** decide what each court DID to each of our sections it cites (README §5.4 types) → `citation_events` with `method = 'extracted'`.
+
+**How** (`pipeline/classify_events.py`):
+- **Candidates:** 2,048 judgments that cite one of our non-Constitution sections and contain ruling language anywhere ("unconstitutional", "we declare", "read down", "per incuriam", "minimum sentence", …). The phrase is searched at judgment level, not next to the citation, because rulings often don't repeat the section number (CA *Ayako*: "life imprisonment translates to thirty years").
+- **One LLM call per judgment**, now `deepseek-flash` (DeepSeek V4.1 Flash, thinking off, JSON mode). `gemini-3.5-flash-lite` still works by changing `MODEL`. The model reads excerpts: the opening, 1,500 characters around every citation of a listed section and every ruling phrase, and the last 12,000 characters (the orders). It may only name sections the judgment cites (JSON enum).
+- **Quotes are checked against the full text.** Spacing differences are ignored, but the stored quote is always the source's own characters. A quote shortened with "..." is accepted only if every part is verbatim and in order. Quotes that don't match are dropped, never stored paraphrased. The paragraph is computed from where the quote sits.
+- Answers are cached (`cache/llm/`, keyed by model + prompt version). `event_runs` records which judgments have been classified. Re-running a judgment replaces its rows.
+
+**Score on the answer key** (`uv run python -m ground_truth.eval_events`):
+
+| Prompt | Events found | Type right | Scope right | False alarms (negatives) |
+|---|---|---|---|---|
+| v2 (full text) | 13/19 | 11/13 | 9/13 | 0/6 |
+| v4, gemini-3.5-flash-lite | 17/19 | 15/17 | 13/17 | 0/6 |
+| **v4, deepseek-flash (used for the full run)** | **19/19** | **18/19** | **16/19** | **0/6** |
+
+**Caveat:** the prompt was refined against these same 19 events, so this is optimistic. An honest number needs a review of a random sample of the full run. Known weaknesses: the SC reversals of *Manyeso* and *Ayako* are still missed; partial declarations are sometimes called `read_down`; and some "extras" are sections the court only applied (CPC s.333) or a holding assigned to the wrong section.
+
+**DeepSeek:** its JSON mode doesn't enforce a schema, so every answer is checked in code (section must be one the judgment cites; type, scope and confidence must be allowed values). Labels without the "(heading)" are accepted when unambiguous. Key: `DEEPSEEK_API_KEY` in `.env`. The full run over 2,048 judgments costs about $3–4 off-peak (~5 s per judgment, ~3 h).
+
+**Gemini cost, for reference:** `gemini-3.5-flash` has a free limit of 20 requests a day; `3.5-flash-lite`'s is higher. For all 2,048 judgments with v4's excerpts: ~14M input tokens, about $12 if billing is on; on the free tier, several days at the daily limit.
+
+## 7c. Phase 7: status resolver and API
+
+### Status resolver (`api/status_ke.py`, `api/status.py`)
+
+Turns a section's events into a status plus the events behind it. Rules for Kenya (pure functions, `api/test_status.py` checks them on the answer key):
+1. **Direct reversal:** an event named in a later `reversed_on_appeal`'s `affects_event` is "reversed on appeal".
+2. **Precedent:** an event is "displaced by a later ruling" when a later event from a court of **equal or higher rank** points the other way (limits vs validates). So *Mwaura* (CA 2013) displaces *Mutiso* (CA 2010), *Muruatetu* (SC 2017) displaces *Mwaura*, and the Supreme Court's 2024–25 rulings displace *Kilwake* (CA 2019), which was never appealed.
+3. `interpreted` events never displace anything; they travel with the events they qualify.
+4. Status labels: "declared unconstitutional", "limited by a court", "in force; its validity has been tested in court", "in force; earlier court limits were reversed", "in force; interpreted by a court", "in force; no recorded court rulings", "repealed". **Always shown with the events and quotes behind it.**
+5. Where the answer key and the extractor record the same ruling, the verified row wins. Extracted rows are returned with `verified: false`.
+
+Results: s.204 → "limited by a court" (*Muruatetu* + the 2021 directions in effect; *Mutiso* and *Mwaura* displaced). s.8 → in force; every Court of Appeal limit reversed or displaced. s.194 → "limited by a court" (*Okuta*).
+
+### API (`api/main.py`, FastAPI)
+
+`uv run uvicorn api.main:app --reload`, then http://127.0.0.1:8000/docs for the live OpenAPI spec. **The Pydantic models in `api/main.py` are the contract the UI builds against.**
+
+| Endpoint | Returns |
+|---|---|
+| `GET /api/acts` | The 8 Acts with their version dates |
+| `GET /api/acts/{act_id}/provisions` | Sections of an Act, in number order |
+| `GET /api/provisions/{provision_id}` | The section's latest text, `status`, `summary_events`, full `history`, and a disclaimer. `?include_unverified=false` hides extracted events |
+| `GET /api/search?q=` | Hybrid search: Postgres full-text + meaning (pgvector), merged by reciprocal rank fusion; each hit carries its status. Falls back to words only if the embedding call fails |
+
+Each event carries the court's verbatim `operative_quote`, `scope_text`, paragraph, date, court, case name, citation, Kenya Law link, `verified`, and `state` / `superseded_by`. CORS allows `http://localhost:3000` (set `CORS_ORIGINS` to change).
+
+**Known limit:** search matches the statute's own words, so colloquial names miss: "criminal defamation" ranks s.194 fourth (its text says "libel"), and "sex with a child" misses SOA s.8 ("defilement"). A synonym list or citation-based ranking would fix it.
 
 ## 8. Glossary
 

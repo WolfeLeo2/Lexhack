@@ -72,6 +72,15 @@ ALTER TABLE citation_mentions ADD COLUMN IF NOT EXISTS section_ref TEXT;  -- '8(
 CREATE INDEX IF NOT EXISTS citation_mentions_judgment ON citation_mentions (judgment_id);
 CREATE INDEX IF NOT EXISTS citation_mentions_provision ON citation_mentions (provision_id);
 
+-- Which judgments event classification has run on (with zero events or more), so scoring can tell "not run" from "none".
+CREATE TABLE IF NOT EXISTS event_runs (
+  judgment_id     TEXT PRIMARY KEY REFERENCES judgments,
+  model           TEXT NOT NULL,
+  prompt_version  INT NOT NULL,
+  events          INT NOT NULL,
+  run_at          TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 -- What a court (or Parliament) actually DID to a section. Definitions: README.md §5.4-5.5.
 CREATE TABLE IF NOT EXISTS citation_events (
   event_id          SERIAL PRIMARY KEY,

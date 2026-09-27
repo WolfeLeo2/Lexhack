@@ -66,8 +66,8 @@ def build_prompt(title, text, spans, allowed):
                            "confidence": {"type": "STRING", "enum": list(CONFIDENCE)}}}}}}
 
 
-def call(prompt, schema, api_key, cache):
-    key = hashlib.sha256(f"{MODEL}|{PROMPT_VERSION}|{json.dumps(schema, sort_keys=True)}|{prompt}".encode()).hexdigest()
+def call(prompt, schema, api_key, cache, model=MODEL, version=PROMPT_VERSION):
+    key = hashlib.sha256(f"{model}|{version}|{json.dumps(schema, sort_keys=True)}|{prompt}".encode()).hexdigest()
     path = cache / f"{key}.json"
     if path.exists():
         return json.loads(path.read_text(encoding="utf-8")), False
@@ -76,13 +76,13 @@ def call(prompt, schema, api_key, cache):
     for attempt in range(10):   # per-minute quotas can take a minute or two to clear
         wait = min(120, 10 * 2 ** attempt)
         try:
-            r = requests.post(URL, json=body, headers={"x-goog-api-key": api_key}, timeout=180)
+            r = requests.post(URL.replace(MODEL, model), json=body, headers={"x-goog-api-key": api_key}, timeout=180)
         except (requests.ConnectionError, requests.Timeout) as e:
             print(f"  network error ({type(e).__name__}); retrying in {wait}s", flush=True)
             time.sleep(wait)
             continue
         if r.status_code == 429 and "PerDay" in r.text:
-            raise SystemExit(f"Gemini daily quota exhausted for {MODEL}. Re-run tomorrow; answers so far are cached.")
+            raise SystemExit(f"Gemini daily quota exhausted for {model}. Re-run tomorrow; answers so far are cached.")
         if r.status_code == 429 or r.status_code >= 500:
             print(f"  HTTP {r.status_code}; retrying in {wait}s", flush=True)
             time.sleep(wait)

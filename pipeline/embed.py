@@ -33,9 +33,9 @@ def normalise(v):   # embedding-2 already returns unit vectors; kept so a model 
     return [x / n for x in v]
 
 
-def embed_batch(texts, api_key):
+def embed_batch(texts, api_key, task=TASK):   # task="RETRIEVAL_QUERY" for search queries
     body = {"requests": [{"model": f"models/{MODEL}", "content": {"parts": [{"text": t}]},
-                          "taskType": TASK, "outputDimensionality": DIMS} for t in texts]}
+                          "taskType": task, "outputDimensionality": DIMS} for t in texts]}
     for attempt in range(10):   # per-minute quotas can take a few minutes to clear
         wait = min(120, 10 * 2 ** attempt)
         try:
