@@ -118,9 +118,12 @@ export interface JudgmentRef {
 }
 
 export interface CaseCheck {
-  result: 'found' | 'name_mismatch' | 'not_in_collection'
+  result: 'found' | 'name_mismatch' | 'possible_match' | 'not_in_collection'
+  form: 'neutral' | 'eklr'
+  match_basis: 'neutral citation' | 'case number' | 'party names and year' | 'quote' | null
   cited_name: string | null
   judgment: JudgmentRef | null
+  candidates: JudgmentRef[] // possible_match: up to three, best first
 }
 
 export interface QuoteCheck {

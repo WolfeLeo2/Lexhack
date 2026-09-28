@@ -242,6 +242,15 @@ a:focus-visible > .spine {
 @keyframes note-ping {
   30% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-gazette) 45%, transparent); }
 }
+.candidate-card {
+  transform: rotate(var(--tilt, 0deg));
+  animation: note-in 0.45s both cubic-bezier(0.22, 1, 0.36, 1);
+  animation-delay: calc(0.5s + var(--i) * 0.1s);
+  transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.candidate-card:hover {
+  transform: rotate(0deg) translateY(-2px);
+}
 .exhibit-tab {
   transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.2s;
 }
@@ -254,6 +263,7 @@ a:focus-visible > .spine {
   .spine { transition: none; }
   .theme-icon, .stamp, .lineage-node, .lineage-edge, .lineage-edge-dashed { animation: none; stroke-dashoffset: 0; }
   .glass { animation: none; transform: translate(236px, 176px); }
-  .glass-mark, .glass-squiggle, .mark-sweep, .note-in, .note-in:target, .scan::after { animation: none; stroke-dashoffset: 0; }
+  .glass-mark, .glass-squiggle, .mark-sweep, .note-in, .note-in:target, .scan::after, .candidate-card { animation: none; stroke-dashoffset: 0; }
+  .candidate-card { transition: none; }
   .exhibit-tab { transition: none; }
 }

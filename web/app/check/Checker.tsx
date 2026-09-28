@@ -4,7 +4,7 @@ import { useActionState, useEffect, useRef, useState } from 'react'
 import { CheckedTag, UnverifiedTag } from '@/components/court'
 import { BlankPage, KindIcon } from '@/components/illustrations'
 import type { CaseCheck, Finding, QuoteCheck, SectionCheck } from '@/lib/api'
-import { cap, courtActed, plural, sectionHref, shortCase } from '@/lib/format'
+import { cap, courtActed, fmtDate, plural, sectionHref, shortCase } from '@/lib/format'
 import { locator, splitAt, wordDiff } from '@/lib/text'
 import { checkFiling, type CheckState } from './actions'
 
@@ -120,8 +120,8 @@ function Report({ ref, text, findings, disclaimer }: { ref: React.Ref<HTMLElemen
             No citations Hakiki can check
           </h2>
           <p className="mt-2 max-w-[64ch] text-ink-2">
-            Hakiki reads neutral citations such as [2017] KESC 2 (KLR) and sections of the Acts it holds. Citations in the older [2017] eKLR form are not read yet, so this is
-            not a sign the filing is sound.
+            Hakiki reads neutral citations such as [2017] KESC 2 (KLR), eKLR citations such as [2017] eKLR, and sections of the Acts it holds. An empty report is not a
+            sign the filing is sound.
           </p>
           <p className="mt-2 text-sm text-ink-2">{disclaimer}</p>
         </div>
@@ -214,8 +214,44 @@ function Report({ ref, text, findings, disclaimer }: { ref: React.Ref<HTMLElemen
   )
 }
 
+// What an eKLR match rests on (an eKLR citation carries only a year, so the report says how the case was found).
+const BASIS: Partial<Record<NonNullable<CaseCheck['match_basis']>, string>> = {
+  'case number': 'the case number',
+  'party names and year': 'the parties’ names and the year',
+  quote: 'the quoted words, found only in this judgment',
+}
+
 function CaseLine({ c }: { c: CaseCheck }) {
   const j = c.judgment
+  if (c.result === 'possible_match')
+    return (
+      <div className="mt-2">
+        <p className="text-seal">Possibly one of these cases in our collection. The citation gives only a year, and the names fit more than one:</p>
+        <ul className="mt-3 grid gap-2.5 sm:grid-cols-2">
+          {c.candidates.map((k, n) => (
+            <li
+              key={k.judgment_id}
+              style={{ ['--i' as string]: n, ['--tilt' as string]: `${n % 2 ? 0.8 : -0.8}deg` }}
+              className="candidate-card relative rounded-sm bg-paper px-3.5 pt-2.5 pb-2 shadow-[0_8px_18px_-14px_rgba(24,33,43,0.6)] ring-1 ring-rule"
+            >
+              <span aria-hidden className="absolute -top-2 right-3 rounded-full bg-note px-1.5 text-xs text-ink-2 ring-1 ring-note-rule">
+                {n + 1}
+              </span>
+              {k.source_url ? (
+                <a href={k.source_url} className="link" target="_blank" rel="noreferrer">
+                  {shortCase(k.title)}
+                </a>
+              ) : (
+                shortCase(k.title)
+              )}
+              <span className="block text-sm text-ink-2">
+                {k.neutral_citation}, {k.court}, {fmtDate(k.decision_date)}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    )
   if (c.result === 'not_in_collection')
     return (
       <p className="mt-2 text-ink-2">
@@ -236,7 +272,20 @@ function CaseLine({ c }: { c: CaseCheck }) {
         <span className="text-seal">The filing calls this “{c.cited_name}”, but the citation belongs to a different case:</span> {title}.
       </p>
     )
-  return <p className="mt-2 text-ink-2">In our collection: {title}.</p>
+  const basis = c.match_basis && BASIS[c.match_basis]
+  return (
+    <>
+      <p className="mt-2 text-ink-2">In our collection: {title}.</p>
+      {basis && (
+        <p className="mt-1 inline-flex items-center gap-1.5 text-sm text-ink-2">
+          <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" aria-hidden fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+            <path d="M6.5 9.5 9.5 6.5M5 8 3.5 9.5a2.1 2.1 0 0 0 3 3L8 11M8 5l1.5-1.5a2.1 2.1 0 0 1 3 3L11 8" />
+          </svg>
+          Matched on {basis}
+        </p>
+      )}
+    </>
+  )
 }
 
 // Below this, the "nearest passage" shares a few words by chance and marking the quote against it is noise.
