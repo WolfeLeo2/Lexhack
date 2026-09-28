@@ -1,0 +1,15 @@
+uv run python -m ground_truth.eval_filing --set test2   (2026-09-28, fresh held-out set, scored once, after the review fixes; thresholds tuned on dev)
+                   items: 301
+               gold held: 213
+         found precision: 132/139
+         wrong-case rate: 7/301
+                coverage: 132/213
+      possible-match hit: 9/12
+ false found on not-held: 6/88
+
+Wrong-case answers, read after scoring (no tuning on them):
+  test2-0037, 0289, 0290  shared institutional party alone (County Government of Kiambu; Commissioner of Domestic Taxes; KRA)
+  test2-0054, 0265        a shared first name or surname with a different case (Kuria; Dorothy)
+  test2-0261              same dispute, a different court's decision (FKE v LSK, Court of Appeal vs High Court)
+  test2-0219              name read without its first words ("Human Rights (MUHURI)…"), matched another Human Rights title
+Labelling: A/B agreement 280/301; Opus tiebreak on 21; Opus audit of all 89 not_held found 1 missed (Gicheru v Morton).

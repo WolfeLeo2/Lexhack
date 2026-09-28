@@ -22,16 +22,16 @@ const STATUSES: [string, string][] = [
   ['Repealed', 'Parliament removed the whole section, according to the reviser’s note in Kenya Law’s own text.'],
 ]
 
-// ground_truth/filing_test_results.txt and filing_planted_results.txt (2026-09-28).
+// ground_truth/filing_test2_results.txt (fresh held-out set, scored once) and filing_planted_results.txt (2026-09-28).
 const CHECKER_SCORES: [string, string, string][] = [
-  ['eKLR citation matched', '71 of 77', 'When Hakiki says it found the case, it was that case (92%), on 224 citations from 40 judgments held out for testing.'],
-  ['Pointed to the wrong case', '6 of 224', 'The error that matters most (2.7%). Most were a different decision between the same parties.'],
-  ['Cited cases found', '71 of 161', 'Of the cited cases we hold (44%). The rest are offered as possible matches or left unmatched.'],
+  ['eKLR citation matched', '132 of 139', 'When Hakiki says it found the case, it was that case (95%), on 301 citations from 40 judgments held out for testing.'],
+  ['Pointed to the wrong case', '7 of 301', 'The error that matters most (2.3%). Mostly a shared institution or surname, such as a county government, taken for the same case.'],
+  ['Cited cases found', '132 of 213', 'Of the cited cases we hold (62%). The rest are offered as possible matches or left unmatched.'],
   ['Real number, wrong name', '46 of 50', 'A real citation under another case’s name, planted on purpose: caught as a different case.'],
   ['Altered quotes', '69 of 70', 'A word dropped, swapped, or “not” inserted: reported as not word for word.'],
   ['Invented citations', '30 of 30', 'Reported as not in our collection.'],
   ['False alarms', '1 of 146', 'Real, unaltered citations flagged as a different case (an anonymised title).'],
-  ['Found, but not held', '4 of 63', 'Citations to cases we don’t hold that were still matched to one we do: part of the wrong cases above.'],
+  ['Found, but not held', '6 of 88', 'Citations to cases we don’t hold that were still matched to one we do: part of the wrong cases above.'],
 ]
 
 export default async function AboutPage() {
