@@ -246,23 +246,37 @@ def quote_check(quote, text):
 
 
 def case_findings(conn, text):
-    cases = find_cases(text)
+    cases = sorted(find_cases(text) + find_eklr(text), key=lambda c: c["char_start"])
     held = {r[0]: r for r in conn.execute(
         """SELECT neutral_citation, judgment_id, title, court, decision_date::text, source_url, raw_path, has_full_text
            FROM judgments WHERE neutral_citation = ANY(%s) AND duplicate_of IS NULL""",
-        ([c["citation"] for c in cases],))}
+        ([c["citation"] for c in cases if c["citation"]],))}
+    index = title_index(conn) if any(c["form"] == "eklr" for c in cases) else None
     quotes = find_quotes(text, cases)
     texts, budget, out = {}, MAX_QUOTES, []
     for i, c in enumerate(cases):
-        row = held.get(c["citation"])
-        result = ("not_in_collection" if not row else
-                  "found" if names_agree(c["cited_name"], row[2]) else "name_mismatch")
+        qs, candidates = quotes.get(i, []), []
+        if c["form"] == "neutral":
+            row = held.get(c["citation"])
+            result = ("not_in_collection" if not row else
+                      "found" if names_agree(c["cited_name"], row[2]) else "name_mismatch")
+            basis = "neutral citation" if row else None
+        else:
+            m = match_eklr(index, c["year"], c["cited_name"], c["case_number"])
+            result, basis = m["result"], m["basis"]
+            row = m["rows"][0] if result == "found" else None
+            candidates = m["rows"] if result == "possible_match" else []
+            # a quote found word for word in exactly one candidate settles which case it is
+            hits = [r for r in candidates
+                    if (t := case_text(r, texts)) is not None and any(match_quote(q, t)["result"] == "verbatim" for q in qs)]
+            if len(hits) == 1:
+                result, basis, row, candidates = "found", "quote", hits[0], []
         out.append({"kind": "case", "raw_text": c["raw_text"], "char_start": c["char_start"],
-                    "char_end": c["char_end"], "section": None,
-                    "case": {"result": result, "cited_name": c["cited_name"],
-                             "judgment": dict(zip(JUDGMENT_COLS, row[:6])) if row else None},
-                    "quotes": []})
-        for q in quotes.get(i, []):
+                    "char_end": c["char_end"], "section": None, "quotes": [],
+                    "case": {"result": result, "form": c["form"], "match_basis": basis, "cited_name": c["cited_name"],
+                             "judgment": dict(zip(JUDGMENT_COLS, row[:6])) if row else None,
+                             "candidates": [dict(zip(JUDGMENT_COLS, r[:6])) for r in candidates]}})
+        for q in qs:
             out[-1]["quotes"].append(quote_check(q, case_text(row, texts) if budget > 0 else None))
             budget -= 1
     return out

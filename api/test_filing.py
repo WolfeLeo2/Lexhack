@@ -144,6 +144,7 @@ def test_demos():
         ("case", "[2021] KESC 31 (KLR)", "found", ["verbatim"]),
         ("section", "sections 203 and 204 of the Penal Code", "linked", "in force; no recorded court rulings"),
         ("section", "sections 203 and 204 of the Penal Code", "linked", "limited by a court"),
+        ("case", "[2017] eKLR", "found", []),
     ])
     quote = next(f for f in clean["findings"] if f["kind"] == "case")["quotes"][0]
     expect("clean quote paragraph", quote["paragraph"], "18")
@@ -152,7 +153,20 @@ def test_demos():
         ("case", "[2017] KEHC 8382 (KLR)", "found", ["not_found"]),
         ("case", "[2017] KESC 2 (KLR)", "found", ["close"]),
         ("case", "[2019] KECA 99999 (KLR)", "not_in_collection", []),
+        ("case", "[2006] eKLR", "found", ["verbatim"]),
+        ("case", "[2019] eKLR", "not_in_collection", []),
     ])
+    ward = next(f for f in bad["findings"] if f["raw_text"] == "[2006] eKLR")["case"]
+    expect("quote settles two same-name cases",
+           (ward["match_basis"], ward["judgment"] and ward["judgment"]["judgment_id"], ward["candidates"]),
+           ("quote", "ke/judgment/kehc/2006/2628", []))
+    muru = next(f for f in clean["findings"] if f["raw_text"] == "[2017] eKLR")["case"]
+    expect("eklr basis", (muru["form"], muru["match_basis"], muru["judgment"] and muru["judgment"]["judgment_id"]),
+           ("eklr", "party names and year", "ke/judgment/kesc/2017/2"))
+    with connect() as conn:
+        same = filing.check(conn, "In John Ward v Standard Limited [2006] eKLR the court said \"the defendant's "
+                                  "application is allowed in terms of the prayers\".")["findings"][0]["case"]
+    expect("no settling quote stays possible", (same["result"], len(same["candidates"])), ("possible_match", 2))
     expect("stale", summary(stale), [
         ("section", "Section 204 of the Penal Code", "linked", "limited by a court"),
         ("section", "section 194 of the Penal Code", "linked", "limited by a court"),

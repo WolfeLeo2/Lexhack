@@ -154,9 +154,12 @@ class JudgmentRef(BaseModel):
 
 
 class CaseCheck(BaseModel):
-    result: str                    # found | name_mismatch | not_in_collection (we hold ~10%: never "fake")
+    result: str                    # found | name_mismatch | possible_match | not_in_collection (never "fake")
+    form: str                      # neutral ([2017] KESC 2 (KLR)) | eklr ([2017] eKLR)
+    match_basis: str | None        # neutral citation | case number | party names and year | quote
     cited_name: str | None         # the case name the filing gives before the citation
     judgment: JudgmentRef | None   # ours, for found and name_mismatch
+    candidates: list[JudgmentRef] = []   # possible_match: up to three, best first
 
 
 class QuoteCheck(BaseModel):
