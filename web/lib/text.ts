@@ -134,3 +134,33 @@ export function splitAt(
   out.push({ text: cps.slice(at).join(''), span: null })
   return out
 }
+
+export interface DiffOp {
+  word: string
+  op: 'same' | 'del' | 'add' // del: only in the filing's quote; add: the court's words the filing left out
+}
+
+/** Word-level diff of a filing's quote (a) against the judgment's words (b), for showing a misquote the way a copy
+ * editor marks it. Case and punctuation are ignored when comparing; words are shown as the court wrote them. */
+export function wordDiff(a: string, b: string): DiffOp[] {
+  const A = a.split(/\s+/).filter(Boolean)
+  const B = b.split(/\s+/).filter(Boolean)
+  const key = (w: string) => w.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '')
+  const L = Array.from({ length: A.length + 1 }, () => new Array<number>(B.length + 1).fill(0))
+  for (let i = A.length - 1; i >= 0; i--)
+    for (let j = B.length - 1; j >= 0; j--) L[i][j] = key(A[i]) === key(B[j]) ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1])
+  const out: DiffOp[] = []
+  let i = 0
+  let j = 0
+  while (i < A.length && j < B.length) {
+    if (key(A[i]) === key(B[j])) {
+      out.push({ word: B[j], op: 'same' })
+      i++
+      j++
+    } else if (L[i + 1][j] >= L[i][j + 1]) out.push({ word: A[i++], op: 'del' })
+    else out.push({ word: B[j++], op: 'add' })
+  }
+  while (i < A.length) out.push({ word: A[i++], op: 'del' })
+  while (j < B.length) out.push({ word: B[j++], op: 'add' })
+  return out
+}

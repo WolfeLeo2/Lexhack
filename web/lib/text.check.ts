@@ -1,6 +1,6 @@
 // pnpm check — asserts on real texts from the database (Penal Code, Sexual Offences Act, judgment titles).
 import assert from 'node:assert/strict'
-import { caseName, locator, splitAt, structure, tidySpaces } from './text.ts'
+import { caseName, locator, splitAt, structure, tidySpaces, wordDiff } from './text.ts'
 
 assert.equal(tidySpaces('Act ( Cap. 245 ) and [Act No. 10 of 1969 , Sch.]'), 'Act (Cap. 245) and [Act No. 10 of 1969, Sch.]')
 assert.equal(tidySpaces('Article 33 (2) (a)- (d ) of the Constitution .'), 'Article 33 (2) (a)- (d) of the Constitution.')
@@ -55,6 +55,16 @@ assert.deepEqual(
 assert.deepEqual(
   splitAt('ss 203 and 204', [{ char_start: 0, char_end: 14 }, { char_start: 0, char_end: 14 }], (i) => i === 1).map((p) => p.span),
   [null, 1, null],
+)
+
+// A misquote shown copy-editor style: 'del' = only in the filing, 'add' = the court's words the filing left out.
+assert.deepEqual(
+  wordDiff('the Court is declared unconstitutional', 'The court is hereby declared unconstitutional.').map((d) => `${d.op}:${d.word}`),
+  ['same:The', 'same:court', 'same:is', 'add:hereby', 'same:declared', 'same:unconstitutional.'],
+)
+assert.deepEqual(
+  wordDiff('invalid in its entirety', 'invalid to the extent').map((d) => d.op),
+  ['same', 'del', 'del', 'del', 'add', 'add', 'add'],
 )
 
 console.log('text checks passed')

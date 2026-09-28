@@ -49,17 +49,18 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           Skip to content
         </a>
         <header className="sticky top-0 z-40 border-b border-rule bg-paper/85 backdrop-blur-md">
-          <div className="mx-auto flex max-w-6xl items-center gap-6 px-5 py-3 sm:px-8">
+          <div className="mx-auto flex max-w-6xl items-center gap-4 px-5 py-3 sm:gap-6 sm:px-8">
             <Link href="/" className="flex items-center gap-2.5" aria-label="Hakiki home">
               <Seal className="h-8 w-8 text-seal" />
               <span className="statute text-[1.4rem] leading-none font-medium tracking-[-0.01em]">Hakiki</span>
             </Link>
-            <nav className="flex gap-5 text-[0.95rem] text-ink-2" aria-label="Main">
+            <nav className="flex gap-4 text-[0.95rem] text-ink-2 sm:gap-5" aria-label="Main">
               <Link href="/acts" className="hover:text-ink">
                 Acts
               </Link>
-              <Link href="/check" className="hover:text-ink">
-                Check a filing
+              <Link href="/check" className="whitespace-nowrap hover:text-ink">
+                <span className="sm:hidden">Check</span>
+                <span className="hidden sm:inline">Check a filing</span>
               </Link>
               <Link href="/about" className="hover:text-ink">
                 About

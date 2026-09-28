@@ -68,3 +68,65 @@ export function Shelf({ acts }: { acts: Act[] }) {
     </div>
   )
 }
+
+/** A filing under the magnifying glass: the glass travels down the page and each citation it passes is marked, one
+ * of them with the proofreader's wavy line. Plays once on load (globals.css: .glass, .glass-mark, .glass-squiggle). */
+export function FilingUnderGlass({ className = '' }: { className?: string }) {
+  const rules = [70, 86, 102, 118, 134, 150, 166, 182, 198, 214]
+  return (
+    <svg viewBox="0 0 320 270" className={className} aria-hidden fill="none">
+      <g transform="rotate(-2 150 140)">
+        <path d="M44 14h150l30 30v214H44z" fill="var(--color-paper)" stroke="var(--color-ink-2)" strokeWidth="1.5" />
+        <path d="M194 14v30h30" stroke="var(--color-ink-2)" strokeWidth="1.5" />
+        <line x1="70" x2="170" y1="40" y2="40" stroke="var(--color-ink-2)" strokeWidth="4" strokeLinecap="round" />
+        <line x1="92" x2="148" y1="52" y2="52" stroke="var(--color-ink-2)" strokeWidth="2.5" strokeLinecap="round" />
+        {rules.map((y, i) => (
+          <line key={y} x1="70" x2={i % 4 === 3 ? 150 : 200} y1={y} y2={y} stroke="var(--color-rule)" strokeWidth="3" strokeLinecap="round" />
+        ))}
+        <rect x="68" y="95.5" width="62" height="13" rx="2" fill="var(--hl)" className="glass-mark" style={{ ['--i' as string]: 0 }} />
+        <rect x="120" y="159.5" width="80" height="13" rx="2" fill="var(--hl)" className="glass-mark" style={{ ['--i' as string]: 2 }} />
+        <path
+          d="M72 144 q5 -4 10 0 t10 0 t10 0 t10 0 t10 0 t10 0 t10 0"
+          pathLength={1}
+          stroke="var(--color-seal)"
+          strokeWidth="2"
+          strokeLinecap="round"
+          className="glass-squiggle"
+        />
+        <line x1="56" x2="56" y1="24" y2="250" stroke="var(--color-seal)" strokeOpacity=".35" />
+      </g>
+      <g className="glass">
+        <circle cx="0" cy="0" r="34" fill="var(--color-paper)" fillOpacity=".55" stroke="var(--color-ink)" strokeWidth="5" />
+        <path d="M-18 -16 a24 24 0 0 1 14 -10" stroke="#fff" strokeOpacity=".7" strokeWidth="3" strokeLinecap="round" />
+        <text x="0" y="6" textAnchor="middle" className="statute" fontSize="15" fill="var(--color-ink)">
+          [2017]
+        </text>
+        <line x1="25" y1="25" x2="52" y2="52" stroke="var(--color-ink)" strokeWidth="9" strokeLinecap="round" />
+      </g>
+    </svg>
+  )
+}
+
+/** Small marks for the report: a judgment (case), the section sign (section), quotation marks (quote). */
+export function KindIcon({ kind, className = 'h-5 w-5' }: { kind: 'case' | 'section' | 'quote'; className?: string }) {
+  return (
+    <svg viewBox="0 0 20 20" className={className} aria-hidden fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round">
+      {kind === 'case' && (
+        <>
+          <path d="M4 3h9l3 3v11H4z" />
+          <path d="M7 8h6M7 11h6M7 14h4" />
+        </>
+      )}
+      {kind === 'section' && (
+        <text x="10" y="15" textAnchor="middle" fontSize="15" fill="currentColor" stroke="none" className="statute">
+          §
+        </text>
+      )}
+      {kind === 'quote' && (
+        <text x="10" y="18" textAnchor="middle" fontSize="20" fill="currentColor" stroke="none" className="statute">
+          “
+        </text>
+      )}
+    </svg>
+  )
+}
