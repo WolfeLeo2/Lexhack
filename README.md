@@ -620,7 +620,20 @@ The product is called **Hakiki** (Swahili for "verify"); LexHack is the hackatho
 - **Section page** (`/p/{provision_id}`): the statute text as Kenya Law publishes it, a status stamp (words, never a flag), the rulings behind the status in the court's words, a **lineage chart** (one lane per court rank, an arrow from each ruling to the one it reversed or displaced), and every ruling in full. `?leads=1` adds unverified leads, drawn dashed.
 - **Home**, **Acts** (versions + filterable sections, with statuses, citation counts and leads), **search** and **About** (how to use it, what each status means, where the data comes from).
 - **Display-only tidying** (`web/lib/text.ts`, `pnpm check`): subsections and paragraphs split back onto their own lines, amendment notes (`[Act No. … ]`) set apart, extraction spacing fixed (`( Cap. 245 )`), shouting case names title-cased, answer-key locators in words. Stored text is never changed (embeddings and citation offsets depend on it). Court quotes get spacing fixes only.
-- Not built yet: the review queue for extracted events (needs a write endpoint) and the filing checker.
+- **Check a filing** (`/check`): see below.
+
+### Filing checker, slice 1 (`api/filing.py`, `POST /api/check`, `web/app/check/`)
+
+Paste a filing; every citation in it comes back with evidence. Design and plan: `docs/superpowers/specs/2026-09-28-filing-checker-design.md`, `docs/superpowers/plans/2026-09-28-filing-checker-slice-1.md`.
+- **Case** (neutral citations, `[2017] KESC 2 (KLR)`): `found`; `name_mismatch` (the case name before the citation shares no party with our title: a real number under someone else's name); `not_in_collection`. We hold about 10% of published judgments, so `not_in_collection` never means fake.
+- **Quote** (8+ words, in the same paragraph as a cited case, given to the nearest citation): `verbatim` (words only: case, quote marks, dashes and spacing ignored; an ellipsis splits the quote into parts that must appear in order), `close` (difflib ratio ≥ 0.85 on the passage sharing the most 5-word runs; the court's words are shown), `not_found` (the nearest passage is shown if there is one), `not_checked` (judgment not held, PDF-only, or text unreachable). Paragraph numbers as in §7.
+- **Section**: `extract_citations.extract` + `pick_provision`, then the status and the court's words from `api/status.py`; `not_covered` for laws we don't hold.
+- **Judgment text** comes from `$LEXHACK_DATA` when the machine has it, else the same key in R2 (`R2_ENDPOINT` without the bucket name, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, optional `R2_BUCKET`; a read-only token). The API host (Railway) has no data folder, so it always reads R2; `scripts/sync.sh push` keeps the bucket current.
+- Filings are not stored or logged; limit 200,000 characters (413). The web page posts through a server action, so CORS stays GET-only.
+- **Demo filings** (synthetic, labelled as such): `web/public/demo/clean.txt`, `hallucinated.txt`, `stale_law.txt`.
+- **Tests:** `uv run python -m api.test_filing` (pure checks, then the demo filings end to end against Neon); `cd web && pnpm check` for highlighting offsets (code points, not UTF-16).
+- **Slice 2:** `[2017] eKLR` and case-name-only matching, PDF/DOCX upload, an agent-labelled benchmark, quotes away from their citation.
+- Not built yet: the review queue for extracted events (needs a write endpoint).
 
 ## 8. Glossary
 

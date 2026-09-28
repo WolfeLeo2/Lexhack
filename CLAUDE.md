@@ -18,7 +18,7 @@ Kenya Law publishes the official consolidated statutes. Our pilot found that **i
 
 So anyone (a lawyer, a student, or an AI tool) reading the official text gets it wrong. Our tool fixes that.
 
-**To verify before the presentation:** that the live Kenya Law pages still lack these notes. Our evidence is from Internet Archive snapshots.
+**Still to verify:** that the live Kenya Law pages still lack these notes. Our evidence is from Internet Archive snapshots.
 
 ## The core design principle: never a simple yes/no
 
@@ -108,6 +108,7 @@ Details of the Internet Archive pilot are in `crawler/REPORT.md`.
   pipeline/                parsing, extraction, loading
   api/                     FastAPI
   web/                     Next.js
+  docs/superpowers/        design specs and implementation plans
   .env                     LEXHACK_DATA, etc. (gitignored)
 
 $LEXHACK_DATA/             outside the repo, never committed
@@ -238,17 +239,18 @@ Done:
 6. **Event classification (README §7b):** `pipeline/classify_events.py` → `citation_events` (`method='extracted'`, unverified). Model: **`deepseek-flash`** (`DEEPSEEK_API_KEY`), thinking off, JSON mode, answers validated in code. `ground_truth/eval_events.py`: 19/19 answer-key events found, 18/19 right type, 0/6 false alarms (optimistic: the prompt was tuned on those events). Full run done 2026-09-27 (271 events). **Blind review of 40 random extracted events: ~53% precision** (README §7b): false positives from courts *following* another ruling, `reversed_on_appeal` on ordinary appeals (0/5), and generic "findings upheld" orders. Prompt v6 + `MIN_LINK_CONFIDENCE` 0.8 (no "the Act" guesses) → 143 events. **Second-pass checker `pipeline/verify_events.py`** (thinking on: own holding? right section?) lifts precision on 111 blind-reviewed events from 59% to ~80% (`ground_truth/eval_checker.py`). **Agent review (`pipeline/review_events.py`, brief `pipeline/review_brief.md`, agent type `.claude/agents/event-reviewer.md`):** Claude agents read each judgment and accept/reject. Benchmark on the 111 blind-reviewed events: **59/59 accepts right**, 59/63 real events kept. Applied 2026-09-27: **108 verified events on 59 sections** (was 19 on 10); 10 leads left. Accepts carry `verified_by = 'agent:claude-opus-5-5 review v1'`; the UI labels "Checked by an AI reviewer" vs "by a person" (only 1 answer-key event is `human:`). **Run order after any re-run: `classify_events` → `verify_events` → `review_events apply`** (apply re-applies saved verdicts; classify keeps verified rows but recreates rejected ones). Web search did not work for the reviewers in this session, so later-appeal history is unchecked.
 7. **Status resolver + API (README §7c):** `api/status_ke.py` (rules: direct reversal; precedent = later equal-or-higher court pointing the other way), `api/test_status.py`, `api/main.py` (FastAPI: `/api/acts`, `/api/provisions/{id}`, `/api/search`; the Pydantic models are the UI's contract). **UI started** in `web/`: the product is **Hakiki** (LexHack is the hackathon). Next.js, pnpm (README §7c, `web/README.md`): home, Acts, section page with lineage chart and citing judgments, search, About. Unverified leads never change a status (`api/status.py` `with_leads`). **Parliament's events done 2026-09-27** (`pipeline/statutory_events.py parse|load`): 1,139 events from Kenya Law's reviser notes (944 amended, 195 repealed; year-only dates); status_ke: a total repeal → "repealed", amendments never change status or displace court rulings. **Status audit** (`pipeline/audit_status.py`, `audit_brief.md`): agents check each section's derived status; 49/59 ok, fixes applied; both rule limits it found are fixed: events carry `issue` (the legal point; displacement only on the same point) and `stance` (an `interpreted` event that cuts for/against earlier limits, e.g. *Muruatetu* 2021 para 15), labelled by an agent for the 16 sections with 2+ rulings (`audit_status issues`; new events are unlabelled = same point, the old behaviour). Still missing: the *PAK* read-down of ss.158/160. **Review rounds never overwrite:** `export` writes `batch_rN_*.json`; 117 checked rulings on 67 sections after round 2 (web search works with the `event-reviewer` agent type).
    - The human review queue was dropped: the agent review replaces it.
-8. **Deployed (2026-09-28):** web (Next.js, `web/`) on Cloudflare; API on Railway at `https://api-production-0506.up.railway.app` (`API_URL` on the web host). Submitted to LexHack at 12am with a demo video; judges audit the repo later.
+8. **Deployed (2026-09-28):** web (Next.js, `web/`) on Cloudflare; API on Railway at `https://api-production-0506.up.railway.app` (`API_URL` on the web host). Submitted to LexHack with a demo video and presented on 2026-09-27; the hackathon is over and the goal is now a full product.
+9. **Filing checker, slice 1 (2026-09-28):** `api/filing.py`, `POST /api/check`, `web/app/check/` ("Check a filing"), three synthetic demo filings in `web/public/demo/`; tests `uv run python -m api.test_filing`. Judgment text from `$LEXHACK_DATA` or R2 (`R2_*` env vars, read-only token; Railway reads R2). README §7c.
 
 Next (priority order, 2026-09-28):
-1. **Filing checker + synthetic demo filings** (the brief's second half; AI-safety pitch). Needs judgment text reachable by the API (Postgres or R2), an endpoint, an upload page.
+1. **Filing checker slice 2:** `[YYYY] eKLR` and case-name matching, PDF/DOCX upload, an agent-labelled benchmark, quotes away from their citation.
 2. **Later-appeal pass** over the 117 checked rulings with the `event-reviewer` agent (web search works): *EG*, *Alai*, *Andama*, *CORD*, *Mbuti* first.
 3. **Benchmark the amendment parser** with an agent sample; real commencement dates instead of year-only.
 4. **Coverage:** agents hunt landmark rulings we don't hold (fetch Wayback copies), then classify → verify → review → apply; add the most-cited missing Acts.
 5. Search synonyms ("criminal defamation" → s.194), section text by version + diff, judgment pages, a public API.
 6. A scheduled pipeline (Archive → citations → classify → verify → review apply → dedupe → issue labels).
 
-Known gaps: *PAK* [2022] KEHC 262 read-down of Penal Code ss.158/160 is missing; 181 judgments are duplicate copies (Kenya Law published them twice), marked `judgments.duplicate_of` by `pipeline/dedupe_judgments.py` and skipped by the API; 286 PDF-only judgments have no text; Archive coverage is ~10% of judgments; the Employment Act's eIds changed in 2022; appeals of *EG*, *Alai* and *Andama* are unchecked. Before the presentation, confirm the live Kenya Law pages still lack court notes.
+Known gaps: *PAK* [2022] KEHC 262 read-down of Penal Code ss.158/160 is missing; 181 judgments are duplicate copies (Kenya Law published them twice), marked `judgments.duplicate_of` by `pipeline/dedupe_judgments.py` and skipped by the API; 286 PDF-only judgments have no text; Archive coverage is ~10% of judgments; the Employment Act's eIds changed in 2022; appeals of *EG*, *Alai* and *Andama* are unchecked. To do: confirm the live Kenya Law pages still lack court notes.
 
 Blind spots to keep in mind (details in README §9):
 - **One shared Neon branch:** both teammates write to `production`, and pipeline re-runs are destructive. Agree who runs them, or use Neon branches.
