@@ -214,6 +214,19 @@ def test_eklr():
     expect("next citation takes nothing from the previous one", (e[1]["cited_name"], e[1]["case_number"]), (None, None))
     e = filing.find_eklr("In Okuta v AG (Petition No. 397 of 2016) the court held so. See Mwangi [2019] eKLR.")
     expect("nothing crosses a sentence break", (e[0]["cited_name"], e[0]["case_number"]), (None, None))
+    for text, want in (
+            ("in Hassan Ali Joho & Another v. Suleiman Said Shahbal & 2 Others S.C. Petition No. 10 of 2013; [2014] eKLR",
+             ("Hassan Ali Joho & Another v. Suleiman Said Shahbal & 2 Others", "10 of 2013")),
+            ("the court in Mall Developers Limited v Postal Corporation of Kenya ML Misc. No. 26 of 2013 [2014] eKLR",
+             ("Mall Developers Limited v Postal Corporation of Kenya", "26 of 2013")),
+            ("costs in Jasbir Singh Rai & 3 others vs. Tarlochan Singh Rai & 4 others , Pet. 4 of 2012 [2014] eKLR",
+             ("Jasbir Singh Rai & 3 others vs. Tarlochan Singh Rai & 4 others", "4 of 2012"))):
+        e = filing.find_eklr(text)
+        expect(f"court abbreviations before the number: {want[0][:20]}", (e[0]["cited_name"], e[0]["case_number"]), want)
+    expect("no leading 'of' or list marker", [filing.find_cases(t)[0]["cited_name"] for t in
+           ("in the case of Kenfit Limited v Consolata Fathers [2010] KECA 1 (KLR)",
+            "(v) Peter Oduor Ngoge v. Francis Ole Kaparo [2012] KESC 7 (KLR)")],
+           ["Kenfit Limited v Consolata Fathers", "Peter Oduor Ngoge v. Francis Ole Kaparo"])
     expect("case number normalised", filing.case_number("Petition E009 of 2023"), "E009 of 2023")
     expect("no case number", filing.case_number("Petition"), None)
     expect("name tokens keep initials", filing.name_tokens("JAC vs PW"), {"jac", "pw"})
@@ -244,6 +257,13 @@ def test_ranking():
     expect("case number", got(2017, "Jacqueline Okuta v AG", "397 of 2016"), ("found", "case number", ["C"]))
     expect("two same-name cases", got(2006, "John Ward v Standard Limited"), ("possible_match", None, ["D", "E"]))
     expect("unknown parties", got(2017, "Nobody Atall v Someone Else"), ("not_in_collection", None, []))
+    ng = fake_index([("KESC7", "Ngoge v Kaparo & 5 others", "Petition 2 of 2012", 2012),
+                     ("KECA6", "Peter O. Ngoge v Francis Ole Kaparo & 3 others", "Civil Appeal 1 of 2011", 2012)]
+                    + [(f"X{i}", f"Kamau{i} v Otieno{i}", None, 2010) for i in range(40)])
+    r = filing.decide(filing.rank_eklr(ng, 2012, "Peter Oduor Ngoge v. Francis Ole Kaparo & Five Others", "2 of 2012",
+                                       min_shared=1.0, single_min_idf=1.0))
+    expect("the one case with the cited number wins a name tie", (r["result"], r["basis"], [x[1] for x in r["rows"]]),
+           ("found", "case number", ["KESC7"]))
     expect("year we hold nothing for", got(1950, "Francis Mwangi v Republic"), ("not_in_collection", None, []))
     expect("common surname alone is never found", got(2019, "Mwangi v Republic")[0] != "found", True)
     short = fake_index([("N", "Njoroge & 17 others v Attorney General", None, 2015),

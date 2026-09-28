@@ -71,7 +71,8 @@ def cited_name(text, start):
         return None
     # the name starts after the last ordinary lowercase word before the "v": "the Court in | Muruatetu & another v"
     first = max((i + 1 for i, w in enumerate(words[:vi]) if w[0].islower() and w.lower() not in GLUE), default=0)
-    while first < vi and words[first].lower() in LEAD_IN:
+    # drop lead-ins, stray glue and list markers: "in", "of", "(v)", "ii."
+    while first < vi and (words[first].lower() in LEAD_IN | GLUE or re.fullmatch(r"\(?[ivx\d]+[.)]", words[first].lower())):
         first += 1
     return " ".join(words[first:]) or None
 
@@ -89,18 +90,30 @@ def case_number(s):
     return f"{hits[-1]['num'].upper()} of {hits[-1]['y']}" if hits else None
 
 
+# What sits between a case name and its number: court and kind words, often abbreviated ("S.C. Petition No.",
+# "ML Misc. No.", "Pet.", "Sup. Ct. Crim. Appeal No."). Taken off the end before the name is read.
+KIND_TAIL = re.compile(r"(?:[\s,(]*\b(?:S\.\s?C|Sup|Ct|Pet(?:ition)?|No|Misc|Appl(?:ication)?|Civ(?:il)?|Crim(?:inal)?|"
+                       r"Appeal|Advisory|Opinion|Motion|Constitutional|Cause|Case|Suit|Reference|Election|Judicial|"
+                       r"Review|Succession|Family|HCCC|HC|CA|EP|JR|NRB|Nai|ML|MLD|Formerly|Consolidated|and)\.?)+[\s,(]*$",
+                       re.I)
+TAIL_NO = re.compile(r"(?:No\.?\s*)?\b(?P<num>[A-Z]?\d+[A-Z]?)\s+of\s+(?P<y>(?:19|20)\d{2})(?:\s*of)?[\s,;)]*$")
+
+
 def eklr_context(text, start):
-    """(case name, case number) for an eKLR citation at `start`. A case number counts only between the name's "v" and
-    the citation ('Okuta v AG (Petition No. 397 of 2016) [2017] eKLR'); it is cut out before the name is read."""
-    pre = NAME_BREAK.split(text[max(0, start - 300):start])[-1]   # nothing from an earlier sentence or citation
-    vs = list(V_WORD.finditer(pre))
+    """(case name, case number) for an eKLR citation at `start`. A case number counts only when it sits right before
+    the citation ('Okuta v AG (Petition No. 397 of 2016) [2017] eKLR', '… S.C. Petition No. 10 of 2013; [2014] eKLR');
+    it and its court/kind words are taken off before the name is read, and the name never reaches back past a sentence
+    break or an earlier citation."""
+    pre = text[max(0, start - 300):start]
     number = None
-    if vs:
-        hits = list(CASE_NO.finditer(pre, vs[-1].end()))
-        if hits:
-            number = f"{hits[-1]['num'].upper()} of {hits[-1]['y']}"
-            pre = re.sub(r"\s*\([^()]*$", "", pre[:hits[-1].start()]).rstrip(" ,;")
-    return cited_name(pre, len(pre)), number
+    m = TAIL_NO.search(pre)
+    if m:
+        number = f"{m['num'].upper()} of {m['y']}"
+        pre = KIND_TAIL.sub("", pre[:m.start()])
+    name = cited_name(pre, len(pre))
+    if number and not name:   # a number with no name before it belongs to no case we can read: not evidence
+        number = None
+    return name, number
 
 
 def find_eklr(text):
@@ -357,13 +370,17 @@ def rank_eklr(index, year, name, number, min_shared=MIN_SHARED, min_cited=MIN_CI
     cited, idf, out = name_tokens(name), index["idf"], []
     for row, words, num in index["by_year"].get(year, ()):
         s, strong = name_score(cited, words, idf, min_shared, min_cited, single_min_idf)
-        by_number = bool(number) and num == number and (not cited or s > 0)
+        # a matching case number needs the names only to overlap, not the name-only coverage bar
+        by_number = bool(number) and num == number and (not cited or name_score(cited, words, idf, min_shared, 0.0)[0] > 0)
         if by_number or s > 0:
             out.append((1.0 if by_number else s, row, by_number, by_number or strong))
     return sorted(out, key=lambda x: -x[0])
 
 
 def decide(ranked, found_score=FOUND_SCORE, margin=FOUND_MARGIN, possible=POSSIBLE_SCORE):
+    numbered = [x for x in ranked if x[2]]
+    if len(numbered) == 1:   # the one candidate with the cited case number settles a tie on names
+        return {"result": "found", "basis": "case number", "rows": [numbered[0][1]]}
     if (ranked and ranked[0][3] and ranked[0][0] >= found_score
             and ranked[0][0] - (ranked[1][0] if len(ranked) > 1 else 0) >= margin):
         return {"result": "found", "basis": "case number" if ranked[0][2] else "party names and year",
