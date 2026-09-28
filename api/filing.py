@@ -57,7 +57,8 @@ MAX_QUOTES = 200   # per request; the rest read "not checked" (each quote is mat
 
 def cited_name(text, start):
     """'Muruatetu & another v Republic' from the words just before a citation, or None if they hold no 'X v Y'."""
-    seg = re.split(r"(?<!\bv)(?<!\bvs)[.;:(]\s|\n", text[max(0, start - 200):start])[-1]
+    # a name never reaches back past a sentence break or an earlier citation's "]" ("… [1983] KLR 445 cited in X v Y")
+    seg = re.split(r"(?<!\bv)(?<!\bvs)[.;:(]\s|\]\s|\n", text[max(0, start - 200):start])[-1]
     words = seg.strip(" ,").split()
     vi = next((i for i, w in enumerate(words) if w.lower() in V), None)
     if not vi:

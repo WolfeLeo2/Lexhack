@@ -15,6 +15,12 @@ For each item in the batch file you are given:
    parties' distinctive names. Titles often drop first names ("Muruatetu & another v Republic") and may abbreviate.
 3. If several titles could fit, open their `text_path` files and compare parties, court, case number and subject with
    the context. A citation's year is the year the judgment was delivered.
+Search the titles file **case-insensitively** (Grep with `-i`): many titles are stored in capitals ("JANE WANJIKU
+KAMAU v …"). Titles often drop first names and ex parte applicants (a title "Otieno v Republic" for a citation "Peter
+Ouma Otieno v Republic"; "Republic v Board & another; … (Ex parte Applicant)" for "Republic v Board & 2 others Ex parte
+Some Company"), and spellings differ between citation and title: search each distinctive surname on its own before
+answering `not_held`. If the item has a `target` field, that is the exact citation to label; a context can hold
+several citations.
 4. Answer the judgment_id only if you are confident it is the same case (same parties and matter). If none fits, answer
    `not_held`. If two fit and nothing distinguishes them, answer `unsure` and name both in the reason.
 

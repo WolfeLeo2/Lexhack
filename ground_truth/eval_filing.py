@@ -51,17 +51,22 @@ def answers(conn, items):
     return out
 
 
+def right_id(jid, gold):
+    """Gold may list alternatives ('a|b'): one ruling Kenya Law published twice, either id is right."""
+    return jid in gold.split("|")
+
+
 def metrics(ans, gold):
     held = [i for i, g in gold.items() if g != "not_held"]
     found = [i for i in gold if ans[i][0] == "found"]
-    right = [i for i in found if ans[i][1][0] == gold[i]]
+    right = [i for i in found if right_id(ans[i][1][0], gold[i])]
     possible = [i for i in held if ans[i][0] == "possible_match"]
     return {
         "items": len(gold), "gold held": len(held),
         "found precision": f"{len(right)}/{len(found)}",
         "wrong-case rate": f"{len(found) - len(right)}/{len(gold)}",
         "coverage": f"{len(right)}/{len(held)}",
-        "possible-match hit": f"{sum(1 for i in possible if gold[i] in ans[i][1])}/{len(possible)}",
+        "possible-match hit": f"{sum(1 for i in possible if any(right_id(j, gold[i]) for j in ans[i][1]))}/{len(possible)}",
         "false found on not-held": f"{sum(1 for i in found if gold[i] == 'not_held')}/{len(gold) - len(held)}",
     }
 
@@ -82,8 +87,8 @@ def tune(conn, items, gold):
         ranked = {i: filing.rank_eklr(idx, *ctx[i], min_shared=ms) for i in gold}
         for fs, mg, ps in itertools.product((0.6, 0.7, 0.8, 0.9), (0.1, 0.2, 0.3, 0.4), (0.3, 0.4, 0.5, 0.6)):
             d = {i: filing.decide(r, fs, mg, ps) for i, r in ranked.items()}
-            wrong = sum(1 for i, x in d.items() if x["result"] == "found" and x["rows"][0][1] != gold[i])
-            cover = sum(1 for i, x in d.items() if x["result"] == "found" and x["rows"][0][1] == gold[i])
+            wrong = sum(1 for i, x in d.items() if x["result"] == "found" and not right_id(x["rows"][0][1], gold[i]))
+            cover = sum(1 for i, x in d.items() if x["result"] == "found" and right_id(x["rows"][0][1], gold[i]))
             key = (wrong, -cover)
             if best is None or key < best[0]:
                 best = (key, dict(MIN_SHARED=ms, FOUND_SCORE=fs, FOUND_MARGIN=mg, POSSIBLE_SCORE=ps))
@@ -182,4 +187,11 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    import sys
+    if sys.argv[1:] == ["--check"]:
+        m = metrics({"1": ("found", ["a"]), "2": ("found", ["x"]), "3": ("possible_match", ["b", "c"])},
+                    {"1": "a|z", "2": "y", "3": "c"})
+        assert (m["found precision"], m["wrong-case rate"], m["possible-match hit"]) == ("1/2", "1/3", "1/1"), m
+        print("eval check passed")
+    else:
+        main()

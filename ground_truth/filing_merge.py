@@ -3,6 +3,10 @@
   uv run python -m ground_truth.filing_merge dev            # writes labels_{A,B,C}.csv, lists items C must label
   uv run python -m ground_truth.filing_merge dev --final    # after C: writes filing_dev_gold.csv
   uv run python -m ground_truth.filing_merge --check        # self-check of the merge rule
+
+Audit (labels/<set>_audit_*.json): an Opus labeller re-checked every gold not_held with a better search brief. An audit
+answer replaces not_held only when it names a judgment (the first labellers' misses were omissions: capitalised titles,
+dropped first names); it never turns a match into not_held.
 """
 import csv
 import json
@@ -31,6 +35,14 @@ def merge(items, a, b, c):
     return gold, need_c, missing
 
 
+def apply_audit(gold, audit):
+    for g in gold:
+        a = audit.get(g["item_id"], "not_held")
+        if g["gold"] == "not_held" and a not in ("not_held", "unsure", ""):
+            g["gold"], g["agreed"] = a, False
+    return gold
+
+
 def main():
     name, final = sys.argv[1], "--final" in sys.argv
     items = [r["item_id"] for r in csv.DictReader(open(HERE / f"filing_{name}_items.csv", encoding="utf-8"))]
@@ -43,6 +55,11 @@ def main():
             csv.writer(f).writerows([("item_id", "label")] + sorted(labels.items()))
     print(f"A/B agreement {len(items) - len(need_c)}/{len(items)}; C must label {len(need_c)}")
     (data_dir() / "review" / "filing" / f"{name}_need_c.json").write_text(json.dumps(need_c), encoding="utf-8")
+    audit = load(name, "audit")
+    if final and audit:
+        before = sum(g["gold"] == "not_held" for g in gold)
+        gold = apply_audit(gold, audit)
+        print(f"audit: {before - sum(g['gold'] == 'not_held' for g in gold)} of {before} not_held items now name a judgment")
     if final:
         if any(not g["gold"] or g["gold"] == "unsure" for g in gold):
             raise SystemExit("C has not labelled every disagreement (or answered unsure): finish C first")
@@ -57,6 +74,9 @@ if __name__ == "__main__":
     if sys.argv[1:] == ["--check"]:
         g, need, miss = merge(["1", "2", "3"], {"1": "x", "2": "x"}, {"1": "x", "2": "y"}, {"2": "y"})
         assert (need, miss, g[1]["gold"]) == (["2"], ["3"], "y"), (need, miss, g)
+        g = apply_audit([{"item_id": "1", "gold": "not_held", "agreed": True}, {"item_id": "2", "gold": "x", "agreed": True},
+                         {"item_id": "3", "gold": "not_held", "agreed": True}], {"1": "y", "2": "not_held", "3": "unsure"})
+        assert [r["gold"] for r in g] == ["y", "x", "not_held"], g
         print("merge check passed")
     else:
         main()

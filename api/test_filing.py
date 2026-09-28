@@ -196,6 +196,9 @@ def test_eklr():
     e = filing.find_eklr("Civil Appeal No. 5 of 2019. In Salesio M’tonga v M’ithara & 3 others [2015] eKLR the")
     expect("earlier case number ignored", (e[0]["cited_name"], e[0]["case_number"]),
            ("Salesio M’tonga v M’ithara & 3 others", None))
+    e = filing.find_eklr("the case of John Muiruri v. Republic [1983] KLR 445 cited in Ben Maina Mwangi v. Republic "
+                         "[2006] eKLR held")
+    expect("name stops at an earlier citation", e[0]["cited_name"], "Ben Maina Mwangi v. Republic")
     expect("case number normalised", filing.case_number("Petition E009 of 2023"), "E009 of 2023")
     expect("no case number", filing.case_number("Petition"), None)
     expect("name tokens keep initials", filing.name_tokens("JAC vs PW"), {"jac", "pw"})
