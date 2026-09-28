@@ -51,4 +51,10 @@ assert.deepEqual(
   [null, 0, null],
 ) // overlapping citations: the earlier is marked
 
+// "sections 203 and 204": two findings, one span. The one worth a second look must own the highlight.
+assert.deepEqual(
+  splitAt('ss 203 and 204', [{ char_start: 0, char_end: 14 }, { char_start: 0, char_end: 14 }], (i) => i === 1).map((p) => p.span),
+  [null, 1, null],
+)
+
 console.log('text checks passed')

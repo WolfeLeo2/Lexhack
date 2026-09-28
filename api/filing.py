@@ -35,11 +35,13 @@ NOT_A_PARTY = {"and", "another", "others", "the", "of", "in", "see", "per", "als
                "supreme", "appeal", "high", "republic", "attorney", "general", "state", "county", "government",
                "director", "public", "prosecutions", "dpp", "ors", "anor", "ltd", "limited", "kenya", "commission",
                "national", "ex", "parte", "re", "klr", "eklr"}
-QUOTE = re.compile(r"[“\"]([^”\"]+)[”\"]")
+# No opening mark inside and a length cap: an unclosed “ must not rescan the paragraph (quadratic on hostile input).
+QUOTE = re.compile(r"[“\"]([^“”\"]{1,3000})[”\"]")
 MIN_QUOTE_WORDS = 8
 ELLIPSIS = re.compile(r"\.\s?\.\s?\.|…")
 SHINGLE = 5    # words per shingle when locating a near-miss quote
 CLOSE = 0.85   # difflib ratio at or above which a quote is "close" rather than "not found"
+MAX_QUOTES = 200   # per request; the rest read "not checked" (each quote is matched against a whole judgment)
 
 
 def cited_name(text, start):
@@ -101,12 +103,22 @@ def find_run(words, run, start):
     return next((i for i in range(start, len(words) - n + 1) if words[i:i + n] == run), None)
 
 
+@functools.lru_cache(maxsize=8)
+def text_index(text):
+    """(tokens, words, {5-word run: [positions]}, paragraph markers) of a judgment, built once for all its quotes."""
+    doc = tokens(text)
+    words = [w for w, _, _ in doc]
+    index = collections.defaultdict(list)
+    for j in range(len(words) - SHINGLE + 1):
+        index[tuple(words[j:j + SHINGLE])].append(j)
+    return doc, words, index, paragraph_markers(text)
+
+
 def match_quote(quote, text):
     """Compare words only. An ellipsis splits the quote into parts that must appear in order. Failing that, the
     passage sharing the most 5-word runs with the quote is scored with difflib: close, or not found (the nearest
     passage is still returned so the reader can compare)."""
-    doc = tokens(text)
-    words = [w for w, _, _ in doc]
+    doc, words, index, _ = text_index(text)
     parts = [p for p in ([w for w, _, _ in tokens(part)] for part in ELLIPSIS.split(quote)) if p]
     at, hits = 0, []
     for p in parts:
@@ -119,11 +131,8 @@ def match_quote(quote, text):
         return {"result": "verbatim", "similarity": 1.0, "court_text": text[doc[hits[0]][1]:doc[at - 1][2]],
                 "char_start": doc[hits[0]][1]}
     flat = [w for p in parts for w in p]
-    n = min(SHINGLE, len(flat))
-    index = collections.defaultdict(list)
-    for j in range(len(words) - n + 1):
-        index[tuple(words[j:j + n])].append(j)
-    votes = collections.Counter(j - k for k in range(len(flat) - n + 1) for j in index.get(tuple(flat[k:k + n]), ()))
+    votes = collections.Counter(j - k for k in range(len(flat) - SHINGLE + 1)
+                                for j in index.get(tuple(flat[k:k + SHINGLE]), ()))
     if not votes:
         return {"result": "not_found", "similarity": None, "court_text": None, "char_start": None}
     s = max(votes.most_common(1)[0][0], 0)
@@ -136,9 +145,12 @@ def match_quote(quote, text):
 @functools.cache
 def _r2():
     import boto3   # only the API host needs it
+    from botocore.config import Config
     return boto3.client("s3", endpoint_url=os.environ["R2_ENDPOINT"], region_name="auto",
                         aws_access_key_id=os.environ["R2_ACCESS_KEY_ID"],
-                        aws_secret_access_key=os.environ["R2_SECRET_ACCESS_KEY"])
+                        aws_secret_access_key=os.environ["R2_SECRET_ACCESS_KEY"],
+                        # fail fast: an R2 outage should cost a few seconds of "not checked", not minutes
+                        config=Config(connect_timeout=3, read_timeout=10, retries={"max_attempts": 2}))
 
 
 @functools.lru_cache(maxsize=256)
@@ -157,18 +169,26 @@ def judgment_text(raw_path):
 JUDGMENT_COLS = ("neutral_citation", "judgment_id", "title", "court", "decision_date", "source_url")
 
 
-def quote_check(quote, row):
-    """row: a judgments row as selected in case_findings() (raw_path at 6, has_full_text at 7), or None if not held."""
-    out = {"quote": quote, "result": "not_checked", "similarity": None, "court_text": None, "paragraph": None}
+def case_text(row, texts):
+    """The text of a judgments row as selected in case_findings() (raw_path at 6, has_full_text at 7), or None if
+    not held, PDF-only or unreachable. texts: this request's {raw_path: text or None}, so a failure is paid once."""
     if not row or not row[7]:
-        return out
-    try:
-        text = judgment_text(row[6])
-    except Exception:   # R2 or disk unreachable: this quote is unchecked, the rest of the report still stands
-        log.warning("judgment text unavailable: %s", row[6])
+        return None
+    if row[6] not in texts:
+        try:
+            texts[row[6]] = judgment_text(row[6])
+        except Exception:   # R2 or disk unreachable: its quotes are unchecked, the rest of the report still stands
+            log.warning("judgment text unavailable: %s", row[6])
+            texts[row[6]] = None
+    return texts[row[6]]
+
+
+def quote_check(quote, text):
+    out = {"quote": quote, "result": "not_checked", "similarity": None, "court_text": None, "paragraph": None}
+    if text is None:
         return out
     m = match_quote(quote, text)
-    para = paragraph_at(paragraph_markers(text), m["char_start"]) if m["char_start"] is not None else None
+    para = paragraph_at(text_index(text)[3], m["char_start"]) if m["char_start"] is not None else None
     return {**out, "result": m["result"], "similarity": m["similarity"], "court_text": m["court_text"],
             "paragraph": para}
 
@@ -180,7 +200,7 @@ def case_findings(conn, text):
            FROM judgments WHERE neutral_citation = ANY(%s) AND duplicate_of IS NULL""",
         ([c["citation"] for c in cases],))}
     quotes = find_quotes(text, cases)
-    out = []
+    texts, budget, out = {}, MAX_QUOTES, []
     for i, c in enumerate(cases):
         row = held.get(c["citation"])
         result = ("not_in_collection" if not row else
@@ -189,7 +209,10 @@ def case_findings(conn, text):
                     "char_end": c["char_end"], "section": None,
                     "case": {"result": result, "cited_name": c["cited_name"],
                              "judgment": dict(zip(JUDGMENT_COLS, row[:6])) if row else None},
-                    "quotes": [quote_check(q, row) for q in quotes.get(i, [])]})
+                    "quotes": []})
+        for q in quotes.get(i, []):
+            out[-1]["quotes"].append(quote_check(q, case_text(row, texts) if budget > 0 else None))
+            budget -= 1
     return out
 
 

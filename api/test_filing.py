@@ -79,18 +79,36 @@ def test_text():
 DEMO = Path(__file__).resolve().parent.parent / "web" / "public" / "demo"
 
 
-def test_quote_check_fallbacks():
+def test_text_fallbacks():
+    texts = {}
     pdf_only = ("[2017] KEHC 1 (KLR)", "j", "t", "c", None, None, "parsed/judgment/x.json", False)
-    expect("pdf-only judgment", filing.quote_check("any quote at all", pdf_only)["result"], "not_checked")
-    real = filing.judgment_text
-    def down(_):
+    expect("pdf-only judgment", filing.case_text(pdf_only, texts), None)
+    expect("not held", filing.case_text(None, texts), None)
+    expect("no text, not checked", filing.quote_check("any quote at all", None)["result"], "not_checked")
+    real, calls = filing.judgment_text, []
+    def down(raw_path):
+        calls.append(raw_path)
         raise OSError("R2 unreachable")
     filing.judgment_text = down
     try:
         held = ("[2017] KEHC 8382 (KLR)", "j", "t", "c", None, None, OKUTA, True)
-        expect("text unreachable", filing.quote_check("any quote at all", held)["result"], "not_checked")
+        expect("text unreachable", filing.case_text(held, texts), None)
+        filing.case_text(held, texts)
+        expect("unreachable text fetched once per request", len(calls), 1)
     finally:
         filing.judgment_text = real
+
+
+def test_limits():
+    import time
+    s = "[2017] KESC 2 (KLR) " + "“a " * 20000   # unclosed quote marks: must stay linear
+    t = time.monotonic()
+    filing.find_quotes(s, filing.find_cases(s))
+    expect("unclosed quotes are fast", time.monotonic() - t < 1, True)
+    filing.text_index.cache_clear()
+    filing.match_quote("the mandatory nature of the death sentence as provided for", JT)
+    filing.match_quote("the mandatory nature of the death sentence as provided for under", JT)
+    expect("judgment indexed once", filing.text_index.cache_info().hits >= 1, True)
 
 
 def summary(report):
@@ -129,6 +147,12 @@ def test_demos():
         ("section", "section 194 of the Penal Code", "linked", "limited by a court"),
         ("section", "section 29 of the Kenya Information and Communications Act", "linked", "declared unconstitutional"),
     ])
+    many = "Okuta v AG [2017] KEHC 8382 (KLR) " + " ".join(
+        f'"quote number {i} with enough words to be checked"' for i in range(filing.MAX_QUOTES + 1))
+    with connect() as conn:
+        qs = filing.check(conn, many)["findings"][0]["quotes"]
+    expect("quotes capped", (len(qs), qs[-1]["result"], qs[0]["result"] != "not_checked"),
+           (filing.MAX_QUOTES + 1, "not_checked", True))
     s204 = next(f for f in stale["findings"] if f["raw_text"] == "Section 204 of the Penal Code")["section"]
     expect("court's words shown", any("mandatory nature of the death sentence" in e["operative_quote"]
                                       for e in s204["summary_events"]), True)
@@ -138,7 +162,8 @@ def main():
     test_cases()
     test_quotes()
     test_text()
-    test_quote_check_fallbacks()
+    test_text_fallbacks()
+    test_limits()
     test_demos()
     for f in fails:
         print("FAIL", *f)

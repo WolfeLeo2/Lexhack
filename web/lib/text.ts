@@ -110,12 +110,22 @@ export function snippet(s: string, max = 240) {
 }
 
 /** Cut text into plain runs and citation runs. The API's offsets are code points (Python), so slice by code point,
- * not by UTF-16 index; a span overlapping the previous one is left unmarked. */
-export function splitAt(text: string, spans: { char_start: number; char_end: number }[]) {
+ * not by UTF-16 index. A span overlapping the previous one is left unmarked, except that of two identical spans
+ * ("sections 203 and 204") the one `prefer` picks owns the run. */
+export function splitAt(
+  text: string,
+  spans: { char_start: number; char_end: number }[],
+  prefer: (i: number, kept: number) => boolean = () => false,
+) {
   const cps = Array.from(text)
   const out: { text: string; span: number | null }[] = []
   let at = 0
   spans.forEach((s, i) => {
+    const last = out[out.length - 1]
+    if (last?.span != null && spans[last.span].char_start === s.char_start && spans[last.span].char_end === s.char_end) {
+      if (prefer(i, last.span)) last.span = i
+      return
+    }
     if (s.char_start < at) return
     out.push({ text: cps.slice(at, s.char_start).join(''), span: null })
     out.push({ text: cps.slice(s.char_start, s.char_end).join(''), span: i })

@@ -2,6 +2,7 @@
 import Link from 'next/link'
 import { useActionState, useState } from 'react'
 import type { CaseCheck, Finding, QuoteCheck, SectionCheck } from '@/lib/api'
+import { CheckedTag, UnverifiedTag } from '@/components/court'
 import { cap, courtActed, sectionHref } from '@/lib/format'
 import { splitAt } from '@/lib/text'
 import { checkFiling, type CheckState } from './actions'
@@ -46,7 +47,6 @@ export function Checker() {
           value={text}
           onChange={(e) => setText(e.target.value)}
           rows={14}
-          maxLength={200000}
           placeholder="Paste a submission, pleading or judgment."
           className="statute mt-3 w-full rounded-sm border border-rule bg-paper p-4 text-[1.02rem] leading-relaxed focus:border-ink focus:outline-none"
         />
@@ -69,13 +69,19 @@ function Report({ text, findings, disclaimer }: { text: string; findings: Findin
   return (
     <section className="mt-12" aria-labelledby="report">
       <h2 id="report" className="statute text-2xl">
-        {findings.length ? `${findings.length} citations found; ${flagged} worth a second look` : 'No citations found'}
+        {findings.length ? `${findings.length} citations found; ${flagged} worth a second look` : 'No citations Hakiki can check'}
       </h2>
+      {!findings.length && (
+        <p className="mt-2 max-w-[68ch] text-ink-2">
+          Hakiki reads neutral citations such as [2017] KESC 2 (KLR) and sections of the Acts it holds. Citations in the older [2017] eKLR form are not read yet, so
+          this is not a sign the filing is sound.
+        </p>
+      )}
       <p className="mt-2 text-sm text-ink-2">{disclaimer}</p>
       {findings.length > 0 && (
         <div className="mt-6 grid gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
           <div className="statute max-h-[70vh] overflow-y-auto whitespace-pre-wrap rounded-sm border border-rule p-5 leading-relaxed">
-            {splitAt(text, findings).map((p, i) =>
+            {splitAt(text, findings, (i, kept) => needsLook(findings[i]) && !needsLook(findings[kept])).map((p, i) =>
               p.span === null ? (
                 <span key={i}>{p.text}</span>
               ) : (
@@ -175,6 +181,7 @@ function SectionLine({ s }: { s: SectionCheck }) {
               e.title
             )}
             {e.source_paragraph && `, para ${e.source_paragraph}`}
+            <span className="ml-2">{e.verified ? <CheckedTag by={e.verified_by} /> : <UnverifiedTag />}</span>
           </footer>
         </blockquote>
       ))}
