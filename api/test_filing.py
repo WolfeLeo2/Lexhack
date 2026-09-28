@@ -133,6 +133,9 @@ def test_demos():
            ("found", ["ke/judgment/kesc/2017/2"]))
     expect("real Okuta", real(2017, "Jacqueline Okuta & another v Attorney General & 2 others"),
            ("found", ["ke/judgment/kehc/2017/8382"]))
+    expect("one common surname: no found", any(real(y, n)[0] == "found" for y, n in
+           ((2014, "Kamau v Republic"), (2019, "Omondi v Republic"), (2014, "Otieno v Republic"),
+            (2014, "Ochieng v Republic"), (2014, "Mutua v Republic"))), False)
     expect("real John Ward", real(2006, "John Ward v Standard Limited"),
            ("possible_match", ["ke/judgment/kehc/2006/2628", "ke/judgment/kehc/2006/2629"]))
     with connect() as conn:
@@ -167,6 +170,14 @@ def test_demos():
         same = filing.check(conn, "In John Ward v Standard Limited [2006] eKLR the court said \"the defendant's "
                                   "application is allowed in terms of the prayers\".")["findings"][0]["case"]
     expect("no settling quote stays possible", (same["result"], len(same["candidates"])), ("possible_match", 2))
+    real_text, calls = filing.case_text, []
+    filing.case_text = lambda row, texts: calls.append(row) or real_text(row, texts)
+    try:
+        with connect() as conn:
+            filing.check(conn, "In John Ward v Standard Limited [2006] eKLR the court allowed the application.")
+    finally:
+        filing.case_text = real_text
+    expect("no quotes, no judgment text fetched for the tie-break", len(calls), 0)
     expect("stale", summary(stale), [
         ("section", "Section 204 of the Penal Code", "linked", "limited by a court"),
         ("section", "section 194 of the Penal Code", "linked", "limited by a court"),
@@ -199,6 +210,10 @@ def test_eklr():
     e = filing.find_eklr("the case of John Muiruri v. Republic [1983] KLR 445 cited in Ben Maina Mwangi v. Republic "
                          "[2006] eKLR held")
     expect("name stops at an earlier citation", e[0]["cited_name"], "Ben Maina Mwangi v. Republic")
+    e = filing.find_eklr("Okuta v AG (Petition No. 397 of 2016) [2017] eKLR and later in Njoroge [2017] eKLR")
+    expect("next citation takes nothing from the previous one", (e[1]["cited_name"], e[1]["case_number"]), (None, None))
+    e = filing.find_eklr("In Okuta v AG (Petition No. 397 of 2016) the court held so. See Mwangi [2019] eKLR.")
+    expect("nothing crosses a sentence break", (e[0]["cited_name"], e[0]["case_number"]), (None, None))
     expect("case number normalised", filing.case_number("Petition E009 of 2023"), "E009 of 2023")
     expect("no case number", filing.case_number("Petition"), None)
     expect("name tokens keep initials", filing.name_tokens("JAC vs PW"), {"jac", "pw"})
@@ -222,7 +237,7 @@ def test_ranking():
                       ("G", "James Mwangi v Republic", "Criminal Appeal 12 of 2019", 2019)]
                      + [(f"X{i}", f"Kamau{i} v Otieno{i}", None, 2010) for i in range(40)])
     def got(year, name, number=None):
-        r = filing.decide(filing.rank_eklr(idx, year, name, number, min_shared=1.0))
+        r = filing.decide(filing.rank_eklr(idx, year, name, number, min_shared=1.0, single_min_idf=1.0))
         return r["result"], r["basis"], [row[1] for row in r["rows"]]
     expect("first names our title drops", got(2017, "Francis Karioko Muruatetu & another v Republic"),
            ("found", "party names and year", ["A"]))

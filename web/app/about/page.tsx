@@ -26,11 +26,12 @@ const STATUSES: [string, string][] = [
 const CHECKER_SCORES: [string, string, string][] = [
   ['eKLR citation matched', '71 of 77', 'When Hakiki says it found the case, it was that case (92%), on 224 citations from 40 judgments held out for testing.'],
   ['Pointed to the wrong case', '6 of 224', 'The error that matters most (2.7%). Most were a different decision between the same parties.'],
-  ['Cited cases found', '71 of 161', 'Of the cited cases we hold (44%). The rest are offered as possible matches or left unmatched, never guessed.'],
+  ['Cited cases found', '71 of 161', 'Of the cited cases we hold (44%). The rest are offered as possible matches or left unmatched.'],
   ['Real number, wrong name', '46 of 50', 'A real citation under another case’s name, planted on purpose: caught as a different case.'],
   ['Altered quotes', '69 of 70', 'A word dropped, swapped, or “not” inserted: reported as not word for word.'],
   ['Invented citations', '30 of 30', 'Reported as not in our collection.'],
   ['False alarms', '1 of 146', 'Real, unaltered citations flagged as a different case (an anonymised title).'],
+  ['Found, but not held', '4 of 63', 'Citations to cases we don’t hold that were still matched to one we do: part of the wrong cases above.'],
 ]
 
 export default async function AboutPage() {
@@ -138,7 +139,7 @@ export default async function AboutPage() {
       <h2 className="statute mt-14 text-[1.9rem] font-medium">How good is the filing checker?</h2>
       <p className="mt-3 max-w-[68ch]">
         Measured on our own collection, with answers checked by AI reviewers: two labelled each citation without seeing the
-        other’s answer or Hakiki’s, and a third settled disagreements.
+        other’s answer or Hakiki’s, a third settled disagreements, and a fourth re-checked every citation marked “not held”.
       </p>
       <dl className="mt-4 divide-y divide-rule border-y border-rule">
         {CHECKER_SCORES.map(([what, score, note]) => (

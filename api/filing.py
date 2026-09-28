@@ -30,6 +30,8 @@ NEUTRAL = re.compile(r"\[(?P<year>\d{4})\]\s*(?P<court>[A-Z]{2,9})\s+(?P<num>\d+
 EKLR = re.compile(r"\[(?P<year>\d{4})\]\s*eKLR")
 CASE_NO = re.compile(r"(?:No\.?\s*)?\b(?P<num>[A-Z]?\d+[A-Z]?)\s+of\s+(?P<y>(?:19|20)\d{2})\b")
 V_WORD = re.compile(r"\sv(?:s)?\.?\s")
+# Where a case name can't reach back past: a sentence break (not after "v." or "No."), or an earlier citation's "]".
+NAME_BREAK = re.compile(r"(?<!\bv)(?<!\bvs)(?<!\bNo)[.;:(]\s|\]\s|\n")
 WORD = re.compile(r"[^\W_]+")
 V = {"v", "v.", "vs", "vs."}
 GLUE = {"and", "another", "others", "of", "the", "&"}   # lowercase words that belong inside a case name
@@ -50,17 +52,19 @@ CLOSE = 0.85   # difflib ratio at or above which a quote is "close" rather than 
 # eKLR matching (spec 2a). Tuned on the dev set, 2026-09-28 (ground_truth/eval_filing.py --tune: fewest wrong
 # cases, then most coverage).
 FOUND_SCORE = 0.6     # best candidate's score needed for "found"
-FOUND_MARGIN = 0.4   # ...and its lead over the runner-up
+FOUND_MARGIN = 0.3   # ...and its lead over the runner-up
 POSSIBLE_SCORE = 0.3  # candidates listed as a possible match
 MIN_SHARED = 2.0      # shared party-word weight below this scores 0 (~ a word in more than ~2,200 of our titles)
 MIN_CITED = 0.5       # share of the filing's (matchable) party-word weight the title must cover
+SINGLE_MIN_IDF = 6.0  # a name-only "found" on ONE shared word needs a word this rare (~ in 40 titles or fewer):
+                      # "Kamau v Republic" (Kamau in 171 titles) is at most a possible match; "Muruatetu" (3) can be found
 MAX_QUOTES = 200   # per request; the rest read "not checked" (each quote is matched against a whole judgment)
 
 
 def cited_name(text, start):
     """'Muruatetu & another v Republic' from the words just before a citation, or None if they hold no 'X v Y'."""
     # a name never reaches back past a sentence break or an earlier citation's "]" ("… [1983] KLR 445 cited in X v Y")
-    seg = re.split(r"(?<!\bv)(?<!\bvs)[.;:(]\s|\]\s|\n", text[max(0, start - 200):start])[-1]
+    seg = NAME_BREAK.split(text[max(0, start - 200):start])[-1]
     words = seg.strip(" ,").split()
     vi = next((i for i, w in enumerate(words) if w.lower() in V), None)
     if not vi:
@@ -88,7 +92,7 @@ def case_number(s):
 def eklr_context(text, start):
     """(case name, case number) for an eKLR citation at `start`. A case number counts only between the name's "v" and
     the citation ('Okuta v AG (Petition No. 397 of 2016) [2017] eKLR'); it is cut out before the name is read."""
-    pre = text[max(0, start - 300):start]
+    pre = NAME_BREAK.split(text[max(0, start - 300):start])[-1]   # nothing from an earlier sentence or citation
     vs = list(V_WORD.finditer(pre))
     number = None
     if vs:
@@ -270,8 +274,9 @@ def case_findings(conn, text):
             row = m["rows"][0] if result == "found" else None
             candidates = m["rows"] if result == "possible_match" else []
             # a quote found word for word in exactly one candidate settles which case it is
-            hits = [r for r in candidates
-                    if (t := case_text(r, texts)) is not None and any(match_quote(q, t)["result"] == "verbatim" for q in qs)]
+            hits = [r for r in candidates if budget > 0 and qs
+                    and (t := case_text(r, texts)) is not None and any(match_quote(q, t)["result"] == "verbatim" for q in qs)]
+            budget -= len(qs) * len(candidates) if qs else 0   # tie-break matches count against the quote budget
             if len(hits) == 1:
                 result, basis, row, candidates = "found", "quote", hits[0], []
         out.append({"kind": "case", "raw_text": c["raw_text"], "char_start": c["char_start"],
@@ -332,35 +337,38 @@ def title_index(conn):
     return _INDEX
 
 
-def name_score(cited, words, idf, min_shared, min_cited=MIN_CITED):
+def name_score(cited, words, idf, min_shared, min_cited=MIN_CITED, single_min_idf=SINGLE_MIN_IDF):
+    """-> (score, strong). strong: 2+ shared party words, or one rare enough to name a case on its own."""
     """Shared party-word weight over the better-covered side: our titles drop first names ('Muruatetu & another v
     Republic'), older titles carry names that filings abbreviate. Cited words in no title can't tell titles apart."""
     cited = {w for w in cited if w in idf}
-    shared = sum(idf[w] for w in cited & words)
+    common = cited & words
+    shared = sum(idf[w] for w in common)
     if not cited or not words or shared < min_shared:
-        return 0.0
+        return 0.0, False
     whole = sum(idf[w] for w in cited)
     if shared / whole < min_cited:   # a short title met by one of many names ('Njoroge & 17 others v AG')
-        return 0.0
-    return shared / min(whole, sum(idf[w] for w in words))
+        return 0.0, False
+    return shared / min(whole, sum(idf[w] for w in words)), len(common) > 1 or shared >= single_min_idf
 
 
-def rank_eklr(index, year, name, number, min_shared=MIN_SHARED, min_cited=MIN_CITED):
-    """[(score, row, matched on case number)] for the year's judgments, best first, zero scores dropped."""
+def rank_eklr(index, year, name, number, min_shared=MIN_SHARED, min_cited=MIN_CITED, single_min_idf=SINGLE_MIN_IDF):
+    """[(score, row, matched on case number, strong enough to be found)] for the year's judgments, best first."""
     cited, idf, out = name_tokens(name), index["idf"], []
     for row, words, num in index["by_year"].get(year, ()):
-        s = name_score(cited, words, idf, min_shared, min_cited)
+        s, strong = name_score(cited, words, idf, min_shared, min_cited, single_min_idf)
         by_number = bool(number) and num == number and (not cited or s > 0)
         if by_number or s > 0:
-            out.append((1.0 if by_number else s, row, by_number))
+            out.append((1.0 if by_number else s, row, by_number, by_number or strong))
     return sorted(out, key=lambda x: -x[0])
 
 
 def decide(ranked, found_score=FOUND_SCORE, margin=FOUND_MARGIN, possible=POSSIBLE_SCORE):
-    if ranked and ranked[0][0] >= found_score and ranked[0][0] - (ranked[1][0] if len(ranked) > 1 else 0) >= margin:
+    if (ranked and ranked[0][3] and ranked[0][0] >= found_score
+            and ranked[0][0] - (ranked[1][0] if len(ranked) > 1 else 0) >= margin):
         return {"result": "found", "basis": "case number" if ranked[0][2] else "party names and year",
                 "rows": [ranked[0][1]]}
-    top = [row for s, row, _ in ranked if s >= possible][:3]
+    top = [row for s, row, *_ in ranked if s >= possible][:3]
     return {"result": "possible_match" if top else "not_in_collection", "basis": None, "rows": top}
 
 

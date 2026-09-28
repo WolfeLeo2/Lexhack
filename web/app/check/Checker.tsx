@@ -202,7 +202,7 @@ function Report({ ref, text, findings, disclaimer }: { ref: React.Ref<HTMLElemen
                 </p>
                 {f.case && <CaseLine c={f.case} />}
                 {f.quotes.map((q, j) => (
-                  <QuoteLine key={j} q={q} />
+                  <QuoteLine key={j} q={q} unsettled={f.case?.result === 'possible_match'} />
                 ))}
                 {f.section && <SectionLine s={f.section} />}
               </li>
@@ -298,14 +298,16 @@ const QUOTE_LABEL: Record<QuoteCheck['result'], string> = {
   not_checked: 'Quote not checked: we don’t hold this judgment’s text',
 }
 
-function QuoteLine({ q }: { q: QuoteCheck }) {
+function QuoteLine({ q, unsettled = false }: { q: QuoteCheck; unsettled?: boolean }) {
   const marked = (q.result === 'close' || (q.result === 'not_found' && (q.similarity ?? 0) >= COMPARABLE)) && q.court_text
   return (
     <div className="mt-4 border-l-2 border-rule pl-4">
       <p className={`flex items-start gap-1.5 ${q.result === 'close' || q.result === 'not_found' ? 'text-seal' : 'text-ink-2'}`}>
         <KindIcon kind="quote" className="mt-1 h-4 w-4 shrink-0" />
         <span>
-          {QUOTE_LABEL[q.result]}
+          {unsettled && q.result === 'not_checked'
+            ? 'Quote not checked: the citation fits more than one case, and the words were not found in just one of them'
+            : QUOTE_LABEL[q.result]}
           {q.result === 'close' && q.similarity !== null && ` (${Math.round(q.similarity * 100)}% the same)`}
           {q.paragraph && `, paragraph ${q.paragraph}`}.
         </span>
