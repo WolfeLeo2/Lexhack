@@ -17,6 +17,7 @@ import crawler.config  # noqa: F401  (loads .env)
 
 from psycopg_pool import ConnectionPool
 
+from . import filing
 from .status import provision_status, statuses
 
 DISCLAIMER = "Hakiki reports what published sources say. It is not legal advice."
@@ -134,6 +135,59 @@ class Stats(BaseModel):
     agent_events: int              # verified_by 'agent:…' (the answer key's agent audit, and review_events)
     leads: int                     # extracted events the checker didn't fail
     lead_sections: int
+
+
+MAX_FILING = 200_000   # characters
+
+
+class CheckRequest(BaseModel):
+    text: str
+
+
+class JudgmentRef(BaseModel):
+    judgment_id: str
+    title: str
+    court: str | None
+    decision_date: str | None
+    neutral_citation: str | None
+    source_url: str | None
+
+
+class CaseCheck(BaseModel):
+    result: str                    # found | name_mismatch | not_in_collection (we hold ~10%: never "fake")
+    cited_name: str | None         # the case name the filing gives before the citation
+    judgment: JudgmentRef | None   # ours, for found and name_mismatch
+
+
+class QuoteCheck(BaseModel):
+    quote: str                     # as written in the filing
+    result: str                    # verbatim | close | not_found | not_checked (judgment not held or text unreachable)
+    similarity: float | None
+    court_text: str | None         # the judgment's words at the match; for not_found, the nearest passage if any
+    paragraph: str | None          # judgment paragraph of that passage
+
+
+class SectionCheck(BaseModel):
+    result: str                    # linked | not_covered (a law we don't hold, or a section we can't resolve)
+    act_ref: str | None
+    provision: ProvisionRef | None
+    status: str | None
+    summary_events: list[Event]    # the court's verbatim words, as on the section page
+
+
+class Finding(BaseModel):
+    kind: str                      # case | section
+    raw_text: str
+    char_start: int                # offsets into the submitted text, in characters (code points)
+    char_end: int
+    case: CaseCheck | None
+    quotes: list[QuoteCheck]
+    section: SectionCheck | None
+
+
+class CheckReport(BaseModel):
+    findings: list[Finding]
+    disclaimer: str
 
 
 def counts(conn, provision_ids):
@@ -266,3 +320,14 @@ def search(q: str = Query(min_length=2), limit: int = Query(10, le=50)):
         status = statuses(conn, [r[0] for r in rows])
         n = counts(conn, [r[0] for r in rows])
     return [SearchHit(**ref_row(r[:5]), **n[r[0]].model_dump(), snippet=r[5], status=status[r[0]]) for r in rows]
+
+
+@app.post("/api/check", response_model=CheckReport)
+def check_filing(req: CheckRequest):
+    """Every case and section citation in a pasted filing, with evidence (api/filing.py). The filing is not stored
+    or logged."""
+    if len(req.text) > MAX_FILING:
+        raise HTTPException(413, f"filing longer than {MAX_FILING:,} characters")
+    with db() as conn:
+        res = filing.check(conn, req.text)
+    return CheckReport(**res, disclaimer=DISCLAIMER)

@@ -3,6 +3,8 @@ against Neon and local data.
 
   uv run python -m api.test_filing
 """
+from pathlib import Path
+
 from . import filing
 
 fails = []
@@ -74,10 +76,70 @@ def test_text():
     expect("okuta text", "to the extent that it covers offences other than" in filing.judgment_text(OKUTA), True)
 
 
+DEMO = Path(__file__).resolve().parent.parent / "web" / "public" / "demo"
+
+
+def test_quote_check_fallbacks():
+    pdf_only = ("[2017] KEHC 1 (KLR)", "j", "t", "c", None, None, "parsed/judgment/x.json", False)
+    expect("pdf-only judgment", filing.quote_check("any quote at all", pdf_only)["result"], "not_checked")
+    real = filing.judgment_text
+    def down(_):
+        raise OSError("R2 unreachable")
+    filing.judgment_text = down
+    try:
+        held = ("[2017] KEHC 8382 (KLR)", "j", "t", "c", None, None, OKUTA, True)
+        expect("text unreachable", filing.quote_check("any quote at all", held)["result"], "not_checked")
+    finally:
+        filing.judgment_text = real
+
+
+def summary(report):
+    """[(kind, raw text, result, quote results or status)] for comparing a report in one line."""
+    out = []
+    for f in report["findings"]:
+        if f["kind"] == "case":
+            out.append(("case", f["raw_text"], f["case"]["result"], [q["result"] for q in f["quotes"]]))
+        else:
+            out.append(("section", f["raw_text"], f["section"]["result"], f["section"]["status"]))
+    return out
+
+
+def test_demos():
+    from pipeline.db import connect
+    with connect() as conn:
+        clean = filing.check(conn, (DEMO / "clean.txt").read_text(encoding="utf-8"))
+        bad = filing.check(conn, (DEMO / "hallucinated.txt").read_text(encoding="utf-8"))
+        stale = filing.check(conn, (DEMO / "stale_law.txt").read_text(encoding="utf-8"))
+    expect("clean", summary(clean), [
+        ("section", "section 107 of the Evidence Act", "linked", "in force; no recorded court rulings"),
+        ("case", "[2021] KESC 31 (KLR)", "found", ["verbatim"]),
+        ("section", "sections 203 and 204 of the Penal Code", "linked", "in force; no recorded court rulings"),
+        ("section", "sections 203 and 204 of the Penal Code", "linked", "limited by a court"),
+    ])
+    quote = next(f for f in clean["findings"] if f["kind"] == "case")["quotes"][0]
+    expect("clean quote paragraph", quote["paragraph"], "18")
+    expect("hallucinated", [s[:4] for s in summary(bad) if s[0] == "case"], [
+        ("case", "[2017] KESC 2 (KLR)", "name_mismatch", []),
+        ("case", "[2017] KEHC 8382 (KLR)", "found", ["not_found"]),
+        ("case", "[2017] KESC 2 (KLR)", "found", ["close"]),
+        ("case", "[2019] KECA 99999 (KLR)", "not_in_collection", []),
+    ])
+    expect("stale", summary(stale), [
+        ("section", "Section 204 of the Penal Code", "linked", "limited by a court"),
+        ("section", "section 194 of the Penal Code", "linked", "limited by a court"),
+        ("section", "section 29 of the Kenya Information and Communications Act", "linked", "declared unconstitutional"),
+    ])
+    s204 = next(f for f in stale["findings"] if f["raw_text"] == "Section 204 of the Penal Code")["section"]
+    expect("court's words shown", any("mandatory nature of the death sentence" in e["operative_quote"]
+                                      for e in s204["summary_events"]), True)
+
+
 def main():
     test_cases()
     test_quotes()
     test_text()
+    test_quote_check_fallbacks()
+    test_demos()
     for f in fails:
         print("FAIL", *f)
     print("FAILED" if fails else "all passed")

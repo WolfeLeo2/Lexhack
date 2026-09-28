@@ -11,11 +11,18 @@ import collections
 import difflib
 import functools
 import json
+import logging
 import os
 import re
+from datetime import date
 from pathlib import Path
 
 import crawler.config  # noqa: F401  (loads .env: LEXHACK_DATA, R2_*)
+from pipeline.extract_citations import extract, paragraph_at, paragraph_markers, pick_provision, provision_lookup
+
+from .status import provision_status
+
+log = logging.getLogger(__name__)
 
 # [2017] KESC 2 (KLR). Any court code, so an invented court reads as "not in our collection" instead of being missed.
 NEUTRAL = re.compile(r"\[(?P<year>\d{4})\]\s*(?P<court>[A-Z]{2,9})\s+(?P<num>\d+)(?:\s*\(KLR\))?")
@@ -145,3 +152,65 @@ def judgment_text(raw_path):
     else:
         body = _r2().get_object(Bucket=os.environ.get("R2_BUCKET", "lexhack-data"), Key=raw_path)["Body"].read()
     return json.loads(body)["text"] or ""
+
+
+JUDGMENT_COLS = ("neutral_citation", "judgment_id", "title", "court", "decision_date", "source_url")
+
+
+def quote_check(quote, row):
+    """row: a judgments row as selected in case_findings() (raw_path at 6, has_full_text at 7), or None if not held."""
+    out = {"quote": quote, "result": "not_checked", "similarity": None, "court_text": None, "paragraph": None}
+    if not row or not row[7]:
+        return out
+    try:
+        text = judgment_text(row[6])
+    except Exception:   # R2 or disk unreachable: this quote is unchecked, the rest of the report still stands
+        log.warning("judgment text unavailable: %s", row[6])
+        return out
+    m = match_quote(quote, text)
+    para = paragraph_at(paragraph_markers(text), m["char_start"]) if m["char_start"] is not None else None
+    return {**out, "result": m["result"], "similarity": m["similarity"], "court_text": m["court_text"],
+            "paragraph": para}
+
+
+def case_findings(conn, text):
+    cases = find_cases(text)
+    held = {r[0]: r for r in conn.execute(
+        """SELECT neutral_citation, judgment_id, title, court, decision_date::text, source_url, raw_path, has_full_text
+           FROM judgments WHERE neutral_citation = ANY(%s) AND duplicate_of IS NULL""",
+        ([c["citation"] for c in cases],))}
+    quotes = find_quotes(text, cases)
+    out = []
+    for i, c in enumerate(cases):
+        row = held.get(c["citation"])
+        result = ("not_in_collection" if not row else
+                  "found" if names_agree(c["cited_name"], row[2]) else "name_mismatch")
+        out.append({"kind": "case", "raw_text": c["raw_text"], "char_start": c["char_start"],
+                    "char_end": c["char_end"], "section": None,
+                    "case": {"result": result, "cited_name": c["cited_name"],
+                             "judgment": dict(zip(JUDGMENT_COLS, row[:6])) if row else None},
+                    "quotes": [quote_check(q, row) for q in quotes.get(i, [])]})
+    return out
+
+
+def section_findings(conn, text):
+    mentions = list(extract(text))   # no decision date: "Article N" is the 2010 Constitution
+    lookup = provision_lookup(conn)
+    pids = [pick_provision(lookup, m["act_id"], m["section_ref"], date.today()) if m["act_id"] else None
+            for m in mentions]
+    refs = {r[0]: dict(zip(("provision_id", "act_id", "act_title", "number", "heading"), r)) for r in conn.execute(
+        """SELECT p.provision_id, p.act_id, a.title, p.number, p.heading FROM provisions p JOIN acts a USING (act_id)
+           WHERE p.provision_id = ANY(%s)""", ([p for p in pids if p],))}
+    status = {p: provision_status(conn, p) for p in refs}
+    return [{"kind": "section", "raw_text": m["raw_text"], "char_start": m["char_start"], "char_end": m["char_end"],
+             "case": None, "quotes": [],
+             "section": {"result": "linked" if p else "not_covered", "act_ref": m["act_ref"], "provision": refs.get(p),
+                         "status": status[p]["status"] if p else None,
+                         "summary_events": status[p]["summary_events"] if p else []}}
+            for m, p in zip(mentions, pids)]
+
+
+def check(conn, text):
+    """-> {"findings": [...]} in document order, each shaped like api.main.Finding."""
+    return {"findings": sorted(case_findings(conn, text) + section_findings(conn, text),
+                               key=lambda f: f["char_start"])}
