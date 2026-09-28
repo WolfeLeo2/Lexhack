@@ -9,7 +9,13 @@ Reports what the sources say. "Not in our collection" never means "fake": we hol
 """
 import collections
 import difflib
+import functools
+import json
+import os
 import re
+from pathlib import Path
+
+import crawler.config  # noqa: F401  (loads .env: LEXHACK_DATA, R2_*)
 
 # [2017] KESC 2 (KLR). Any court code, so an invented court reads as "not in our collection" instead of being missed.
 NEUTRAL = re.compile(r"\[(?P<year>\d{4})\]\s*(?P<court>[A-Z]{2,9})\s+(?P<num>\d+)(?:\s*\(KLR\))?")
@@ -118,3 +124,24 @@ def match_quote(quote, text):
     ratio = round(difflib.SequenceMatcher(None, flat, words[s:e], autojunk=False).ratio(), 2)
     return {"result": "close" if ratio >= CLOSE else "not_found", "similarity": ratio,
             "court_text": text[doc[s][1]:doc[e - 1][2]], "char_start": doc[s][1]}
+
+
+@functools.cache
+def _r2():
+    import boto3   # only the API host needs it
+    return boto3.client("s3", endpoint_url=os.environ["R2_ENDPOINT"], region_name="auto",
+                        aws_access_key_id=os.environ["R2_ACCESS_KEY_ID"],
+                        aws_secret_access_key=os.environ["R2_SECRET_ACCESS_KEY"])
+
+
+@functools.lru_cache(maxsize=256)
+def judgment_text(raw_path):
+    """A judgment's text: from $LEXHACK_DATA when this machine has it, else the same key in R2 (scripts/sync.sh
+    keeps the bucket a copy of the data folder; the API host has no data folder)."""
+    local = os.environ.get("LEXHACK_DATA")
+    path = Path(local).expanduser() / raw_path if local else None
+    if path and path.exists():
+        body = path.read_text(encoding="utf-8")
+    else:
+        body = _r2().get_object(Bucket=os.environ.get("R2_BUCKET", "lexhack-data"), Key=raw_path)["Body"].read()
+    return json.loads(body)["text"] or ""

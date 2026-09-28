@@ -67,9 +67,17 @@ def test_quotes():
     expect("quote to nearest citation", dict(q), {1: ["the mandatory nature of the death sentence is unconstitutional"]})
 
 
+OKUTA = "parsed/judgment/akn_ke_judgment_kehc_2017_8382_eng@2017-02-06.json"
+
+
+def test_text():
+    expect("okuta text", "to the extent that it covers offences other than" in filing.judgment_text(OKUTA), True)
+
+
 def main():
     test_cases()
     test_quotes()
+    test_text()
     for f in fails:
         print("FAIL", *f)
     print("FAILED" if fails else "all passed")
