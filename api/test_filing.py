@@ -37,8 +37,39 @@ def test_cases():
     expect("no name given", filing.names_agree(None, MURUATETU), True)
 
 
+JT = ("1. The appellant was convicted of murder.\n"
+      "2. The mandatory nature of the death sentence as provided for under section 204 of the Penal Code is hereby "
+      "declared unconstitutional.\n3. Costs to follow the event.")
+
+
+def test_quotes():
+    m = filing.match_quote("the mandatory nature of the death sentence as provided for under section 204", JT)
+    expect("verbatim", m["result"], "verbatim")
+    expect("verbatim offset", m["char_start"], JT.index("The mandatory"))
+    expect("verbatim court text", m["court_text"],
+           "The mandatory nature of the death sentence as provided for under section 204")
+    m = filing.match_quote("The Mandatory nature of the death-sentence, as provided for under Section 204", JT)
+    expect("case, dash, comma ignored", m["result"], "verbatim")
+    m = filing.match_quote("The mandatory nature of the death sentence ... is hereby declared unconstitutional", JT)
+    expect("ellipsis", m["result"], "verbatim")
+    m = filing.match_quote("is hereby declared unconstitutional … The mandatory nature of the death sentence", JT)
+    expect("ellipsis parts out of order", m["result"] == "verbatim", False)
+    m = filing.match_quote("The mandatory nature of the death sentence as provided for under section 204 of the Penal "
+                           "Code is declared unconstitutional", JT)
+    expect("close", (m["result"], m["similarity"]), ("close", 0.95))
+    m = filing.match_quote("The death sentence is abolished for every offence in the Republic of Kenya", JT)
+    expect("not found", (m["result"], m["court_text"]), ("not_found", None))
+
+    text = ("1. In Okuta v AG [2017] KEHC 8382 (KLR) and Muruatetu v Republic [2017] KESC 2 (KLR) the court said "
+            "\"the mandatory nature of the death sentence is unconstitutional\" and \"too short to check\".\n\n"
+            "2. Elsewhere it was said that \"a quote with no case citation in its paragraph is skipped\".")
+    q = filing.find_quotes(text, filing.find_cases(text))
+    expect("quote to nearest citation", dict(q), {1: ["the mandatory nature of the death sentence is unconstitutional"]})
+
+
 def main():
     test_cases()
+    test_quotes()
     for f in fails:
         print("FAIL", *f)
     print("FAILED" if fails else "all passed")
