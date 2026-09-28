@@ -241,9 +241,10 @@ Done:
    - The human review queue was dropped: the agent review replaces it.
 8. **Deployed:** web (Next.js, `web/`) on **Vercel** at https://hakiki-ashen.vercel.app/ (moved from Cloudflare, 2026-09-28); API on Railway at `https://api-production-0506.up.railway.app` (`API_URL` on the web host), deployed with the Railway CLI: `railway up --service api --ci` from the repo root. Submitted to LexHack with a demo video and presented on 2026-09-27; the hackathon is over and the goal is now a full product.
 9. **Filing checker, slice 1 (2026-09-28):** `api/filing.py`, `POST /api/check`, `web/app/check/` ("Check a filing"), three synthetic demo filings in `web/public/demo/`; tests `uv run python -m api.test_filing`. Judgment text from `$LEXHACK_DATA` or R2 (`R2_*` env vars, read-only token; Railway reads R2). README §7c.
+   - **Slice 2a (2026-09-28): `[YYYY] eKLR` matching** by weighted party names, case number and quotes (`found` / `possible_match` / `not_in_collection`), plus an agent-labelled benchmark (`ground_truth/filing_*`, agent type `citation-labeler`; README §7c). **Test set, scored once: found precision 71/77 (92%), wrong case 6/224 (2.7%), coverage 71/161 (44%).** Planted: wrong names 46/50, altered quotes 69/70, invented numbers 30/30, false alarms 1/146.
 
 Next (priority order, 2026-09-28):
-1. **Filing checker slice 2:** `[YYYY] eKLR` and case-name matching, PDF/DOCX upload, an agent-labelled benchmark, quotes away from their citation.
+1. **Filing checker 2b/2c:** PDF/DOCX upload (2b), then quotes away from their citation (2c). Matching follow-ups from the benchmark: court words in context, "estate"/"deceased" as generic words, anonymised titles; re-measure on a fresh sample.
 2. **Later-appeal pass** over the 117 checked rulings with the `event-reviewer` agent (web search works): *EG*, *Alai*, *Andama*, *CORD*, *Mbuti* first.
 3. **Benchmark the amendment parser** with an agent sample; real commencement dates instead of year-only.
 4. **Coverage:** agents hunt landmark rulings we don't hold (fetch Wayback copies), then classify → verify → review → apply; add the most-cited missing Acts.

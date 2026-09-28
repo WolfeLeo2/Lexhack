@@ -22,6 +22,17 @@ const STATUSES: [string, string][] = [
   ['Repealed', 'Parliament removed the whole section, according to the reviser’s note in Kenya Law’s own text.'],
 ]
 
+// ground_truth/filing_test_results.txt and filing_planted_results.txt (2026-09-28).
+const CHECKER_SCORES: [string, string, string][] = [
+  ['eKLR citation matched', '71 of 77', 'When Hakiki says it found the case, it was that case (92%), on 224 citations from 40 judgments held out for testing.'],
+  ['Pointed to the wrong case', '6 of 224', 'The error that matters most (2.7%). Most were a different decision between the same parties.'],
+  ['Cited cases found', '71 of 161', 'Of the cited cases we hold (44%). The rest are offered as possible matches or left unmatched, never guessed.'],
+  ['Real number, wrong name', '46 of 50', 'A real citation under another case’s name, planted on purpose: caught as a different case.'],
+  ['Altered quotes', '69 of 70', 'A word dropped, swapped, or “not” inserted: reported as not word for word.'],
+  ['Invented citations', '30 of 30', 'Reported as not in our collection.'],
+  ['False alarms', '1 of 146', 'Real, unaltered citations flagged as a different case (an anonymised title).'],
+]
+
 export default async function AboutPage() {
   const s = await getStats()
   return (
@@ -123,6 +134,25 @@ export default async function AboutPage() {
           are cited at least once.
         </li>
       </ul>
+
+      <h2 className="statute mt-14 text-[1.9rem] font-medium">How good is the filing checker?</h2>
+      <p className="mt-3 max-w-[68ch]">
+        Measured on our own collection, with answers checked by AI reviewers: two labelled each citation without seeing the
+        other’s answer or Hakiki’s, and a third settled disagreements.
+      </p>
+      <dl className="mt-4 divide-y divide-rule border-y border-rule">
+        {CHECKER_SCORES.map(([what, score, note]) => (
+          <div key={what} className="grid gap-x-6 gap-y-1 py-3 sm:grid-cols-[16rem_7rem_minmax(0,1fr)]">
+            <dt className="text-ink">{what}</dt>
+            <dd className="statute text-lg text-seal tabular-nums">{score}</dd>
+            <dd className="text-ink-2">{note}</dd>
+          </div>
+        ))}
+      </dl>
+      <p className="mt-3 text-[0.95rem] text-ink-2">
+        eKLR citations give only a year, so Hakiki matches them by the parties’ names, the case number, or a quote found in
+        exactly one judgment. When the names fit more than one case it lists the possibilities instead of choosing.
+      </p>
 
       <h2 className="statute mt-14 text-[1.9rem] font-medium">What it is not</h2>
       <p className="mt-3">
