@@ -25,13 +25,17 @@ Our `judgments.case_number` ("Petition 397 of 2016", 16,113 of 16,419 rows) is n
 **Candidates.** Judgments with `extract(year from decision_date) = year`, not `duplicate_of`, loaded once per year
 (`functools.lru_cache`): id, title, party part of the title (`title` up to the first ` (`, `[`, or `;`), case number.
 
-**Score.** Party tokens: lowercase words of 2+ letters, plus all-caps initials of 2+ letters ("JAC", "PW"), minus
-`NOT_A_PARTY` (slice 1). Weight each token by IDF over all titles we hold (`log(N / df)`), computed once. Score of a
-candidate = sum of weights of cited tokens found in its party part / sum of weights of all cited tokens (0..1).
-Case number equal → score set to 1.0 and basis `case number`.
+**Score.** Party tokens: lowercase words of 3+ letters, plus all-caps initials of 2+ letters ("JAC", "PW"), minus
+`NOT_A_PARTY` (slice 1, plus case-kind words such as "petition", "appeal", "hccc"). Weight each token by IDF over all
+titles we hold (`log(N / df)`), computed once; cited tokens that appear in no title are ignored (they can't tell our
+titles apart). Shared weight = sum of weights of tokens in both. Score = shared weight divided by the smaller of the
+two sides' total weight, i.e. the better-covered side: our titles drop first names ("Muruatetu & another v Republic"
+for "Francis Karioko Muruatetu & another v Republic"), and old titles carry names filings abbreviate. A shared weight
+below `MIN_SHARED` (starting value 4.0 ≈ a word in at most ~250 titles) scores 0, so common names alone never match.
+Case number equal (and the names don't score 0, when the filing gives a name) → score 1.0, basis `case number`.
 
-**Decision** (thresholds `FOUND_SCORE`, `FOUND_MARGIN`, `POSSIBLE_SCORE`; starting values 0.8, 0.25, 0.5, tuned on the
-dev set only):
+**Decision** (thresholds `FOUND_SCORE`, `FOUND_MARGIN`, `POSSIBLE_SCORE`, `MIN_SHARED`; starting values 0.8, 0.25, 0.5, 4.0,
+tuned on the dev set only):
 - best ≥ `FOUND_SCORE` and best − second ≥ `FOUND_MARGIN` → `found`, basis `party names and year` (or `case number`);
 - else candidates with score ≥ `POSSIBLE_SCORE` (top 3) → `possible_match`;
 - else → `not_in_collection`.
