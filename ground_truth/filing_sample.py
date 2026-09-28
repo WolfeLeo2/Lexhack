@@ -1,8 +1,12 @@
 """Filing benchmark sample (spec 2a): judgments with 2+ eKLR citations, split into dev and test; every eKLR citation in
 them is an item. Also writes each needed year's list of titles and the labelling batches.
 
-  uv run python -m ground_truth.filing_sample
+  uv run python -m ground_truth.filing_sample              # dev + test
+  uv run python -m ground_truth.filing_sample test2        # a fresh held-out set: the next 40 of the same shuffle
+
+test2 was added after test had been scored once and the matcher then changed (review fixes): it gives a clean number.
 """
+import sys
 import csv
 import json
 import random
@@ -44,7 +48,9 @@ def main():
     out = data_dir() / "review" / "filing"
     (out / "batches").mkdir(parents=True, exist_ok=True)
     years = set()
-    for name, part in (("dev", pool[:PER_SET]), ("test", pool[PER_SET:2 * PER_SET])):
+    sets = (("dev", pool[:PER_SET]), ("test", pool[PER_SET:2 * PER_SET]), ("test2", pool[2 * PER_SET:3 * PER_SET]))
+    only = sys.argv[1] if len(sys.argv) > 1 else None
+    for name, part in [x for x in sets if (x[0] == only if only else x[0] != "test2")]:
         items = []
         for jid, raw_path, text, cites in part:
             for c in cites:
