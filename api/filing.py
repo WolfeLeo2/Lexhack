@@ -47,11 +47,13 @@ MIN_QUOTE_WORDS = 8
 ELLIPSIS = re.compile(r"\.\s?\.\s?\.|…")
 SHINGLE = 5    # words per shingle when locating a near-miss quote
 CLOSE = 0.85   # difflib ratio at or above which a quote is "close" rather than "not found"
-# eKLR matching (spec 2a). Starting values; tuned on the dev set by ground_truth/eval_filing.py --tune.
-FOUND_SCORE = 0.8     # best candidate's score needed for "found"
-FOUND_MARGIN = 0.25   # ...and its lead over the runner-up
-POSSIBLE_SCORE = 0.5  # candidates listed as a possible match
-MIN_SHARED = 4.0      # shared party-word weight below this scores 0 (~ a word in more than ~250 of our titles)
+# eKLR matching (spec 2a). Tuned on the dev set, 2026-09-28 (ground_truth/eval_filing.py --tune: fewest wrong
+# cases, then most coverage).
+FOUND_SCORE = 0.6     # best candidate's score needed for "found"
+FOUND_MARGIN = 0.4   # ...and its lead over the runner-up
+POSSIBLE_SCORE = 0.3  # candidates listed as a possible match
+MIN_SHARED = 2.0      # shared party-word weight below this scores 0 (~ a word in more than ~2,200 of our titles)
+MIN_CITED = 0.5       # share of the filing's (matchable) party-word weight the title must cover
 MAX_QUOTES = 200   # per request; the rest read "not checked" (each quote is matched against a whole judgment)
 
 
@@ -330,21 +332,24 @@ def title_index(conn):
     return _INDEX
 
 
-def name_score(cited, words, idf, min_shared):
+def name_score(cited, words, idf, min_shared, min_cited=MIN_CITED):
     """Shared party-word weight over the better-covered side: our titles drop first names ('Muruatetu & another v
     Republic'), older titles carry names that filings abbreviate. Cited words in no title can't tell titles apart."""
     cited = {w for w in cited if w in idf}
     shared = sum(idf[w] for w in cited & words)
     if not cited or not words or shared < min_shared:
         return 0.0
-    return shared / min(sum(idf[w] for w in cited), sum(idf[w] for w in words))
+    whole = sum(idf[w] for w in cited)
+    if shared / whole < min_cited:   # a short title met by one of many names ('Njoroge & 17 others v AG')
+        return 0.0
+    return shared / min(whole, sum(idf[w] for w in words))
 
 
-def rank_eklr(index, year, name, number, min_shared=MIN_SHARED):
+def rank_eklr(index, year, name, number, min_shared=MIN_SHARED, min_cited=MIN_CITED):
     """[(score, row, matched on case number)] for the year's judgments, best first, zero scores dropped."""
     cited, idf, out = name_tokens(name), index["idf"], []
     for row, words, num in index["by_year"].get(year, ()):
-        s = name_score(cited, words, idf, min_shared)
+        s = name_score(cited, words, idf, min_shared, min_cited)
         by_number = bool(number) and num == number and (not cited or s > 0)
         if by_number or s > 0:
             out.append((1.0 if by_number else s, row, by_number))

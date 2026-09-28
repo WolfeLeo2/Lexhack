@@ -1,0 +1,15 @@
+uv run python -m ground_truth.eval_filing --set test   (2026-09-28, thresholds tuned on dev; scored once)
+                   items: 224
+               gold held: 161
+         found precision: 71/77
+         wrong-case rate: 6/224
+                coverage: 71/161
+      possible-match hit: 13/16
+ false found on not-held: 4/63
+
+Wrong-case answers on test, read after scoring (no tuning on them):
+  test-0014, test-0216  same parties, a different decision from the one cited (ruling vs judgment; another judge's)
+  test-0212             two Supreme Court decisions in the same petition (Munya v Kithinji 2014); the other one chosen
+  test-0063             "Estate"/"Deceased" count as party words: Re Estate of X matched a different estate (a bug)
+  test-0204             matched on a shared party alone (Orange Democratic Movement Party)
+  test-0050             possibly a gold error: two citations in one context, the first labellers had no target field

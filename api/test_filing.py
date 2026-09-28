@@ -231,6 +231,13 @@ def test_ranking():
     expect("unknown parties", got(2017, "Nobody Atall v Someone Else"), ("not_in_collection", None, []))
     expect("year we hold nothing for", got(1950, "Francis Mwangi v Republic"), ("not_in_collection", None, []))
     expect("common surname alone is never found", got(2019, "Mwangi v Republic")[0] != "found", True)
+    short = fake_index([("N", "Njoroge & 17 others v Attorney General", None, 2015),
+                        ("K", "Kenyatta University v Humphrey Mbuthi", None, 2012)]   # the words exist elsewhere
+                       + [(f"X{i}", f"Kamau{i} v Otieno{i}", None, 2015) for i in range(40)])
+    cite = "Republic v Kenyatta University Ex Parte Njoroge Humphrey Mbuthi"
+    expect("short title covered by one name", filing.rank_eklr(short, 2015, cite, None, min_shared=1.0, min_cited=0.0)[0][0], 1.0)
+    expect("min_cited: most of the filing's names must be in the title",
+           filing.rank_eklr(short, 2015, cite, None, min_shared=1.0, min_cited=0.5), [])
 
 
 def main():

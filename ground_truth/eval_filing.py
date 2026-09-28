@@ -83,15 +83,15 @@ def tune(conn, items, gold):
                 key=lambda c: abs(c["char_start"] - min(300, int(it["char_start"]))))
         ctx[i] = (int(it["year"]), e["cited_name"], e["case_number"])
     best = None
-    for ms in (2.0, 3.0, 4.0, 5.0, 6.0):
-        ranked = {i: filing.rank_eklr(idx, *ctx[i], min_shared=ms) for i in gold}
+    for ms, mc in itertools.product((2.0, 3.0, 4.0, 5.0, 6.0), (0.0, 0.2, 0.3, 0.4, 0.5)):
+        ranked = {i: filing.rank_eklr(idx, *ctx[i], min_shared=ms, min_cited=mc) for i in gold}
         for fs, mg, ps in itertools.product((0.6, 0.7, 0.8, 0.9), (0.1, 0.2, 0.3, 0.4), (0.3, 0.4, 0.5, 0.6)):
             d = {i: filing.decide(r, fs, mg, ps) for i, r in ranked.items()}
             wrong = sum(1 for i, x in d.items() if x["result"] == "found" and not right_id(x["rows"][0][1], gold[i]))
             cover = sum(1 for i, x in d.items() if x["result"] == "found" and right_id(x["rows"][0][1], gold[i]))
             key = (wrong, -cover)
             if best is None or key < best[0]:
-                best = (key, dict(MIN_SHARED=ms, FOUND_SCORE=fs, FOUND_MARGIN=mg, POSSIBLE_SCORE=ps))
+                best = (key, dict(MIN_SHARED=ms, MIN_CITED=mc, FOUND_SCORE=fs, FOUND_MARGIN=mg, POSSIBLE_SCORE=ps))
     print("best on dev (wrong, -coverage):", best[0], best[1])
 
 

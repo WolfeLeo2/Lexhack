@@ -1,4 +1,4 @@
-uv run python -m ground_truth.eval_filing --planted   (2026-09-28, starting thresholds)
+uv run python -m ground_truth.eval_filing --planted   (2026-09-28; same with the starting and the tuned thresholds)
                      wrong name -> name_mismatch: 46/50
                     control: right name -> found: 50/50
 altered quote (drop a word) -> close or not_found: 22/22
@@ -6,3 +6,7 @@ altered quote (insert not) -> close or not_found: 20/21
 altered quote (swap a word) -> close or not_found: 27/27
             invented number -> not_in_collection: 30/30
     real neutral citations flagged name_mismatch: 1/146
+
+False alarm checked (1): [2023] KECA 1081 cited as "Nyale v Republic (Criminal Appeal 54 of 2021)"; our title is
+"RN v Republic (Criminal Appeal 54 of 2021)", the same appeal with the appellant anonymised to initials. A false alarm
+(anonymised titles), not a citation error.
