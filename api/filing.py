@@ -12,6 +12,7 @@ import difflib
 import functools
 import json
 import logging
+import math
 import os
 import re
 from datetime import date
@@ -46,6 +47,11 @@ MIN_QUOTE_WORDS = 8
 ELLIPSIS = re.compile(r"\.\s?\.\s?\.|…")
 SHINGLE = 5    # words per shingle when locating a near-miss quote
 CLOSE = 0.85   # difflib ratio at or above which a quote is "close" rather than "not found"
+# eKLR matching (spec 2a). Starting values; tuned on the dev set by ground_truth/eval_filing.py --tune.
+FOUND_SCORE = 0.8     # best candidate's score needed for "found"
+FOUND_MARGIN = 0.25   # ...and its lead over the runner-up
+POSSIBLE_SCORE = 0.5  # candidates listed as a possible match
+MIN_SHARED = 4.0      # shared party-word weight below this scores 0 (~ a word in more than ~250 of our titles)
 MAX_QUOTES = 200   # per request; the rest read "not checked" (each quote is matched against a whole judgment)
 
 
@@ -283,3 +289,60 @@ def check(conn, text):
     """-> {"findings": [...]} in document order, each shaped like api.main.Finding."""
     return {"findings": sorted(case_findings(conn, text) + section_findings(conn, text),
                                key=lambda f: f["char_start"])}
+
+
+def build_index(rows):
+    """rows (neutral_citation, judgment_id, title, court, decision_date, source_url, raw_path, has_full_text,
+    case_number, year) -> {"idf": party-word weight, "by_year": {year: [(row, party words, case number)]}}."""
+    df, by_year = collections.Counter(), collections.defaultdict(list)
+    for r in rows:
+        words = name_tokens(party_part(r[2]))
+        df.update(words)
+        by_year[r[9]].append((r, words, case_number(r[8])))
+    return {"idf": {w: math.log(len(rows) / n) for w, n in df.items()}, "by_year": by_year}
+
+
+_INDEX = {}
+
+
+def title_index(conn):
+    """Every judgment we hold, indexed once per process (~16k titles, a few MB)."""
+    if not _INDEX:
+        _INDEX.update(build_index(conn.execute(
+            """SELECT neutral_citation, judgment_id, title, court, decision_date::text, source_url, raw_path,
+                      has_full_text, case_number, extract(year FROM decision_date)::int
+               FROM judgments WHERE duplicate_of IS NULL""").fetchall()))
+    return _INDEX
+
+
+def name_score(cited, words, idf, min_shared):
+    """Shared party-word weight over the better-covered side: our titles drop first names ('Muruatetu & another v
+    Republic'), older titles carry names that filings abbreviate. Cited words in no title can't tell titles apart."""
+    cited = {w for w in cited if w in idf}
+    shared = sum(idf[w] for w in cited & words)
+    if not cited or not words or shared < min_shared:
+        return 0.0
+    return shared / min(sum(idf[w] for w in cited), sum(idf[w] for w in words))
+
+
+def rank_eklr(index, year, name, number, min_shared=MIN_SHARED):
+    """[(score, row, matched on case number)] for the year's judgments, best first, zero scores dropped."""
+    cited, idf, out = name_tokens(name), index["idf"], []
+    for row, words, num in index["by_year"].get(year, ()):
+        s = name_score(cited, words, idf, min_shared)
+        by_number = bool(number) and num == number and (not cited or s > 0)
+        if by_number or s > 0:
+            out.append((1.0 if by_number else s, row, by_number))
+    return sorted(out, key=lambda x: -x[0])
+
+
+def decide(ranked, found_score=FOUND_SCORE, margin=FOUND_MARGIN, possible=POSSIBLE_SCORE):
+    if ranked and ranked[0][0] >= found_score and ranked[0][0] - (ranked[1][0] if len(ranked) > 1 else 0) >= margin:
+        return {"result": "found", "basis": "case number" if ranked[0][2] else "party names and year",
+                "rows": [ranked[0][1]]}
+    top = [row for s, row, _ in ranked if s >= possible][:3]
+    return {"result": "possible_match" if top else "not_in_collection", "basis": None, "rows": top}
+
+
+def match_eklr(index, year, name, number):
+    return decide(rank_eklr(index, year, name, number))

@@ -125,6 +125,17 @@ def summary(report):
 def test_demos():
     from pipeline.db import connect
     with connect() as conn:
+        idx = filing.title_index(conn)
+    def real(year, name, number=None):
+        r = filing.match_eklr(idx, year, name, number)
+        return r["result"], sorted(row[1] for row in r["rows"])
+    expect("real Muruatetu", real(2017, "Francis Karioko Muruatetu & another v Republic"),
+           ("found", ["ke/judgment/kesc/2017/2"]))
+    expect("real Okuta", real(2017, "Jacqueline Okuta & another v Attorney General & 2 others"),
+           ("found", ["ke/judgment/kehc/2017/8382"]))
+    expect("real John Ward", real(2006, "John Ward v Standard Limited"),
+           ("possible_match", ["ke/judgment/kehc/2006/2628", "ke/judgment/kehc/2006/2629"]))
+    with connect() as conn:
         clean = filing.check(conn, (DEMO / "clean.txt").read_text(encoding="utf-8"))
         bad = filing.check(conn, (DEMO / "hallucinated.txt").read_text(encoding="utf-8"))
         stale = filing.check(conn, (DEMO / "stale_law.txt").read_text(encoding="utf-8"))
@@ -179,8 +190,35 @@ def test_eklr():
     expect("neutral form", filing.find_cases("[2017] KESC 2 (KLR)")[0]["form"], "neutral")
 
 
+def fake_index(rows):
+    """rows: (judgment_id, title, case_number, year) -> an index shaped like title_index()."""
+    return filing.build_index([(None, jid, title, None, None, None, None, True, cn, y) for jid, title, cn, y in rows])
+
+
+def test_ranking():
+    idx = fake_index([("A", MURUATETU, "Petition 15 of 2015", 2017),
+                      ("B", "Francis Mwangi v Republic", "Criminal Appeal 3 of 2016", 2017),
+                      ("C", "Jacqueline Okuta & another v Attorney General & 2 others", "Petition 397 of 2016", 2017),
+                      ("D", "John Ward v Standard Limited", "Civil Case 1062 of 2005", 2006),
+                      ("E", "John Ward v Standard Limited", "Civil Case 1062 of 2005", 2006),
+                      ("F", "Peter Mwangi v Republic", "Criminal Appeal 9 of 2019", 2019),
+                      ("G", "James Mwangi v Republic", "Criminal Appeal 12 of 2019", 2019)]
+                     + [(f"X{i}", f"Kamau{i} v Otieno{i}", None, 2010) for i in range(40)])
+    def got(year, name, number=None):
+        r = filing.decide(filing.rank_eklr(idx, year, name, number, min_shared=1.0))
+        return r["result"], r["basis"], [row[1] for row in r["rows"]]
+    expect("first names our title drops", got(2017, "Francis Karioko Muruatetu & another v Republic"),
+           ("found", "party names and year", ["A"]))
+    expect("case number", got(2017, "Jacqueline Okuta v AG", "397 of 2016"), ("found", "case number", ["C"]))
+    expect("two same-name cases", got(2006, "John Ward v Standard Limited"), ("possible_match", None, ["D", "E"]))
+    expect("unknown parties", got(2017, "Nobody Atall v Someone Else"), ("not_in_collection", None, []))
+    expect("year we hold nothing for", got(1950, "Francis Mwangi v Republic"), ("not_in_collection", None, []))
+    expect("common surname alone is never found", got(2019, "Mwangi v Republic")[0] != "found", True)
+
+
 def main():
     test_eklr()
+    test_ranking()
     test_cases()
     test_quotes()
     test_text()
