@@ -108,3 +108,19 @@ export function snippet(s: string, max = 240) {
   const cut = t.lastIndexOf(' ', t.length - 1)
   return (cut > 0 ? t.slice(0, cut) : t).replace(/[,;:]$/, '') + '…'
 }
+
+/** Cut text into plain runs and citation runs. The API's offsets are code points (Python), so slice by code point,
+ * not by UTF-16 index; a span overlapping the previous one is left unmarked. */
+export function splitAt(text: string, spans: { char_start: number; char_end: number }[]) {
+  const cps = Array.from(text)
+  const out: { text: string; span: number | null }[] = []
+  let at = 0
+  spans.forEach((s, i) => {
+    if (s.char_start < at) return
+    out.push({ text: cps.slice(at, s.char_start).join(''), span: null })
+    out.push({ text: cps.slice(s.char_start, s.char_end).join(''), span: i })
+    at = s.char_end
+  })
+  out.push({ text: cps.slice(at).join(''), span: null })
+  return out
+}

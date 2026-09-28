@@ -107,3 +107,49 @@ export const search = (q: string) =>
 export const getCitations = (id: string, limit: number) =>
   get<{ total: number; judgments: CitingJudgment[] }>(`/api/provisions/${id}/citations?limit=${limit}`)
 export const getStats = () => get<Stats>('/api/stats').then((s) => s!)
+
+export interface JudgmentRef {
+  judgment_id: string
+  title: string
+  court: string | null
+  decision_date: string | null
+  neutral_citation: string | null
+  source_url: string | null
+}
+
+export interface CaseCheck {
+  result: 'found' | 'name_mismatch' | 'not_in_collection'
+  cited_name: string | null
+  judgment: JudgmentRef | null
+}
+
+export interface QuoteCheck {
+  quote: string
+  result: 'verbatim' | 'close' | 'not_found' | 'not_checked'
+  similarity: number | null
+  court_text: string | null // the judgment's words at the match; for not_found, the nearest passage if any
+  paragraph: string | null
+}
+
+export interface SectionCheck {
+  result: 'linked' | 'not_covered'
+  act_ref: string | null
+  provision: ProvisionRef | null
+  status: string | null
+  summary_events: CourtEvent[]
+}
+
+export interface Finding {
+  kind: 'case' | 'section'
+  raw_text: string
+  char_start: number // code points into the checked text
+  char_end: number
+  case: CaseCheck | null
+  quotes: QuoteCheck[]
+  section: SectionCheck | null
+}
+
+export interface CheckReport {
+  findings: Finding[]
+  disclaimer: string
+}

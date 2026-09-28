@@ -1,6 +1,6 @@
 // pnpm check — asserts on real texts from the database (Penal Code, Sexual Offences Act, judgment titles).
 import assert from 'node:assert/strict'
-import { caseName, locator, structure, tidySpaces } from './text.ts'
+import { caseName, locator, splitAt, structure, tidySpaces } from './text.ts'
 
 assert.equal(tidySpaces('Act ( Cap. 245 ) and [Act No. 10 of 1969 , Sch.]'), 'Act (Cap. 245) and [Act No. 10 of 1969, Sch.]')
 assert.equal(tidySpaces('Article 33 (2) (a)- (d ) of the Constitution .'), 'Article 33 (2) (a)- (d) of the Constitution.')
@@ -39,5 +39,16 @@ assert.equal(locator('112(a); scope_text from 69'), 'para 112(a) (limiting words
 assert.equal(locator('Final declarations (i) (paragraphs unnumbered)'), 'final declarations (i)')
 assert.equal(locator('27 (see also 32)'), 'para 27 (see also para 32)')
 assert.equal(locator('36'), 'para 36')
+
+// Offsets from the API are code points (Python); an emoji is two UTF-16 units, so slicing by JS index would shift.
+assert.deepEqual(splitAt('😀 see [2017] KESC 2 now', [{ char_start: 6, char_end: 19 }]), [
+  { text: '😀 see ', span: null },
+  { text: '[2017] KESC 2', span: 0 },
+  { text: ' now', span: null },
+])
+assert.deepEqual(
+  splitAt('ab cd', [{ char_start: 0, char_end: 5 }, { char_start: 3, char_end: 5 }]).map((p) => p.span),
+  [null, 0, null],
+) // overlapping citations: the earlier is marked
 
 console.log('text checks passed')
