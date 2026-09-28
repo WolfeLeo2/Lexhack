@@ -26,6 +26,9 @@ log = logging.getLogger(__name__)
 
 # [2017] KESC 2 (KLR). Any court code, so an invented court reads as "not in our collection" instead of being missed.
 NEUTRAL = re.compile(r"\[(?P<year>\d{4})\]\s*(?P<court>[A-Z]{2,9})\s+(?P<num>\d+)(?:\s*\(KLR\))?")
+EKLR = re.compile(r"\[(?P<year>\d{4})\]\s*eKLR")
+CASE_NO = re.compile(r"(?:No\.?\s*)?\b(?P<num>[A-Z]?\d+[A-Z]?)\s+of\s+(?P<y>(?:19|20)\d{2})\b")
+V_WORD = re.compile(r"\sv(?:s)?\.?\s")
 WORD = re.compile(r"[^\W_]+")
 V = {"v", "v.", "vs", "vs."}
 GLUE = {"and", "another", "others", "of", "the", "&"}   # lowercase words that belong inside a case name
@@ -34,7 +37,9 @@ LEAD_IN = {"in", "see", "per", "also", "cf"}
 NOT_A_PARTY = {"and", "another", "others", "the", "of", "in", "see", "per", "also", "held", "case", "matter", "court",
                "supreme", "appeal", "high", "republic", "attorney", "general", "state", "county", "government",
                "director", "public", "prosecutions", "dpp", "ors", "anor", "ltd", "limited", "kenya", "commission",
-               "national", "ex", "parte", "re", "klr", "eklr"}
+               "national", "ex", "parte", "re", "klr", "eklr", "ag", "petition", "civil", "criminal", "application",
+               "suit", "cause", "misc", "miscellaneous", "hccc", "constitutional", "election", "judicial", "review",
+               "succession", "reference", "no", "consolidated", "formerly", "number"}
 # No opening mark inside and a length cap: an unclosed “ must not rescan the paragraph (quadratic on hostile input).
 QUOTE = re.compile(r"[“\"]([^“”\"]{1,3000})[”\"]")
 MIN_QUOTE_WORDS = 8
@@ -59,9 +64,50 @@ def cited_name(text, start):
 
 
 def find_cases(text):
-    return [{"raw_text": m.group(0), "char_start": m.start(), "char_end": m.end(),
+    return [{"raw_text": m.group(0), "char_start": m.start(), "char_end": m.end(), "form": "neutral",
              "citation": f"[{m['year']}] {m['court']} {m['num']} (KLR)", "cited_name": cited_name(text, m.start())}
             for m in NEUTRAL.finditer(text)]
+
+
+def case_number(s):
+    """'Petition No. 397 of 2016' -> '397 of 2016'. The kind is dropped: filings write HCCC, Pet. or Constitutional
+    Petition for the same case."""
+    hits = list(CASE_NO.finditer(s or ""))
+    return f"{hits[-1]['num'].upper()} of {hits[-1]['y']}" if hits else None
+
+
+def eklr_context(text, start):
+    """(case name, case number) for an eKLR citation at `start`. A case number counts only between the name's "v" and
+    the citation ('Okuta v AG (Petition No. 397 of 2016) [2017] eKLR'); it is cut out before the name is read."""
+    pre = text[max(0, start - 300):start]
+    vs = list(V_WORD.finditer(pre))
+    number = None
+    if vs:
+        hits = list(CASE_NO.finditer(pre, vs[-1].end()))
+        if hits:
+            number = f"{hits[-1]['num'].upper()} of {hits[-1]['y']}"
+            pre = re.sub(r"\s*\([^()]*$", "", pre[:hits[-1].start()]).rstrip(" ,;")
+    return cited_name(pre, len(pre)), number
+
+
+def find_eklr(text):
+    out = []
+    for m in EKLR.finditer(text):
+        name, number = eklr_context(text, m.start())
+        out.append({"raw_text": m.group(0), "char_start": m.start(), "char_end": m.end(), "form": "eklr",
+                    "year": int(m["year"]), "citation": None, "cited_name": name, "case_number": number})
+    return out
+
+
+def party_part(title):
+    """The parties in one of our titles: 'Muruatetu & another v Republic; Katiba Institute… (Petition…) [2017]…'."""
+    return re.split(r"\s\(|\s\[|;", title or "", maxsplit=1)[0]
+
+
+def name_tokens(name):
+    """Party words of a case name: words of 3+ letters, and all-caps initials ('JAC v PW'); generic words dropped."""
+    return {w.lower() for w in WORD.findall(name or "")
+            if (len(w) > 2 or (len(w) > 1 and w.isupper())) and not w.isdigit() and w.lower() not in NOT_A_PARTY}
 
 
 def party_tokens(name):

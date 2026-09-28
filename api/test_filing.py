@@ -158,7 +158,29 @@ def test_demos():
                                       for e in s204["summary_events"]), True)
 
 
+def test_eklr():
+    t = ("the High Court in Jacqueline Okuta & another v Attorney General & 2 others (Petition No. 397 of 2016) "
+         "[2017] eKLR held")
+    e = filing.find_eklr(t)
+    expect("eklr found", [(x["raw_text"], x["year"], x["form"]) for x in e], [("[2017] eKLR", 2017, "eklr")])
+    expect("eklr name, number taken out", (e[0]["cited_name"], e[0]["case_number"]),
+           ("Jacqueline Okuta & another v Attorney General & 2 others", "397 of 2016"))
+    e = filing.find_eklr("relied on Gatirau Peter Munya vs Dickson Mwenda Kithinji & 3 Others [2014]eKLR relied upon")
+    expect("no space, vs", (e[0]["year"], e[0]["cited_name"], e[0]["case_number"]),
+           (2014, "Gatirau Peter Munya vs Dickson Mwenda Kithinji & 3 Others", None))
+    e = filing.find_eklr("Civil Appeal No. 5 of 2019. In Salesio M’tonga v M’ithara & 3 others [2015] eKLR the")
+    expect("earlier case number ignored", (e[0]["cited_name"], e[0]["case_number"]),
+           ("Salesio M’tonga v M’ithara & 3 others", None))
+    expect("case number normalised", filing.case_number("Petition E009 of 2023"), "E009 of 2023")
+    expect("no case number", filing.case_number("Petition"), None)
+    expect("name tokens keep initials", filing.name_tokens("JAC vs PW"), {"jac", "pw"})
+    expect("name tokens drop case words", filing.name_tokens("Okuta v AG (Petition"), {"okuta"})
+    expect("party part", filing.party_part(MURUATETU), "Muruatetu & another v Republic")
+    expect("neutral form", filing.find_cases("[2017] KESC 2 (KLR)")[0]["form"], "neutral")
+
+
 def main():
+    test_eklr()
     test_cases()
     test_quotes()
     test_text()
