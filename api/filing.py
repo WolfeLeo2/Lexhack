@@ -16,6 +16,7 @@ import math
 import os
 import re
 import time
+import unicodedata
 from datetime import date
 from pathlib import Path
 
@@ -167,8 +168,9 @@ def find_quotes(text, cases):
 
 
 def tokens(s):
-    """(lowercased word, start, end) for every word: quote marks, dashes, brackets and spacing drop out."""
-    return [(m.group().lower(), m.start(), m.end()) for m in WORD.finditer(s)]
+    """(lowercased word, start, end) for every word: quote marks, dashes, brackets and spacing drop out. Each word is
+    NFKC-normalised on its own ('ﬁnd' -> 'find', a ligature PDFs leave behind), so offsets still point into `s`."""
+    return [(unicodedata.normalize("NFKC", m.group()).lower(), m.start(), m.end()) for m in WORD.finditer(s)]
 
 
 def find_run(words, run, start):

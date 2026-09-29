@@ -59,6 +59,9 @@ def test_quotes():
     m = filing.match_quote("The mandatory nature of the death sentence as provided for under section 204 of the Penal "
                            "Code is declared unconstitutional", JT)
     expect("close", (m["result"], m["similarity"]), ("close", 0.95))
+    m = filing.match_quote("we find the office of the court", "Then we \ufb01nd the o\ufb03ce of the court is vacant.")
+    expect("ligatures in a judgment match plain letters", (m["result"], m["court_text"]),
+           ("verbatim", "we \ufb01nd the o\ufb03ce of the court"))
     m = filing.match_quote("The death sentence is abolished for every offence in the Republic of Kenya", JT)
     expect("not found", (m["result"], m["court_text"]), ("not_found", None))
 

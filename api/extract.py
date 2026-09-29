@@ -4,6 +4,8 @@ The text goes back to the page so the reader sees what was read before checking 
 layer (a scan) is refused with a message saying so.
 """
 import io
+import re
+import unicodedata
 import zipfile
 from xml.etree import ElementTree
 
@@ -12,6 +14,13 @@ from pypdf import PdfReader
 MAX_BYTES = 10 * 1024 * 1024
 W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
 MIN_PAGE_CHARS = 20   # a page with less text than this has no real text layer
+
+
+def tidy(text):
+    """Ligatures to letters ('ﬁ' -> 'fi'), runs of spaces to one, no trailing spaces, at most one blank line."""
+    text = unicodedata.normalize("NFKC", text)
+    lines = [re.sub(r"[ \t]+", " ", line).strip() for line in text.split("\n")]
+    return re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip()
 
 
 class ExtractError(Exception):
@@ -25,7 +34,9 @@ def read_pdf(data):
         reader = PdfReader(io.BytesIO(data))
         if reader.is_encrypted and not reader.decrypt(""):
             raise ExtractError("This PDF is password-protected. Remove the password, or paste the text.", 422)
-        pages = [(p.extract_text() or "").strip() for p in reader.pages]
+        # layout mode places text by position: plain mode breaks PDFs that draw every word as its own object on a
+        # flipped page (Google Docs exports) into one word per line
+        pages = [tidy(p.extract_text(extraction_mode="layout") or "") for p in reader.pages]
     except ExtractError:
         raise
     except Exception:
@@ -34,8 +45,7 @@ def read_pdf(data):
     if sum(len(p) >= MIN_PAGE_CHARS for p in pages) * 2 < max(len(pages), 1):   # most pages have no text: a scan
         raise ExtractError("This PDF looks scanned: it has no text layer to read. Paste the text, or upload a PDF "
                            "or DOCX with selectable text.", 422)
-    # ponytail: PDF text keeps line breaks but rarely paragraph breaks, so a quote may be attributed within the
-    # whole page rather than its paragraph; paragraph reconstruction if that bites
+    # layout mode keeps blank lines between paragraphs (by vertical gap), so quotes stay within their paragraph
     return {"kind": "pdf", "pages": len(pages), "text": text}
 
 
@@ -59,7 +69,7 @@ def read_docx(data):
         if line:
             paras.append(line)
     # a blank line between paragraphs: quotes are attributed within a paragraph (api/filing.py blocks)
-    return {"kind": "docx", "pages": None, "text": "\n\n".join(paras)}
+    return {"kind": "docx", "pages": None, "text": tidy("\n\n".join(paras))}
 
 
 def read(data, filename=""):
@@ -78,4 +88,4 @@ def read(data, filename=""):
         text = None
     if text is None or "\x00" in text:
         raise ExtractError("Hakiki reads PDF, DOCX and plain text files.", 415)
-    return {"kind": "text", "pages": None, "text": text.replace("\r\n", "\n").strip()}
+    return {"kind": "text", "pages": None, "text": tidy(text.replace("\r\n", "\n"))}
