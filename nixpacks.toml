@@ -1,0 +1,3 @@
+# Railway (Nixpacks) build: Tesseract for reading scanned PDFs (api/extract.py); "..." keeps the default packages.
+[phases.setup]
+aptPkgs = ["...", "tesseract-ocr", "tesseract-ocr-eng"]

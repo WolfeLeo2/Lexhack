@@ -31,6 +31,7 @@ export function Checker() {
   const [readNote, setReadNote] = useState<{ ok: boolean; text: string } | null>(null)
   const [dragging, setDragging] = useState(false)
   const [fed, setFed] = useState(0) // bumps to replay the feed-in animation when a file's text lands
+  const [ocr, setOcr] = useState(false) // the text came from OCR of a scan: quote slips may be OCR's, not the author's
 
   async function readFile(file: File | undefined) {
     if (!file) return
@@ -45,8 +46,12 @@ export function Checker() {
     setText(r.text)
     setExhibit(null)
     setFed((n) => n + 1)
+    setOcr(r.ocr_pages.length > 0)
     const what = r.kind === 'pdf' ? `${r.pages} ${r.pages === 1 ? 'page' : 'pages'}` : r.kind === 'docx' ? 'the document' : 'the text'
-    setReadNote({ ok: true, text: `Read ${what} from ${r.name}. Check it reads right, then check the citations.` })
+    const scanned = r.ocr_pages.length
+      ? ` ${r.ocr_pages.length === r.pages ? 'It is a scan, read by OCR' : `Page${r.ocr_pages.length > 1 ? 's' : ''} ${r.ocr_pages.join(', ')} ${r.ocr_pages.length > 1 ? 'are scans' : 'is a scan'}, read by OCR`}: letters can be misread, so compare any flagged quote with the original.`
+      : ''
+    setReadNote({ ok: true, text: `Read ${what} from ${r.name}.${scanned} Check it reads right, then check the citations.` })
   }
 
   // The report arrives below the fold: bring it into view (gently, unless motion is reduced).
@@ -58,6 +63,7 @@ export function Checker() {
 
   async function loadExhibit(name: string) {
     setExhibit(name)
+    setOcr(false)
     setText(await (await fetch(`/demo/${name}.txt`)).text())
   }
 
@@ -177,13 +183,25 @@ export function Checker() {
         )}
       </form>
       {state.report && (
-        <Report key={state.text} ref={report} text={state.text} findings={state.report.findings} disclaimer={state.report.disclaimer} />
+        <Report key={state.text} ref={report} text={state.text} findings={state.report.findings} disclaimer={state.report.disclaimer} ocr={ocr} />
       )}
     </>
   )
 }
 
-function Report({ ref, text, findings, disclaimer }: { ref: React.Ref<HTMLElement>; text: string; findings: Finding[]; disclaimer: string }) {
+function Report({
+  ref,
+  text,
+  findings,
+  disclaimer,
+  ocr,
+}: {
+  ref: React.Ref<HTMLElement>
+  text: string
+  findings: Finding[]
+  disclaimer: string
+  ocr: boolean
+}) {
   const [active, setActive] = useState<number | null>(null)
   const flagged = findings.filter(needsLook).length
   const cases = findings.filter((f) => f.kind === 'case').length
@@ -280,7 +298,7 @@ function Report({ ref, text, findings, disclaimer }: { ref: React.Ref<HTMLElemen
                 </p>
                 {f.case && <CaseLine c={f.case} />}
                 {f.quotes.map((q, j) => (
-                  <QuoteLine key={j} q={q} unsettled={f.case?.result === 'possible_match'} />
+                  <QuoteLine key={j} q={q} unsettled={f.case?.result === 'possible_match'} ocr={ocr} />
                 ))}
                 {f.section && <SectionLine s={f.section} />}
               </li>
@@ -376,7 +394,7 @@ const QUOTE_LABEL: Record<QuoteCheck['result'], string> = {
   not_checked: 'Quote not checked: we don’t hold this judgment’s text',
 }
 
-function QuoteLine({ q, unsettled = false }: { q: QuoteCheck; unsettled?: boolean }) {
+function QuoteLine({ q, unsettled = false, ocr = false }: { q: QuoteCheck; unsettled?: boolean; ocr?: boolean }) {
   const marked = (q.result === 'close' || (q.result === 'not_found' && (q.similarity ?? 0) >= COMPARABLE)) && q.court_text
   return (
     <div className="mt-4 border-l-2 border-rule pl-4">
@@ -388,6 +406,7 @@ function QuoteLine({ q, unsettled = false }: { q: QuoteCheck; unsettled?: boolea
             : QUOTE_LABEL[q.result]}
           {q.result === 'close' && q.similarity !== null && ` (${Math.round(q.similarity * 100)}% the same)`}
           {q.paragraph && `, paragraph ${q.paragraph}`}.
+          {ocr && (q.result === 'close' || q.result === 'not_found') && ' The filing was read by OCR, so this may be an OCR slip.'}
         </span>
       </p>
       {marked ? (

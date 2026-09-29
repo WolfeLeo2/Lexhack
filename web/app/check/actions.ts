@@ -28,7 +28,9 @@ export async function checkFiling(_prev: CheckState, form: FormData): Promise<Ch
 
 const MAX_UPLOAD = 4 * 1024 * 1024 // Vercel caps function bodies at ~4.5 MB; the API itself takes 10 MB
 
-export type ReadResult = { text: string; kind: 'pdf' | 'docx' | 'text'; pages: number | null; name: string } | { error: string }
+export type ReadResult =
+  | { text: string; kind: 'pdf' | 'docx' | 'text'; pages: number | null; ocr_pages: number[]; name: string }
+  | { error: string }
 
 /** Read an uploaded filing's text on the server (api/extract.py). The file is not stored. */
 export async function readFiling(form: FormData): Promise<ReadResult> {

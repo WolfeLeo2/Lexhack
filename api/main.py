@@ -197,6 +197,7 @@ class ExtractResult(BaseModel):
     kind: str                      # pdf | docx | text
     pages: int | None              # PDFs only
     text: str                      # what was read: shown to the reader before checking
+    ocr_pages: list[int] = []      # pages read by OCR (scans): slips there can look like misquotes
 
 
 def counts(conn, provision_ids):

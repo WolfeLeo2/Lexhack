@@ -66,6 +66,35 @@ def pdf_word_objects(lines, extra=""):
     return out
 
 
+def scanned(text_pdf):
+    """A scan of a text PDF: each page rendered to grey pixels and wrapped in a new PDF as an image, no text layer."""
+    import zlib
+    import pypdfium2
+    objs, kids = ["<</Type/Catalog/Pages 2 0 R>>", None], []
+    for page in pypdfium2.PdfDocument(text_pdf):
+        bm = page.render(scale=200 / 72, grayscale=True)
+        raw = b"".join(bytes(bm.buffer)[y * bm.stride:y * bm.stride + bm.width] for y in range(bm.height))
+        img = zlib.compress(raw)
+        objs.append((f"<</Type/XObject/Subtype/Image/Width {bm.width}/Height {bm.height}/ColorSpace/DeviceGray"
+                     f"/BitsPerComponent 8/Filter/FlateDecode/Length {len(img)}>>stream\n").encode("latin-1") + img
+                    + b"\nendstream")
+        draw = "q 612 0 0 792 0 0 cm /Im0 Do Q"
+        objs.append(f"<</Length {len(draw)}>>stream\n{draw}\nendstream")
+        objs.append(f"<</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]/Resources<</XObject<</Im0 {len(objs) - 1} 0 R>>>>"
+                    f"/Contents {len(objs)} 0 R>>")
+        kids.append(f"{len(objs)} 0 R")
+    objs[1] = f"<</Type/Pages/Kids[{' '.join(kids)}]/Count {len(kids)}>>"
+    out, offsets = b"%PDF-1.4\n", []
+    for n, body in enumerate(objs, 1):
+        offsets.append(len(out))
+        out += f"{n} 0 obj".encode() + (body if isinstance(body, bytes) else body.encode("latin-1")) + b"endobj\n"
+    xref = len(out)
+    out += f"xref\n0 {len(objs) + 1}\n0000000000 65535 f \n".encode()
+    out += "".join(f"{o:010d} 00000 n \n" for o in offsets).encode()
+    out += f"trailer<</Size {len(objs) + 1}/Root 1 0 R>>\nstartxref\n{xref}\n%%EOF".encode()
+    return out
+
+
 def docx(paragraphs):
     w = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
     body = "".join(f"<w:p>{''.join(f'<w:r><w:t xml:space=\"preserve\">{run}</w:t></w:r>' for run in p)}</w:p>"
@@ -91,7 +120,18 @@ def main():
     expect("pdf kind and pages", (r["kind"], r["pages"]), ("pdf", 2))
     expect("pdf text, pages apart", "[2017] eKLR the court held that" in r["text"] and
            "\n\nsection 194 of the Penal Code" in r["text"], True)
-    expect("scanned pdf refused", error_of(pdf([[], []]), "scan.pdf"), 422)
+    expect("blank pdf refused", error_of(pdf([[], []]), "blank.pdf"), 422)
+    if extract.ocr_available():
+        scan = scanned(pdf([["In Okuta v Attorney General the court held that section 194"],
+                            ["of the Penal Code is unconstitutional to the extent that"]]))
+        r = extract.read(scan, "scan.pdf")
+        words = r["text"].lower()
+        expect("scan read by OCR", (r["ocr_pages"], "okuta" in words, "section 194" in words, "penal code" in words),
+               ([1, 2], True, True, True))
+        many = scanned(pdf([["A scanned page of a long filing"]] * (extract.OCR_MAX_PAGES + 1)))
+        expect("too many scanned pages refused", error_of(many, "long-scan.pdf"), 422)
+    else:
+        print("skipped OCR checks: tesseract not installed")
     r = extract.read(pdf_word_objects(["In Okuta v Attorney General the court held", "that section 194 is limited"]),
                      "gdocs.pdf")
     expect("word-per-object pdf reads as lines of words", r["text"],

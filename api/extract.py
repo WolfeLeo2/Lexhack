@@ -1,19 +1,50 @@
 """Read an uploaded filing (PDF, DOCX or plain text) into text for the filing checker. The file is not stored.
 
-The text goes back to the page so the reader sees what was read before checking it. No OCR: a PDF without a text
-layer (a scan) is refused with a message saying so.
+The text goes back to the page so the reader sees what was read before checking it. PDF pages without a text layer
+(scans) are read by OCR on this server (Tesseract; the file never leaves it), up to OCR_MAX_PAGES, and the result says
+which pages: OCR slips can look like misquotes, so the page tells the reader to compare with the original.
 """
+import functools
 import io
 import re
+import shutil
+import subprocess
 import unicodedata
 import zipfile
 from xml.etree import ElementTree
 
+import pypdfium2
 from pypdf import PdfReader
 
 MAX_BYTES = 10 * 1024 * 1024
 W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
 MIN_PAGE_CHARS = 20   # a page with less text than this has no real text layer
+OCR_MAX_PAGES = 30    # scanned pages read per file (~1-3 s each); longer scans are refused with a message
+OCR_DPI = 300
+
+
+@functools.cache
+def tesseract():
+    return shutil.which("tesseract") or next((p for p in ("/opt/homebrew/bin/tesseract", "/usr/bin/tesseract")
+                                              if shutil.which(p)), None)
+
+
+def ocr_available():
+    return tesseract() is not None
+
+
+def ocr_pages(data, numbers):
+    """{page number (1-based): text} for the given pages: rendered grey at OCR_DPI, written as PGM for Tesseract."""
+    doc, out = pypdfium2.PdfDocument(data), {}
+    for n in numbers:
+        bm = doc[n - 1].render(scale=OCR_DPI / 72, grayscale=True)
+        buf = bytes(bm.buffer)
+        pgm = b"P5\n%d %d\n255\n" % (bm.width, bm.height) + b"".join(
+            buf[y * bm.stride:y * bm.stride + bm.width] for y in range(bm.height))
+        run = subprocess.run([tesseract(), "stdin", "stdout", "-l", "eng", "--psm", "3"], input=pgm,
+                             capture_output=True, timeout=120)
+        out[n] = tidy(run.stdout.decode("utf-8", "replace"))
+    return out
 
 
 def tidy(text):
@@ -41,12 +72,23 @@ def read_pdf(data):
         raise
     except Exception:
         raise ExtractError("This PDF could not be read. Try saving it again as PDF, or paste the text.", 422)
+    blank = [n for n, p in enumerate(pages, 1) if len(p) < MIN_PAGE_CHARS]
+    ocr = []
+    if blank and len(blank) * 2 >= len(pages):   # mostly without a text layer: a scan
+        if not ocr_available():
+            raise ExtractError("This PDF looks scanned: it has no text layer to read. Paste the text, or upload a PDF "
+                               "or DOCX with selectable text.", 422)
+        if len(blank) > OCR_MAX_PAGES:
+            raise ExtractError(f"This PDF is a scan of {len(blank)} pages; Hakiki reads scans of up to "
+                               f"{OCR_MAX_PAGES} pages. Upload the pages you need, or paste the text.", 422)
+        for n, t in ocr_pages(data, blank).items():
+            pages[n - 1] = t
+        ocr = blank
+        if sum(len(p) >= MIN_PAGE_CHARS for p in pages) * 2 < len(pages):
+            raise ExtractError("This PDF looks scanned, and OCR found almost no text in it. Paste the text instead.", 422)
     text = "\n\n".join(p for p in pages if p)
-    if sum(len(p) >= MIN_PAGE_CHARS for p in pages) * 2 < max(len(pages), 1):   # most pages have no text: a scan
-        raise ExtractError("This PDF looks scanned: it has no text layer to read. Paste the text, or upload a PDF "
-                           "or DOCX with selectable text.", 422)
     # layout mode keeps blank lines between paragraphs (by vertical gap), so quotes stay within their paragraph
-    return {"kind": "pdf", "pages": len(pages), "text": text}
+    return {"kind": "pdf", "pages": len(pages), "text": text, "ocr_pages": ocr}
 
 
 def read_docx(data):
@@ -69,7 +111,7 @@ def read_docx(data):
         if line:
             paras.append(line)
     # a blank line between paragraphs: quotes are attributed within a paragraph (api/filing.py blocks)
-    return {"kind": "docx", "pages": None, "text": tidy("\n\n".join(paras))}
+    return {"kind": "docx", "pages": None, "text": tidy("\n\n".join(paras)), "ocr_pages": []}
 
 
 def read(data, filename=""):
@@ -88,4 +130,4 @@ def read(data, filename=""):
         text = None
     if text is None or "\x00" in text:
         raise ExtractError("Hakiki reads PDF, DOCX and plain text files.", 415)
-    return {"kind": "text", "pages": None, "text": tidy(text.replace("\r\n", "\n"))}
+    return {"kind": "text", "pages": None, "text": tidy(text.replace("\r\n", "\n")), "ocr_pages": []}
