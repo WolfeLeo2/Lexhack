@@ -9,7 +9,7 @@ import functools
 import os
 from contextlib import contextmanager
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -17,7 +17,7 @@ import crawler.config  # noqa: F401  (loads .env)
 
 from psycopg_pool import ConnectionPool
 
-from . import filing
+from . import extract, filing
 from .status import provision_status, statuses
 
 DISCLAIMER = "Hakiki reports what published sources say. It is not legal advice."
@@ -193,6 +193,12 @@ class CheckReport(BaseModel):
     disclaimer: str
 
 
+class ExtractResult(BaseModel):
+    kind: str                      # pdf | docx | text
+    pages: int | None              # PDFs only
+    text: str                      # what was read: shown to the reader before checking
+
+
 def counts(conn, provision_ids):
     """{provision_id: Counts}. Leads are counted as load_events shows them: one per judgment and event type, and not
     when a verified event already records the same ruling."""
@@ -334,3 +340,15 @@ def check_filing(req: CheckRequest):
     with db() as conn:
         res = filing.check(conn, req.text)
     return CheckReport(**res, disclaimer=DISCLAIMER)
+
+
+@app.post("/api/extract", response_model=ExtractResult)
+async def extract_file(request: Request):
+    """Text of an uploaded filing (raw bytes in the body; X-Filename for messages). PDF, DOCX or plain text, up to
+    10 MB; not stored. A scanned PDF (no text layer) is refused with a message, not OCR'd."""
+    if int(request.headers.get("content-length") or 0) > extract.MAX_BYTES:
+        raise HTTPException(413, f"That file is larger than {extract.MAX_BYTES // (1024 * 1024)} MB.")
+    try:
+        return ExtractResult(**extract.read(await request.body(), request.headers.get("x-filename", "")))
+    except extract.ExtractError as e:
+        raise HTTPException(e.status, str(e))

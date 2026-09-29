@@ -1,0 +1,81 @@
+"""Read an uploaded filing (PDF, DOCX or plain text) into text for the filing checker. The file is not stored.
+
+The text goes back to the page so the reader sees what was read before checking it. No OCR: a PDF without a text
+layer (a scan) is refused with a message saying so.
+"""
+import io
+import zipfile
+from xml.etree import ElementTree
+
+from pypdf import PdfReader
+
+MAX_BYTES = 10 * 1024 * 1024
+W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
+MIN_PAGE_CHARS = 20   # a page with less text than this has no real text layer
+
+
+class ExtractError(Exception):
+    def __init__(self, message, status):
+        super().__init__(message)
+        self.status = status
+
+
+def read_pdf(data):
+    try:
+        reader = PdfReader(io.BytesIO(data))
+        if reader.is_encrypted and not reader.decrypt(""):
+            raise ExtractError("This PDF is password-protected. Remove the password, or paste the text.", 422)
+        pages = [(p.extract_text() or "").strip() for p in reader.pages]
+    except ExtractError:
+        raise
+    except Exception:
+        raise ExtractError("This PDF could not be read. Try saving it again as PDF, or paste the text.", 422)
+    text = "\n\n".join(p for p in pages if p)
+    if sum(len(p) >= MIN_PAGE_CHARS for p in pages) * 2 < max(len(pages), 1):   # most pages have no text: a scan
+        raise ExtractError("This PDF looks scanned: it has no text layer to read. Paste the text, or upload a PDF "
+                           "or DOCX with selectable text.", 422)
+    # ponytail: PDF text keeps line breaks but rarely paragraph breaks, so a quote may be attributed within the
+    # whole page rather than its paragraph; paragraph reconstruction if that bites
+    return {"kind": "pdf", "pages": len(pages), "text": text}
+
+
+def read_docx(data):
+    try:
+        with zipfile.ZipFile(io.BytesIO(data)) as z:
+            root = ElementTree.fromstring(z.read("word/document.xml"))
+    except (zipfile.BadZipFile, KeyError, ElementTree.ParseError):
+        raise ExtractError("This Word file could not be read. Save it again as DOCX or PDF, or paste the text.", 415)
+    paras = []
+    for p in root.iter(f"{W}p"):
+        parts = []
+        for el in p.iter():
+            if el.tag == f"{W}t":
+                parts.append(el.text or "")
+            elif el.tag == f"{W}tab":
+                parts.append("\t")
+            elif el.tag in (f"{W}br", f"{W}cr"):
+                parts.append("\n")
+        line = "".join(parts).strip()
+        if line:
+            paras.append(line)
+    # a blank line between paragraphs: quotes are attributed within a paragraph (api/filing.py blocks)
+    return {"kind": "docx", "pages": None, "text": "\n\n".join(paras)}
+
+
+def read(data, filename=""):
+    """-> {"kind": pdf|docx|text, "pages": int|None, "text": str}; raises ExtractError(message, HTTP status)."""
+    if len(data) > MAX_BYTES:
+        raise ExtractError(f"That file is larger than {MAX_BYTES // (1024 * 1024)} MB.", 413)
+    if data.startswith(b"%PDF"):
+        return read_pdf(data)
+    if data.startswith(b"PK\x03\x04"):
+        return read_docx(data)
+    if data.startswith(b"\xd0\xcf\x11\xe0"):
+        raise ExtractError("Old Word (.doc) files can't be read. Save it as DOCX or PDF, or paste the text.", 415)
+    try:
+        text = data.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        text = None
+    if text is None or "\x00" in text:
+        raise ExtractError("Hakiki reads PDF, DOCX and plain text files.", 415)
+    return {"kind": "text", "pages": None, "text": text.replace("\r\n", "\n").strip()}
