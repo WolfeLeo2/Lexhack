@@ -256,16 +256,20 @@ def main():
     ap.add_argument("--limit", type=int)
     ap.add_argument("--paragraphs-only", action="store_true",
                     help="recompute the paragraph of existing rows in place (keeps LLM rows); nothing else changes")
+    ap.add_argument("--judgments", help="file of judgment ids, one per line: rebuild ONLY their rows; everyone else's "
+                                         "rows (LLM ones included) are untouched")
     args = ap.parse_args()
     if args.paragraphs_only:
         return update_paragraphs()
+    only = open(args.judgments).read().split() if args.judgments else None
 
     with connect() as conn:
         if not args.dry_run:
             apply_schema(conn)
         lookup = provision_lookup(conn)
         judgments = conn.execute("""SELECT judgment_id, raw_path, decision_date FROM judgments
-                                    WHERE has_full_text ORDER BY judgment_id""").fetchall()
+                                    WHERE has_full_text AND (%(only)s::text[] IS NULL OR judgment_id = ANY(%(only)s))
+                                    ORDER BY judgment_id""", {"only": only}).fetchall()
     if args.limit:
         judgments = judgments[:args.limit]
 
@@ -293,8 +297,11 @@ def main():
         return
     with connect() as conn:
         with conn.transaction():
-            # all rows, including the LLM pass's: re-run pipeline.llm_resolve afterwards (its answers are cached)
-            conn.execute("DELETE FROM citation_mentions WHERE method IN ('regex', 'llm')")
+            if only:   # just these judgments' rows
+                conn.execute("DELETE FROM citation_mentions WHERE method IN ('regex', 'llm') AND judgment_id = ANY(%s)",
+                             (only,))
+            else:   # all rows, including the LLM pass's: re-run pipeline.llm_resolve afterwards (answers are cached)
+                conn.execute("DELETE FROM citation_mentions WHERE method IN ('regex', 'llm')")
             with conn.cursor().copy("""COPY citation_mentions (judgment_id, provision_id, raw_text, paragraph,
                     char_start, char_end, method, confidence, act_ref, section_ref) FROM STDIN""") as cp:
                 for r in rows:

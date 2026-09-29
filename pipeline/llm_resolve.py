@@ -191,7 +191,9 @@ def main():
     ap.add_argument("--limit", type=int, help="judgments to process")
     ap.add_argument("--shard", default="0/1", help="i/N: this worker takes every N-th judgment, offset i")
     ap.add_argument("--model", default=BACKEND, help=f"{BACKEND} (default) or a Gemini model, e.g. {MODEL}")
+    ap.add_argument("--judgments", help="file of judgment ids, one per line: resolve only these judgments")
     args = ap.parse_args()
+    only = set(open(args.judgments).read().split()) if args.judgments else None
     shard, shards = map(int, args.shard.split("/"))
     api_key = None if args.model.startswith("deepseek") else require_env("GEMINI_API_KEY")
     cache = data_dir() / "cache" / "llm"
@@ -207,6 +209,7 @@ def main():
             GROUP BY 1, 2, 3, 4
             HAVING bool_or(m.method = 'regex' AND (m.act_ref IS NULL OR m.act_ref IN ('the Act', 'the Code')))
             ORDER BY held DESC, j.judgment_id""").fetchall()
+    todo = [t for t in todo if only is None or t[0] in only]
     todo = todo[:args.limit] if args.limit else todo
     todo = todo[shard::shards]   # shards never share a judgment, so never update the same rows
     print(f"{len(todo)} judgments with unresolved mentions (shard {args.shard}, {args.model})", flush=True)

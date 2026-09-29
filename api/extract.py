@@ -60,7 +60,7 @@ class ExtractError(Exception):
         self.status = status
 
 
-def read_pdf(data):
+def read_pdf(data, max_ocr_pages=OCR_MAX_PAGES):
     try:
         reader = PdfReader(io.BytesIO(data))
         if reader.is_encrypted and not reader.decrypt(""):
@@ -78,9 +78,9 @@ def read_pdf(data):
         if not ocr_available():
             raise ExtractError("This PDF looks scanned: it has no text layer to read. Paste the text, or upload a PDF "
                                "or DOCX with selectable text.", 422)
-        if len(blank) > OCR_MAX_PAGES:
+        if len(blank) > max_ocr_pages:
             raise ExtractError(f"This PDF is a scan of {len(blank)} pages; Hakiki reads scans of up to "
-                               f"{OCR_MAX_PAGES} pages. Upload the pages you need, or paste the text.", 422)
+                               f"{max_ocr_pages} pages. Upload the pages you need, or paste the text.", 422)
         for n, t in ocr_pages(data, blank).items():
             pages[n - 1] = t
         ocr = blank
@@ -114,12 +114,13 @@ def read_docx(data):
     return {"kind": "docx", "pages": None, "text": tidy("\n\n".join(paras)), "ocr_pages": []}
 
 
-def read(data, filename=""):
-    """-> {"kind": pdf|docx|text, "pages": int|None, "text": str}; raises ExtractError(message, HTTP status)."""
-    if len(data) > MAX_BYTES:
-        raise ExtractError(f"That file is larger than {MAX_BYTES // (1024 * 1024)} MB.", 413)
+def read(data, filename="", max_bytes=MAX_BYTES, max_ocr_pages=OCR_MAX_PAGES):
+    """-> {"kind": pdf|docx|text, "pages": int|None, "text": str, "ocr_pages": [int]}; raises ExtractError(message,
+    HTTP status). The limits are for uploads; pipeline.fetch_sources lifts them."""
+    if len(data) > max_bytes:
+        raise ExtractError(f"That file is larger than {max_bytes // (1024 * 1024)} MB.", 413)
     if data.startswith(b"%PDF"):
-        return read_pdf(data)
+        return read_pdf(data, max_ocr_pages)
     if data.startswith(b"PK\x03\x04"):
         return read_docx(data)
     if data.startswith(b"\xd0\xcf\x11\xe0"):
