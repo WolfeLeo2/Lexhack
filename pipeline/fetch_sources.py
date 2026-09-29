@@ -62,6 +62,10 @@ def fetch():
                 h = hits[0]
                 time.sleep(1)
                 body = s.get(f"https://web.archive.org/web/{h['timestamp']}id_/{h['original']}", timeout=120).content
+                if not body.startswith((b"%PDF", b"PK\x03\x04")):   # the Archive sent a page of its own, not the file
+                    index[jid] = {**h, "bad_download": True}
+                    index_path.write_text(json.dumps(index, indent=1))
+                    continue
                 ext = "pdf" if h["mimetype"] == PREFER[0] else "docx"
                 (out_dir() / f"{slug(jid)}.{ext}").write_bytes(body)
                 index[jid] = {**h, "file": f"{slug(jid)}.{ext}", "bytes": len(body)}
@@ -91,6 +95,10 @@ def parse():
             except extract.ExtractError as e:
                 stats["unreadable"] += 1
                 print(f"  {jid}: {e}", flush=True)
+                continue
+            if r["kind"] not in ("pdf", "docx"):   # a saved Archive page, not the judgment's file
+                stats["unreadable"] += 1
+                print(f"  {jid}: not a PDF or DOCX", flush=True)
                 continue
             path = data_dir() / rows[jid]
             doc = json.loads(path.read_text(encoding="utf-8"))
