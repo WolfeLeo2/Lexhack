@@ -25,3 +25,27 @@ export async function checkFiling(_prev: CheckState, form: FormData): Promise<Ch
     return { text, report: null, error: 'The checker is unreachable. Try again in a moment.' }
   }
 }
+
+const MAX_UPLOAD = 4 * 1024 * 1024 // Vercel caps function bodies at ~4.5 MB; the API itself takes 10 MB
+
+export type ReadResult = { text: string; kind: 'pdf' | 'docx' | 'text'; pages: number | null; name: string } | { error: string }
+
+/** Read an uploaded filing's text on the server (api/extract.py). The file is not stored. */
+export async function readFiling(form: FormData): Promise<ReadResult> {
+  const file = form.get('file')
+  if (!(file instanceof File) || !file.size) return { error: 'Choose a PDF, DOCX or text file.' }
+  if (file.size > MAX_UPLOAD) return { error: 'That file is larger than 4 MB. Paste the text instead.' }
+  try {
+    const res = await fetch(`${API_URL}/api/extract`, {
+      method: 'POST',
+      headers: { 'X-Filename': encodeURIComponent(file.name) },
+      body: await file.arrayBuffer(),
+      cache: 'no-store',
+    })
+    const body = await res.json()
+    if (!res.ok) return { error: typeof body.detail === 'string' ? body.detail : `The reader answered ${res.status}.` }
+    return { ...body, name: file.name }
+  } catch {
+    return { error: 'The reader is unreachable. Try again in a moment.' }
+  }
+}

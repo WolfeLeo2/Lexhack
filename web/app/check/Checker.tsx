@@ -6,7 +6,7 @@ import { BlankPage, KindIcon } from '@/components/illustrations'
 import type { CaseCheck, Finding, QuoteCheck, SectionCheck } from '@/lib/api'
 import { cap, courtActed, fmtDate, plural, sectionHref, shortCase } from '@/lib/format'
 import { locator, splitAt, wordDiff } from '@/lib/text'
-import { checkFiling, type CheckState } from './actions'
+import { checkFiling, readFiling, type CheckState } from './actions'
 
 const MAX = 200000
 const EXHIBITS = [
@@ -26,6 +26,28 @@ export function Checker() {
   const [text, setText] = useState('')
   const [exhibit, setExhibit] = useState<string | null>(null)
   const report = useRef<HTMLElement>(null)
+  const picker = useRef<HTMLInputElement>(null)
+  const [reading, setReading] = useState<string | null>(null) // file name while the server reads it
+  const [readNote, setReadNote] = useState<{ ok: boolean; text: string } | null>(null)
+  const [dragging, setDragging] = useState(false)
+  const [fed, setFed] = useState(0) // bumps to replay the feed-in animation when a file's text lands
+
+  async function readFile(file: File | undefined) {
+    if (!file) return
+    setReadNote(null)
+    if (file.size > 4 * 1024 * 1024) return setReadNote({ ok: false, text: 'That file is larger than 4 MB. Paste the text instead.' })
+    setReading(file.name)
+    const form = new FormData()
+    form.append('file', file)
+    const r = await readFiling(form)
+    setReading(null)
+    if ('error' in r) return setReadNote({ ok: false, text: r.error })
+    setText(r.text)
+    setExhibit(null)
+    setFed((n) => n + 1)
+    const what = r.kind === 'pdf' ? `${r.pages} ${r.pages === 1 ? 'page' : 'pages'}` : r.kind === 'docx' ? 'the document' : 'the text'
+    setReadNote({ ok: true, text: `Read ${what} from ${r.name}. Check it reads right, then check the citations.` })
+  }
 
   // The report arrives below the fold: bring it into view (gently, unless motion is reduced).
   useEffect(() => {
@@ -56,10 +78,61 @@ export function Checker() {
             </button>
           ))}
           <span className="shrink-0 pb-2 pl-2 text-sm text-ink-2">Synthetic examples, written by us</span>
+          <button
+            type="button"
+            onClick={() => picker.current?.click()}
+            disabled={!!reading}
+            className="exhibit-tab group ml-auto flex shrink-0 items-center gap-2 rounded-t-md border border-b-0 border-rule bg-panel px-3.5 pt-1.5 pb-2 text-left disabled:opacity-60"
+          >
+            <svg viewBox="0 0 20 20" className="h-5 w-5 text-ink-2 transition-transform group-hover:-rotate-12" aria-hidden fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+              <path d="M13.5 6.5 7.8 12.2a1.6 1.6 0 0 0 2.3 2.3l6-6a3.2 3.2 0 0 0-4.5-4.5l-6.2 6.2a4.8 4.8 0 0 0 6.8 6.8l4.2-4.2" />
+            </svg>
+            <span>
+              <span className="block text-xs text-ink-2">Your filing</span>
+              <span className="block text-[0.95rem]">Upload PDF or DOCX</span>
+            </span>
+          </button>
+          <input
+            ref={picker}
+            type="file"
+            accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+            className="sr-only"
+            tabIndex={-1}
+            aria-hidden
+            onChange={(e) => {
+              readFile(e.target.files?.[0])
+              e.target.value = ''
+            }}
+          />
         </div>
         <div
-          className={`relative overflow-hidden rounded-sm bg-paper shadow-[0_1px_0_var(--color-rule),0_22px_44px_-30px_rgba(24,33,43,0.55)] ring-1 ring-rule ${pending ? 'scan' : ''}`}
+          key={fed}
+          onDragOver={(e) => {
+            e.preventDefault()
+            setDragging(true)
+          }}
+          onDragLeave={(e) => {
+            if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragging(false)
+          }}
+          onDrop={(e) => {
+            e.preventDefault()
+            setDragging(false)
+            readFile(e.dataTransfer.files[0])
+          }}
+          className={`relative overflow-hidden rounded-sm bg-paper shadow-[0_1px_0_var(--color-rule),0_22px_44px_-30px_rgba(24,33,43,0.55)] ring-1 ring-rule ${pending || reading ? 'scan' : ''} ${fed ? 'feed-in' : ''}`}
         >
+          {(dragging || reading) && (
+            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 border-2 border-dashed border-gazette bg-paper/85 text-ink-2" aria-live="polite">
+              <svg viewBox="0 0 64 72" className={`h-16 w-16 ${dragging ? 'drop-hint' : ''}`} aria-hidden fill="none">
+                <path d="M10 4h32l12 12v52H10z" fill="var(--color-paper)" stroke="var(--color-ink-2)" strokeWidth="1.5" />
+                <path d="M42 4v12h12" stroke="var(--color-ink-2)" strokeWidth="1.5" />
+                {[26, 34, 42, 50].map((y) => (
+                  <line key={y} x1="18" x2="46" y1={y} y2={y} stroke="var(--color-rule)" strokeWidth="3" strokeLinecap="round" />
+                ))}
+              </svg>
+              <span>{reading ? `Reading ${reading}…` : 'Drop the filing to read it'}</span>
+            </div>
+          )}
           <label htmlFor="filing" className="sr-only">
             Filing text
           </label>
@@ -72,7 +145,7 @@ export function Checker() {
               setExhibit(null)
             }}
             rows={14}
-            placeholder="Paste a filing here, or open one of the exhibits above."
+            placeholder="Paste a filing here, drop a PDF or DOCX on this page, or open one of the exhibits above."
             className="ruled statute block min-h-[24.5rem] w-full resize-y bg-transparent py-4 pr-5 pl-14 text-[1.02rem] placeholder:text-ink-2/70 focus:outline-none"
           />
         </div>
@@ -92,6 +165,11 @@ export function Checker() {
             {pending ? 'Reading the filing…' : 'Check citations'}
           </button>
         </div>
+        {readNote && (
+          <p className={`mt-3 ${readNote.ok ? 'text-gazette' : 'text-seal'}`} role={readNote.ok ? 'status' : 'alert'}>
+            {readNote.text}
+          </p>
+        )}
         {state.error && (
           <p className="mt-3 text-seal" role="alert">
             {state.error}

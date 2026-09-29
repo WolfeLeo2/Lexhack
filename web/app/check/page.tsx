@@ -11,10 +11,10 @@ export default function CheckPage() {
         <div>
           <h1 className="statute text-[2.4rem] leading-[1.08] font-medium tracking-[-0.02em] sm:text-[3.2rem]">Check the citations in a filing</h1>
           <p className="mt-5 max-w-[56ch] text-lg text-ink-2">
-            Paste a submission, pleading or judgment. Hakiki finds every case and section it cites, then reports what the sources say: whether we hold the case, whether the
+            Paste or upload a submission, pleading or judgment (PDF, DOCX or text). Hakiki finds every case and section it cites, then reports what the sources say: whether we hold the case, whether the
             quoted words are really in it, and what the courts have done to each section.
           </p>
-          <p className="mt-3 text-[0.95rem] text-ink-2">Your text is checked and thrown away. Nothing is stored.</p>
+          <p className="mt-3 text-[0.95rem] text-ink-2">Your text or file is checked and thrown away. Nothing is stored.</p>
         </div>
         <FilingUnderGlass className="mx-auto hidden w-full max-w-[22rem] lg:block" />
       </section>

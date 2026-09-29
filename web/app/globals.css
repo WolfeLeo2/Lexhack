@@ -251,6 +251,19 @@ a:focus-visible > .spine {
 .candidate-card:hover {
   transform: rotate(0deg) translateY(-2px);
 }
+/* An uploaded filing's text lands on the page like a sheet fed into the typewriter; a dragged file hovers. */
+.feed-in {
+  animation: feed-in 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes feed-in {
+  from { transform: translateY(-18px); opacity: 0.3; }
+}
+.drop-hint {
+  animation: drop-hint 1.2s ease-in-out infinite;
+}
+@keyframes drop-hint {
+  50% { transform: translateY(6px); }
+}
 .exhibit-tab {
   transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.2s;
 }
@@ -263,7 +276,7 @@ a:focus-visible > .spine {
   .spine { transition: none; }
   .theme-icon, .stamp, .lineage-node, .lineage-edge, .lineage-edge-dashed { animation: none; stroke-dashoffset: 0; }
   .glass { animation: none; transform: translate(236px, 176px); }
-  .glass-mark, .glass-squiggle, .mark-sweep, .note-in, .note-in:target, .scan::after, .candidate-card { animation: none; stroke-dashoffset: 0; }
+  .glass-mark, .glass-squiggle, .mark-sweep, .note-in, .note-in:target, .scan::after, .candidate-card, .feed-in, .drop-hint { animation: none; stroke-dashoffset: 0; }
   .candidate-card { transition: none; }
   .exhibit-tab { transition: none; }
 }
