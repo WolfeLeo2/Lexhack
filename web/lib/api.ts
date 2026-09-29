@@ -131,6 +131,7 @@ export interface QuoteCheck {
   result: 'verbatim' | 'close' | 'not_found' | 'not_checked'
   similarity: number | null
   court_text: string | null // the judgment's words at the match; for not_found, the nearest passage if any
+  judgment_ocr?: boolean // our copy of the judgment was read by OCR from a scan: a mismatch may be a slip on our side
   paragraph: string | null
 }
 

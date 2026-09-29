@@ -39,9 +39,14 @@ ALIASES = {
     "constitution": "constitution", "constitution of kenya": "constitution", "constitution of kenya, 2010": "constitution",
     "kenyan constitution": "constitution",
 }
-CAPS = {"63": "cap-63", "63a": "cap-63a", "411a": "cap-411a", "75": "cap-75", "21": "cap-21", "80": "cap-80",
+CAPS = {"160": "cap-160", "63": "cap-63", "63a": "cap-63a", "411a": "cap-411a", "75": "cap-75", "21": "cap-21", "80": "cap-80",
         "226": "cap-226"}
-CANONICAL = {"cap-63": "Penal Code", "cap-63a": "Sexual Offences Act", "cap-411a": "Kenya Information and Communications Act",
+# Acts matched on the WHOLE name only: suffix matching would read "National Assembly and Presidential Elections Act"
+# as the Elections Act and "Indian Succession Act" as the Law of Succession Act.
+EXACT_ALIASES = {"elections act": "cap-7", "elections act, 2011": "cap-7", "elections act 2011": "cap-7",
+                 "law of succession act": "cap-160", "laws of succession act": "cap-160", "succession act": "cap-160"}
+COMMENCEMENT = {"cap-7": date(2011, 8, 27), "cap-160": date(1981, 7, 1)}   # before these, the name meant an older law
+CANONICAL = {"cap-7": "Elections Act", "cap-160": "Law of Succession Act", "cap-63": "Penal Code", "cap-63a": "Sexual Offences Act", "cap-411a": "Kenya Information and Communications Act",
              "cap-75": "Criminal Procedure Code", "cap-21": "Civil Procedure Act", "cap-80": "Evidence Act",
              "cap-226": "Employment Act", "constitution": "Constitution of Kenya"}
 REPEALED_CONSTITUTION = "Constitution (repealed)"
@@ -96,6 +101,9 @@ def norm_ref(s):
 def canonical(name):
     """Act name as written -> (act_ref, act slug or None)."""
     name = re.sub(r"\s+", " ", name).strip()
+    if name.lower() in EXACT_ALIASES:
+        slug = EXACT_ALIASES[name.lower()]
+        return CANONICAL[slug], slug
     words = name.split(" ")
     for i in range(len(words)):   # "Statutes Penal Code" (a heading word run into the name) -> "Penal Code"
         slug = ALIASES.get(" ".join(words[i:]).lower())
@@ -217,12 +225,40 @@ def provision_lookup(conn):
 
 
 def pick_provision(lookup, slug, section_ref, decision_date):
+    if slug in COMMENCEMENT and decision_date is not None and decision_date < COMMENCEMENT[slug]:
+        return None   # e.g. "Elections Act" in a 2008 judgment is the Act the 2011 one replaced
     number = re.match(r"\d+[A-Z]{0,2}", section_ref).group(0)
     cands = lookup.get((slug, number), [])
     if len(cands) > 1 and slug == "cap-226":   # Employment Act: eId scheme changed at the 2022-12-31 revision
         new = decision_date is not None and decision_date >= EMPLOYMENT_EID_CHANGE
         cands = [c for c in cands if c[0].startswith("part_") == new] or cands
     return cands[0][1] if len(cands) == 1 else None
+
+
+def relink():
+    """Link stored mentions to Acts loaded since they were extracted (act_ref names the law, provision_id is NULL),
+    in place: nothing is deleted, so LLM-resolved rows keep their method and confidence."""
+    with connect() as conn:
+        lookup = provision_lookup(conn)
+        rows = conn.execute("""SELECT m.mention_id, m.act_ref, m.section_ref, j.decision_date FROM citation_mentions m
+                               JOIN judgments j USING (judgment_id)
+                               WHERE m.provision_id IS NULL AND m.act_ref IS NOT NULL""").fetchall()
+    changes = []
+    for mid, act_ref, section_ref, ddate in rows:
+        ref, slug = canonical(act_ref)
+        if slug and section_ref and re.match(r"\d", section_ref):
+            pid = pick_provision(lookup, slug, section_ref, ddate)
+            if pid:
+                changes.append((mid, ref, pid))
+    with connect() as conn, conn.transaction():
+        conn.execute("CREATE TEMP TABLE link_fix (mention_id INT PRIMARY KEY, act_ref TEXT, provision_id TEXT) ON COMMIT DROP")
+        with conn.cursor().copy("COPY link_fix FROM STDIN") as cp:
+            for r in changes:
+                cp.write_row(r)
+        conn.execute("""UPDATE citation_mentions m SET act_ref = f.act_ref, provision_id = f.provision_id FROM link_fix f
+                        WHERE m.mention_id = f.mention_id""")
+    by = collections.Counter(pid.rsplit("/", 1)[0] for _, _, pid in changes)
+    print(f"{len(changes)} of {len(rows)} unlinked mentions now linked: {dict(by)}")
 
 
 def update_paragraphs():
@@ -254,11 +290,15 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--limit", type=int)
+    ap.add_argument("--relink", action="store_true",
+                    help="link stored mentions to newly loaded Acts, in place (keeps LLM rows); nothing else changes")
     ap.add_argument("--paragraphs-only", action="store_true",
                     help="recompute the paragraph of existing rows in place (keeps LLM rows); nothing else changes")
     ap.add_argument("--judgments", help="file of judgment ids, one per line: rebuild ONLY their rows; everyone else's "
                                          "rows (LLM ones included) are untouched")
     args = ap.parse_args()
+    if args.relink:
+        return relink()
     if args.paragraphs_only:
         return update_paragraphs()
     only = open(args.judgments).read().split() if args.judgments else None

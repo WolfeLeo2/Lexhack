@@ -23,6 +23,12 @@ CASES = {
     "section 3 of the Act": [("3", "the Act", None)],
     "section 4 and 5 witnesses testified": [("4", None, None)],
     "sections 3 to 7 of the Civil Procedure Act": [(str(n), "Civil Procedure Act", "cap-21") for n in range(3, 8)],
+    "section 45 of the Law of Succession Act": [("45", "Law of Succession Act", "cap-160")],
+    "section 83 of the Elections Act": [("83", "Elections Act", "cap-7")],
+    # whole-name only: these are different laws
+    "section 23 of the National Assembly and Presidential Elections Act":
+        [("23", "National Assembly and Presidential Elections Act", None)],
+    "section 5 of the Indian Succession Act": [("5", "Indian Succession Act", None)],
     "section 8(1) of the SOA": [("8(1)", "Sexual Offences Act", "cap-63a")],
     "Section 204 of Cap 63": [("204", "Penal Code", "cap-63")],
     "sub-section 2 of section 8 of the Penal Code": [("8", "Penal Code", "cap-63")],
@@ -30,7 +36,7 @@ CASES = {
     "section 159 (2) (d) of the Criminal Procedure Code": [("159(2)(d)", "Criminal Procedure Code", "cap-75")],
     "Article 6 of the International Covenant on Civil and Political Rights":
         [("6", "International Covenant on Civil and Political Rights", None)],
-    "Elections Act (Cap 7), sections 34(6B) and 35;": [("34(6B)", "Elections Act", None), ("35", "Elections Act", None)],
+    "Elections Act (Cap 7), sections 34(6B) and 35;": [("34(6B)", "Elections Act", "cap-7"), ("35", "Elections Act", "cap-7")],
     "Constitution of Kenya, 2010 article 27; Penal Code (cap 63) section 204 - (Interpreted)":
         [("27", "Constitution of Kenya", "constitution"), ("204", "Penal Code", "cap-63")],
     "Statutes Penal Code (cap 63) section 194": [("194", "Penal Code", "cap-63")],
@@ -42,7 +48,7 @@ CASES = {
         [("25", "Constitution of Kenya", "constitution"), ("165(6)&(7)", "Constitution of Kenya", "constitution"),
          ("169(2)", "Constitution of Kenya", "constitution")],
     "pursuant to article 178(1) as read with section 21(1) of the Elections Act":
-        [("178(1)", "Constitution of Kenya", "constitution"), ("21(1)", "Elections Act", None)],
+        [("178(1)", "Constitution of Kenya", "constitution"), ("21(1)", "Elections Act", "cap-7")],
     "In Article 768 of Section 9 of Halsbury's Laws of England": [("768", None, None), ("9", None, None)],
     "Ashwander v Tennessee Valley Authority, 297 U.S. 288, 347 (1936)": [],
 }

@@ -407,6 +407,7 @@ function QuoteLine({ q, unsettled = false, ocr = false }: { q: QuoteCheck; unset
           {q.result === 'close' && q.similarity !== null && ` (${Math.round(q.similarity * 100)}% the same)`}
           {q.paragraph && `, paragraph ${q.paragraph}`}.
           {ocr && (q.result === 'close' || q.result === 'not_found') && ' The filing was read by OCR, so this may be an OCR slip.'}
+          {q.judgment_ocr && (q.result === 'close' || q.result === 'not_found') && ' Our copy of this judgment was read by OCR from a scan, so the difference may be a slip in our text.'}
         </span>
       </p>
       {marked ? (

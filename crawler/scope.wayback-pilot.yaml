@@ -17,6 +17,8 @@ wayback:
     - new.kenyalaw.org/akn/ke/act/1924/3/      # Civil Procedure Act (Cap. 21)
     - new.kenyalaw.org/akn/ke/act/1963/46/     # Evidence Act (Cap. 80)
     - new.kenyalaw.org/akn/ke/act/1930/11/     # Criminal Procedure Code (Cap. 75)
+    - new.kenyalaw.org/akn/ke/act/1972/14/     # Law of Succession Act (Cap. 160)
+    - new.kenyalaw.org/akn/ke/act/2011/24/     # Elections Act, 2011
     - new.kenyalaw.org/akn/ke/judgment/
   works:                           # every captured point-in-time version + source file
     - /akn/ke/act/1930/10
@@ -27,6 +29,8 @@ wayback:
     - /akn/ke/act/1924/3
     - /akn/ke/act/1963/46
     - /akn/ke/act/1930/11
+    - /akn/ke/act/1972/14
+    - /akn/ke/act/2011/24
   sample:                          # 60 judgments: 20 per era, round-robin across courts
     prefix: /akn/ke/judgment/
     per_bucket: 20

@@ -88,6 +88,8 @@ def test_text_fallbacks():
     expect("pdf-only judgment", filing.case_text(pdf_only, texts), None)
     expect("not held", filing.case_text(None, texts), None)
     expect("no text, not checked", filing.quote_check("any quote at all", None)["result"], "not_checked")
+    expect("OCR-read judgment is labelled", filing.quote_check("any quote", "some other text", ocr=True)["judgment_ocr"], True)
+    expect("no text: no OCR label", filing.quote_check("any quote", None, ocr=True)["judgment_ocr"], False)
     real, calls = filing.judgment_text, []
     def down(raw_path):
         calls.append(raw_path)

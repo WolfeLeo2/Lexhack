@@ -168,6 +168,8 @@ class QuoteCheck(BaseModel):
     similarity: float | None
     court_text: str | None         # the judgment's words at the match; for not_found, the nearest passage if any
     paragraph: str | None          # judgment paragraph of that passage
+    judgment_ocr: bool = False     # our copy of the judgment was read by OCR from a scan: a "close" or "not_found"
+                                   # may be a scanning slip on our side, not a misquote
 
 
 class SectionCheck(BaseModel):

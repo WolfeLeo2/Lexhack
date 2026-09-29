@@ -229,8 +229,8 @@ def _r2():
 
 
 @functools.lru_cache(maxsize=256)
-def judgment_text(raw_path):
-    """A judgment's text: from $LEXHACK_DATA when this machine has it, else the same key in R2 (scripts/sync.sh
+def judgment_doc(raw_path):
+    """A judgment's parsed JSON: from $LEXHACK_DATA when this machine has it, else the same key in R2 (scripts/sync.sh
     keeps the bucket a copy of the data folder; the API host has no data folder)."""
     local = os.environ.get("LEXHACK_DATA")
     path = Path(local).expanduser() / raw_path if local else None
@@ -238,7 +238,17 @@ def judgment_text(raw_path):
         body = path.read_text(encoding="utf-8")
     else:
         body = _r2().get_object(Bucket=os.environ.get("R2_BUCKET", "lexhack-data"), Key=raw_path)["Body"].read()
-    return json.loads(body)["text"] or ""
+    return json.loads(body)
+
+
+def judgment_text(raw_path):
+    return judgment_doc(raw_path)["text"] or ""
+
+
+def judgment_ocr(raw_path):
+    """True when our copy of the judgment was read by OCR from a scan (pipeline/fetch_sources.py): a slip in OUR text
+    can then look like a misquote in the filing."""
+    return bool((judgment_doc(raw_path).get("text_source") or {}).get("ocr_pages"))
 
 
 JUDGMENT_COLS = ("neutral_citation", "judgment_id", "title", "court", "decision_date", "source_url")
@@ -258,8 +268,9 @@ def case_text(row, texts):
     return texts[row[6]]
 
 
-def quote_check(quote, text):
-    out = {"quote": quote, "result": "not_checked", "similarity": None, "court_text": None, "paragraph": None}
+def quote_check(quote, text, ocr=False):
+    out = {"quote": quote, "result": "not_checked", "similarity": None, "court_text": None, "paragraph": None,
+           "judgment_ocr": bool(ocr and text is not None)}
     if text is None:
         return out
     m = match_quote(quote, text)
@@ -301,7 +312,8 @@ def case_findings(conn, text):
                              "judgment": dict(zip(JUDGMENT_COLS, row[:6])) if row else None,
                              "candidates": [dict(zip(JUDGMENT_COLS, r[:6])) for r in candidates]}})
         for q in qs:
-            out[-1]["quotes"].append(quote_check(q, case_text(row, texts) if budget > 0 else None))
+            t = case_text(row, texts) if budget > 0 else None
+            out[-1]["quotes"].append(quote_check(q, t, t is not None and judgment_ocr(row[6])))
             budget -= 1
     return out
 
