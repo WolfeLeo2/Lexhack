@@ -226,7 +226,7 @@ function CaseLine({ c }: { c: CaseCheck }) {
   if (c.result === 'possible_match')
     return (
       <div className="mt-2">
-        <p className="text-seal">Possibly one of these cases in our collection. The citation gives only a year, and the names fit more than one:</p>
+        <p className="text-ink-2">Possibly one of these cases in our collection. The citation gives only a year, and the names fit more than one:</p>
         <ul className="mt-3 grid gap-2.5 sm:grid-cols-2">
           {c.candidates.map((k, n) => (
             <li
@@ -245,7 +245,7 @@ function CaseLine({ c }: { c: CaseCheck }) {
                 shortCase(k.title)
               )}
               <span className="block text-sm text-ink-2">
-                {k.neutral_citation}, {k.court}, {fmtDate(k.decision_date)}
+                {[k.neutral_citation, k.court, fmtDate(k.decision_date)].filter(Boolean).join(', ')}
               </span>
             </li>
           ))}

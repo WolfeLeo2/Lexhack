@@ -15,6 +15,7 @@ import logging
 import math
 import os
 import re
+import time
 from datetime import date
 from pathlib import Path
 
@@ -338,11 +339,14 @@ def build_index(rows):
 
 
 _INDEX = {}
+INDEX_TTL = 24 * 3600   # seconds; judgments loaded later appear within a day, without a restart
 
 
 def title_index(conn):
-    """Every judgment we hold, indexed once per process (~16k titles, a few MB)."""
-    if not _INDEX:
+    """Every judgment we hold (~16k titles, a few MB), rebuilt when older than INDEX_TTL."""
+    if not _INDEX or time.monotonic() - _INDEX["built"] > INDEX_TTL:
+        _INDEX.clear()
+        _INDEX["built"] = time.monotonic()
         _INDEX.update(build_index(conn.execute(
             """SELECT neutral_citation, judgment_id, title, court, decision_date::text, source_url, raw_path,
                       has_full_text, case_number, extract(year FROM decision_date)::int

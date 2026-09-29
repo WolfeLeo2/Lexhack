@@ -10,6 +10,7 @@ dropped first names); it never turns a match into not_held.
 """
 import csv
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -24,6 +25,15 @@ def load(name, who):
         for a in json.loads(f.read_text(encoding="utf-8")):
             out[a["item_id"]] = a["label"].strip()
     return out
+
+
+JUDGMENT_ID = re.compile(r"ke/judgment/[a-z]+/\d{4}/\d+")
+
+
+def bad_labels(labels):
+    """Item ids whose label is not not_held, unsure, or judgment ids joined by '|' (a typo would pass as gold)."""
+    return [i for i, l in labels.items()
+            if l not in ("not_held", "unsure") and not all(JUDGMENT_ID.fullmatch(x) for x in l.split("|"))]
 
 
 def merge(items, a, b, c):
@@ -47,6 +57,9 @@ def main():
     name, final = sys.argv[1], "--final" in sys.argv
     items = [r["item_id"] for r in csv.DictReader(open(HERE / f"filing_{name}_items.csv", encoding="utf-8"))]
     a, b, c = load(name, "A"), load(name, "B"), load(name, "C")
+    bad = {who: bad_labels(lab) for who, lab in (("A", a), ("B", b), ("C", c), ("audit", load(name, "audit")))}
+    if any(bad.values()):
+        raise SystemExit(f"malformed labels (fix or re-run those items): { {k: v for k, v in bad.items() if v} }")
     gold, need_c, missing = merge(items, a, b, c)
     if missing:
         raise SystemExit(f"{len(missing)} items unlabelled by A or B, e.g. {missing[:5]}; re-run those batches")
@@ -77,6 +90,8 @@ if __name__ == "__main__":
         g = apply_audit([{"item_id": "1", "gold": "not_held", "agreed": True}, {"item_id": "2", "gold": "x", "agreed": True},
                          {"item_id": "3", "gold": "not_held", "agreed": True}], {"1": "y", "2": "not_held", "3": "unsure"})
         assert [r["gold"] for r in g] == ["y", "x", "not_held"], g
+        assert bad_labels({"1": "ke/judgment/kehc/2017/8382", "2": "not_held", "3": "Not_held", "4": "x|ke/judgment/kesc/2011/1",
+                           "5": "ke/judgment/keca/2020/359|ke/judgment/keca/2020/418", "6": "unsure"}) == ["3", "4"]
         print("merge check passed")
     else:
         main()

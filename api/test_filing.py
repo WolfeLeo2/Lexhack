@@ -170,6 +170,17 @@ def test_demos():
         same = filing.check(conn, "In John Ward v Standard Limited [2006] eKLR the court said \"the defendant's "
                                   "application is allowed in terms of the prayers\".")["findings"][0]["case"]
     expect("no settling quote stays possible", (same["result"], len(same["candidates"])), ("possible_match", 2))
+    with connect() as conn:
+        both = filing.check(conn, "In John Ward v Standard Limited [2006] eKLR the page read \"Skip to document content "
+                                  "REPUBLIC OF KENYA IN THE HIGH COURT\".")["findings"][0]["case"]
+    expect("a quote found in both candidates settles nothing", (both["result"], len(both["candidates"])),
+           ("possible_match", 2))
+    with connect() as conn:
+        filing.title_index(conn)
+        filing._INDEX["built"] -= filing.INDEX_TTL + 1
+        built_before = filing._INDEX["built"]
+        filing.title_index(conn)
+    expect("title index rebuilt when stale", filing._INDEX["built"] > built_before, True)
     real_text, calls = filing.case_text, []
     filing.case_text = lambda row, texts: calls.append(row) or real_text(row, texts)
     try:
