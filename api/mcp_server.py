@@ -24,7 +24,7 @@ mcp = MCPServer("hakiki", instructions=INSTRUCTIONS)
 
 
 def result_only(fn):
-    @functools.wraps(fn)   # FastMCP reads the signature and docstring through __wrapped__
+    @functools.wraps(fn)   # MCPServer reads the signature and docstring through __wrapped__
     def tool(*args, **kwargs):
         return fn(*args, **kwargs)["result"]
     return tool
@@ -40,5 +40,6 @@ http_app = mcp.streamable_http_app(
 
 
 if __name__ == "__main__":
-    main.POOL.open()
-    mcp.run()   # stdio
+    from api import mcp_server as served   # this file runs as __main__; serve the copy main imported, so tools register once
+    with main.POOL:
+        served.mcp.run()   # stdio

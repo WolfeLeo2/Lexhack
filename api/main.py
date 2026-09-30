@@ -34,8 +34,11 @@ POOL = ConnectionPool(os.environ["DATABASE_URL"], min_size=1, max_size=5, open=F
 @asynccontextmanager
 async def lifespan(app):
     POOL.open()
-    async with mcp_server.mcp.session_manager.run():   # the /mcp endpoint's sessions (stateless)
-        yield
+    try:
+        async with mcp_server.mcp.session_manager.run():   # the /mcp endpoint's sessions (stateless)
+            yield
+    finally:
+        POOL.close()
 
 
 app = FastAPI(title="LexHack citator API", version="0.1", lifespan=lifespan)
@@ -58,11 +61,16 @@ def allow(key, now, hits=_hits):
     return True
 
 
+def client_key(forwarded, peer):
+    # the last entry is the one Railway's edge wrote; earlier ones are client-supplied and can be spoofed
+    return (forwarded.split(",")[-1].strip() if forwarded else peer) or ""
+
+
 @app.middleware("http")
 async def limit_mcp(request, call_next):
     if request.url.path.startswith("/mcp"):
-        ip = (request.headers.get("x-forwarded-for") or (request.client.host if request.client else "")).split(",")[0]
-        if not allow(ip.strip(), time.monotonic()):
+        ip = client_key(request.headers.get("x-forwarded-for"), request.client.host if request.client else "")
+        if not allow(ip, time.monotonic()):
             return JSONResponse({"error": f"rate limit: {RATE} requests a minute"}, status_code=429)
     return await call_next(request)
 

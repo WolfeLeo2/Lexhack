@@ -52,6 +52,8 @@ def rate_limit():
 
 
 def run():
+    expect("key: last entry", main.client_key("1.1.1.1, 2.2.2.2", "9.9.9.9"), "2.2.2.2")
+    expect("key: peer fallback", main.client_key(None, "9.9.9.9"), "9.9.9.9")
     rate_limit()
     http()
     asyncio.run(stdio())

@@ -56,9 +56,9 @@ def test_call():
 
 
 def main_():
-    main.POOL.open()
-    for t in (test_declarations, test_get_section, test_search_and_cases, test_call):
-        t()
+    with main.POOL:   # opens the pool and closes it on exit
+        for t in (test_declarations, test_get_section, test_search_and_cases, test_call):
+            t()
     for f in fails:
         print("FAIL", *f)
     print(f"{len(fails)} failures")
