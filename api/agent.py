@@ -20,8 +20,9 @@ from .status import statuses
 
 MODEL, MAX_ROUNDS = "gemini-3.5-flash-lite", 8
 URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
-CACHE = Path(os.environ["LEXHACK_DATA"]) / "cache" / "agent"
 REF = re.compile(r"\[\[(section|event|judgment):([^\]\s]+)\]\]")
+LABELS = [("human:", "checked by a person"), ("agent:", "checked by an AI reviewer"),
+          ("source:", "from Kenya Law's reviser's note")]
 
 SYSTEM = """You are Hakiki's research assistant for Kenyan statute law. Hakiki is a citator: it records whether a
 section is in force, amended, repealed, or limited or struck down by a court, with the court's own words.
@@ -34,8 +35,9 @@ Rules:
 3. Only use IDs that a tool returned in this conversation. Never guess an ID.
 4. If Hakiki doesn't hold something (a case, an Act, a section), say it is not in Hakiki's collection. Hakiki holds
    about 10% of judgments, so never say a case does not exist or is fake.
-5. Say whether each ruling was checked by a person (verified_by 'human:...') or by an AI reviewer ('agent:...'). Never
-   present an unverified lead as the status.
+5. Say whether each ruling was checked by a person (verified_by 'human:...') or by an AI reviewer ('agent:...'); verified_by
+   'source:...' means the event was transcribed from Kenya Law's reviser's notes. Never present an unverified lead as
+   the status.
 6. Report what the sources say. Never advise on the user's own case or tell them what to do; suggest they consult an
    advocate.
 
@@ -45,8 +47,9 @@ rulings, find_case for a named case. Answer briefly, in plain English."""
 
 def generate(body, api_key):
     """One generateContent call, cached by request body (temperature 0: same request, same answer)."""
-    CACHE.mkdir(parents=True, exist_ok=True)
-    path = CACHE / f"{hashlib.sha256(json.dumps(body, sort_keys=True).encode()).hexdigest()}.json"
+    cache = Path(os.environ["LEXHACK_DATA"]) / "cache" / "agent"   # resolved here: Railway has no LEXHACK_DATA
+    cache.mkdir(parents=True, exist_ok=True)
+    path = cache / f"{hashlib.sha256(json.dumps(body, sort_keys=True).encode()).hexdigest()}.json"
     if path.exists():
         return json.loads(path.read_text(encoding="utf-8"))
     for attempt in range(10):   # per-minute quotas can take a minute or two to clear (as pipeline/llm_resolve.call)
@@ -64,8 +67,10 @@ def generate(body, api_key):
             time.sleep(wait)
             continue
         r.raise_for_status()
-        path.write_text(r.text, encoding="utf-8")
-        return r.json()
+        data = r.json()
+        if ((data.get("candidates") or [{}])[0].get("content") or {}).get("parts"):   # never cache an empty reply
+            path.write_text(r.text, encoding="utf-8")
+        return data
     raise RuntimeError("Gemini call failed after 10 attempts (network or rate limit)")
 
 
@@ -133,8 +138,7 @@ def render(answer, seen, conn):
         k, v = m.groups()
         if (k, v) in ok and k == "event" and v in ev:
             quote, para, by, title, cite, court, url = ev[v]
-            who = ("checked by a person" if (by or "").startswith("human:") else
-                   "checked by an AI reviewer" if by else "unverified")
+            who = next((label for prefix, label in LABELS if (by or "").startswith(prefix)), "unverified")
             src = ", ".join(x for x in (title or "Parliament (Kenya Law reviser's note)", cite, court,
                                         para and f"para {para}") if x)
             return f'"{quote}" ({src}; {who}){f" <{url}>" if url else ""}'

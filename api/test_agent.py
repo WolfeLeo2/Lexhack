@@ -23,6 +23,11 @@ def test_render():
         text = f"See [[event:{eid[0]}]] and [[section:{S204}]] but not [[event:999999]]."
         expect("refs", agent.refs(text), [("event", str(eid[0])), ("section", S204), ("event", "999999")])
         out, invented = agent.render(text, {"event": [str(eid[0])], "section": [S204]}, conn)
+        st = conn.execute("SELECT event_id FROM citation_events WHERE judgment_id IS NULL AND verified_by LIKE 'source:%%' "
+                          "ORDER BY event_id LIMIT 1").fetchone()
+        sout, _ = agent.render(f"[[event:{st[0]}]]", {"event": [str(st[0])]}, conn)
+    expect("statutory event label", "from Kenya Law's reviser's note)" in sout, True)
+    expect("statutory event not AI-labelled", "AI reviewer" in sout, False)
     expect("verbatim quote filled in", eid[1] in out, True)
     expect("invented removed", "[unverified reference removed]" in out, True)
     expect("invented counted", invented, 1)
