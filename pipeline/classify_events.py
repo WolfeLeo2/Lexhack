@@ -270,11 +270,11 @@ def main():
         if shards == 1:   # parallel workers applying the schema at once deadlock on its ALTERs; run once first
             apply_schema(conn)
         rows, labels = candidates(conn, only)
+    rows = rows[shard::shards]   # shard BEFORE reading texts: 24 workers each reading every file pinned the disk
     if not args.answer_key:   # the answer-key judgments are always classified, trigger or not, so scoring is fair
         rows = [r for r in rows if TRIGGER.search(
             json.loads((data_dir() / r[4]).read_text(encoding="utf-8"))["text"] or "")]
     rows = rows[:args.limit] if args.limit else rows
-    rows = rows[shard::shards]
     if not (args.redo or args.answer_key):
         with connect() as conn:
             done = {j for (j,) in conn.execute("SELECT judgment_id FROM event_runs WHERE model = %s AND prompt_version = %s",
