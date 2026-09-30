@@ -32,6 +32,10 @@ def test_get_section():
     expect("section id", out["ids"]["section"], [S204])
     expect("event ids seen", set(out["ids"]["event"]) >= {str(e["event_id"]) for e in out["result"]["summary_events"]},
            True)
+    shown = out["result"]["summary_events"] + out["result"]["history"]
+    expect("events carry judgment_id", all(e["judgment_id"] for e in shown if e["title"]), True)
+    expect("judgment ids seen", set(out["ids"]["judgment"]) == {e["judgment_id"] for e in shown if e["judgment_id"]},
+           True)
     expect("history capped", len(out["result"]["history"]) <= tools.MAX_HISTORY, True)
     expect("text capped", len(out["result"]["text"]) <= tools.MAX_TEXT, True)
 

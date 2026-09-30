@@ -45,12 +45,17 @@ def get_section(provision_id: str, include_leads: bool = False):
     and its history. The status field is authoritative: report it, never derive your own. include_leads adds
     machine-extracted rulings nobody has checked (verified: false); never present those as the status."""
     p = main.provision(provision_id, include_leads).model_dump()
-    events = [event_view(e) for e in p["summary_events"]], [event_view(e) for e in p["history"]]
+    with main.db() as conn:   # main.Event has no judgment_id; the model needs it to cite [[judgment:ID]]
+        jid = dict(conn.execute("SELECT event_id, judgment_id FROM citation_events WHERE event_id = ANY(%s)",
+                                ([e["event_id"] for e in p["history"] + p["summary_events"]],)).fetchall())
+    events = [[event_view(e) | {"judgment_id": jid.get(e["event_id"])} for e in p[k]]
+              for k in ("summary_events", "history")]
+    shown = events[0] + events[1][-MAX_HISTORY:]
     result = {**p["provision"], "text": p["provision"]["text"][:MAX_TEXT], "status": p["status"],
               "summary_events": events[0], "history": events[1][-MAX_HISTORY:],
               "history_total": len(events[1]), "cited_by": p["cited_by"], "lead_count": p["lead_count"]}
-    return {"result": result, "ids": ids(section=[provision_id],
-                                         event=[e["event_id"] for e in events[0] + events[1][-MAX_HISTORY:]])}
+    return {"result": result, "ids": ids(section=[provision_id], event=[e["event_id"] for e in shown],
+                                         judgment=sorted({e["judgment_id"] for e in shown if e["judgment_id"]}))}
 
 
 def citing_judgments(provision_id: str, limit: int = 10):
