@@ -7,10 +7,13 @@ bare yes/no.
 """
 import functools
 import os
-from contextlib import contextmanager
+import time
+from collections import deque
+from contextlib import asynccontextmanager, contextmanager
 
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 import crawler.config  # noqa: F401  (loads .env)
@@ -19,22 +22,49 @@ from psycopg_pool import ConnectionPool
 
 from . import extract, filing
 from .status import provision_status, statuses
+from . import mcp_server
 
 DISCLAIMER = "Hakiki reports what published sources say. It is not legal advice."
-app = FastAPI(title="LexHack citator API", version="0.1")
-app.add_middleware(CORSMiddleware, allow_origins=os.environ.get("CORS_ORIGINS", "http://localhost:3000").split(","),
-                   allow_methods=["GET"], allow_headers=["*"])
-
-
 # Opening a connection costs ~1 s from Kenya to Neon (Frankfurt); a pool keeps a few open. Pooled URL (PgBouncer).
 POOL = ConnectionPool(os.environ["DATABASE_URL"], min_size=1, max_size=5, open=False,
                       kwargs={"prepare_threshold": None},   # PgBouncer transaction mode: no prepared statements
                       check=ConnectionPool.check_connection)  # Neon drops idle connections; re-check before use
 
 
-@app.on_event("startup")
-def _open_pool():
+@asynccontextmanager
+async def lifespan(app):
     POOL.open()
+    async with mcp_server.mcp.session_manager.run():   # the /mcp endpoint's sessions (stateless)
+        yield
+
+
+app = FastAPI(title="LexHack citator API", version="0.1", lifespan=lifespan)
+app.add_middleware(CORSMiddleware, allow_origins=os.environ.get("CORS_ORIGINS", "http://localhost:3000").split(","),
+                   allow_methods=["GET"], allow_headers=["*"])
+
+RATE, WINDOW = 60, 60.0   # /mcp requests per client IP per minute
+_hits = {}
+
+
+def allow(key, now, hits=_hits):
+    """Sliding window. ponytail: in memory, one Railway instance; Redis if it ever runs several. Keys are never
+    dropped: fine at our traffic, prune idle keys if memory ever grows."""
+    q = hits.setdefault(key, deque())
+    while q and now - q[0] > WINDOW:
+        q.popleft()
+    if len(q) >= RATE:
+        return False
+    q.append(now)
+    return True
+
+
+@app.middleware("http")
+async def limit_mcp(request, call_next):
+    if request.url.path.startswith("/mcp"):
+        ip = (request.headers.get("x-forwarded-for") or (request.client.host if request.client else "")).split(",")[0]
+        if not allow(ip.strip(), time.monotonic()):
+            return JSONResponse({"error": f"rate limit: {RATE} requests a minute"}, status_code=429)
+    return await call_next(request)
 
 
 @contextmanager
@@ -355,3 +385,6 @@ async def extract_file(request: Request):
         return ExtractResult(**extract.read(await request.body(), request.headers.get("x-filename", "")))
     except extract.ExtractError as e:
         raise HTTPException(e.status, str(e))
+
+
+app.mount("/", mcp_server.http_app)   # serves /mcp; mounted last so every /api route above matches first
