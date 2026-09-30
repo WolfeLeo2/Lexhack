@@ -12,7 +12,8 @@ from . import filing, main   # main's names are used only inside functions: main
 MAX_TEXT, MAX_HISTORY, MAX_QUOTE = 3000, 15, 600
 TYPES = {str: "string", int: "integer", bool: "boolean"}
 NAME_NOISE = {"the", "and", "another", "others", "republic", "attorney", "general", "ekl", "eklr", "kesc", "keca",
-              "kehc", "klr"}
+              "kehc", "klr", "ruling", "judgment", "case", "court", "summarise", "summarize", "what", "did", "hold",
+              "held", "about", "ors", "anor", "petition", "appeal"}
 
 
 def ids(section=(), event=(), judgment=()):
@@ -65,12 +66,16 @@ def citing_judgments(provision_id: str, limit: int = 10):
 
 
 def title_search(conn, name):
-    words = [f"%{w}%" for w in re.findall(r"[A-Za-z]{3,}", name) if w.lower() not in NAME_NOISE][:4]
+    """Titles matching the most party words (whole words), judgments with checked rulings first, then newest."""
+    words = [rf"\m{w}\M" for w in dict.fromkeys(re.findall(r"[A-Za-z]{3,}", name.lower())) if w not in NAME_NOISE][:6]
     if not words:
         return []
     rows = conn.execute("""SELECT judgment_id, title, court, decision_date::text, neutral_citation, source_url
-                           FROM judgments WHERE duplicate_of IS NULL AND title ILIKE ALL(%s)
-                           ORDER BY decision_date DESC NULLS LAST LIMIT 5""", (words,)).fetchall()
+                           FROM judgments j WHERE duplicate_of IS NULL AND title ~* ANY(%s)
+                           ORDER BY (SELECT count(*) FROM unnest(%s::text[]) w WHERE j.title ~* w) DESC,
+                                    EXISTS (SELECT 1 FROM citation_events e WHERE e.judgment_id = j.judgment_id
+                                            AND e.verified) DESC,
+                                    decision_date DESC NULLS LAST LIMIT 5""", (words, words)).fetchall()
     return [dict(zip(("judgment_id", "title", "court", "decision_date", "neutral_citation", "source_url"), r))
             for r in rows]
 
