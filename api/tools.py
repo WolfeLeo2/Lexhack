@@ -13,7 +13,8 @@ MAX_TEXT, MAX_HISTORY, MAX_QUOTE = 3000, 15, 600
 TYPES = {str: "string", int: "integer", bool: "boolean"}
 NAME_NOISE = {"the", "and", "another", "others", "republic", "attorney", "general", "ekl", "eklr", "kesc", "keca",
               "kehc", "klr", "ruling", "judgment", "case", "court", "summarise", "summarize", "what", "did", "hold",
-              "held", "about", "ors", "anor", "petition", "appeal"}
+              "held", "about", "ors", "anor", "petition", "appeal", "high", "supreme", "decision", "kenya", "county",
+              "commissioner", "judgement"}
 
 
 def ids(section=(), event=(), judgment=()):
@@ -66,34 +67,43 @@ def citing_judgments(provision_id: str, limit: int = 10):
 
 
 def title_search(conn, name):
-    """Titles matching the most party words (whole words), judgments with checked rulings first, then newest."""
+    """Titles with every party word (whole words); only if none, titles missing one word (needs 3+ words). Judgments
+    with checked rulings first, then newest."""
     words = [rf"\m{w}\M" for w in dict.fromkeys(re.findall(r"[A-Za-z]{3,}", name.lower())) if w not in NAME_NOISE][:6]
     if not words:
         return []
-    rows = conn.execute("""SELECT judgment_id, title, court, decision_date::text, neutral_citation, source_url
-                           FROM judgments j WHERE duplicate_of IS NULL AND title ~* ANY(%s)
-                           ORDER BY (SELECT count(*) FROM unnest(%s::text[]) w WHERE j.title ~* w) DESC,
+    n = len(words)
+    rows = conn.execute("""SELECT * FROM (
+                             SELECT judgment_id, title, court, decision_date::text AS d, neutral_citation, source_url,
+                                    (SELECT count(*) FROM unnest(%s::text[]) w WHERE j.title ~* w) AS hits,
                                     EXISTS (SELECT 1 FROM citation_events e WHERE e.judgment_id = j.judgment_id
-                                            AND e.verified) DESC,
-                                    decision_date DESC NULLS LAST LIMIT 5""", (words, words)).fetchall()
-    return [dict(zip(("judgment_id", "title", "court", "decision_date", "neutral_citation", "source_url"), r))
-            for r in rows]
+                                            AND e.verified) AS ruled
+                             FROM judgments j WHERE duplicate_of IS NULL AND title ~* ANY(%s)) x
+                           WHERE hits >= %s ORDER BY hits DESC, ruled DESC, d DESC NULLS LAST LIMIT 5""",
+                        (words, words, n - 1 if n >= 3 else n)).fetchall()
+    if rows and rows[0][6] == n:   # all-words matches exist: drop the partial ones
+        rows = [r for r in rows if r[6] == n]
+    return [dict(zip(("judgment_id", "title", "court", "decision_date", "neutral_citation", "source_url",
+                      "words_matched"), r[:7]), words_total=n) for r in rows]
 
 
 def find_case(citation: str):
     """Look up a case, e.g. 'Muruatetu & another v Republic [2017] eKLR' or '[2017] KESC 2 (KLR)'. Result per case:
     found | name_mismatch | possible_match | not_in_collection (Hakiki holds ~10% of judgments: not_in_collection never
-    means the case doesn't exist). With only party names, returns title matches. Also lists the checked rulings Hakiki
-    records from the judgments found."""
+    means the case doesn't exist). With only party names, returns title matches with words_matched / words_total; a
+    title matching only some of the words is not a confirmed case. Also lists the checked rulings Hakiki records from
+    the judgments found by citation or by a title matching every word (none from partial title matches)."""
     with main.db() as conn:
         cases = [f["case"] for f in filing.check(conn, citation)["findings"] if f["kind"] == "case"]
         judgments = [j for c in cases for j in ([c["judgment"]] if c["judgment"] else []) + c["candidates"]]
         titles = [] if cases else title_search(conn, citation)
         jids = [j["judgment_id"] for j in judgments + titles]
+        ruled = [j["judgment_id"] for j in judgments] + [t["judgment_id"] for t in titles
+                                                          if t["words_matched"] == t["words_total"]]
         events = [dict(zip(("event_id", "provision_id", "event_type", "judgment_id", "verified_by"), r))
                   for r in conn.execute("""SELECT event_id, provision_id, event_type, judgment_id, verified_by
                                            FROM citation_events WHERE judgment_id = ANY(%s) AND verified
-                                           ORDER BY event_id""", (jids,))]
+                                           ORDER BY event_id""", (ruled,))]
     return {"result": {"cases": cases, "title_matches": titles, "events": events},
             "ids": ids(section=sorted({e["provision_id"] for e in events}), event=[e["event_id"] for e in events],
                        judgment=jids)}

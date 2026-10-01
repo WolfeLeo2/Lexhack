@@ -52,6 +52,14 @@ def test_search_and_cases():
     expect("name only: held case with rulings first", out["ids"]["judgment"][:1], ["ke/judgment/kehc/2022/114"])
     expect("name only: whole words", any("Okimaru" in t["title"] for t in out["result"]["title_matches"]), False)
     expect("name only: its rulings listed", len(out["ids"]["event"]) > 0, True)
+    out = tools.find_case("Matemu v Trusted Society of Human Rights Alliance")
+    expect("name only: Matemu", "Matemu" in out["result"]["title_matches"][0]["title"], True)
+    out = tools.find_case("Zzyzx Mwangi")   # shares one common word with many held titles
+    expect("one shared word: no titles, no rulings", (out["result"]["title_matches"], out["ids"]["event"]), ([], []))
+    out = tools.find_case("Zzyzx Mwangi Kamau")   # 2 of 3 words: partial matches allowed, but carry no rulings
+    expect("partial match: no rulings", out["ids"]["event"], [])
+    expect("partial match: labelled", all(t["words_matched"] < t["words_total"] for t in out["result"]["title_matches"]),
+           True)
     out = tools.find_case("Zzyzx Quabble v Republic [2019] eKLR")
     expect("invented case not found", out["result"]["cases"][0]["result"] != "found", True)
 

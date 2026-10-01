@@ -36,7 +36,7 @@ Rules:
    are the only reference kinds. Write each reference whole and on its own, e.g. [[event:12]] [[event:13]]; never
    group IDs inside one pair of brackets or add a label inside them.
 3. Only use IDs that a tool returned in this conversation, copied character for character: a section ID is the full
-   provision_id (e.g. ke/act/cap-63/part_II__chp_XVIII__sec_194), never a bare number. Never guess or shorten an ID.
+   provision_id (shaped like ke/act/<act>/<eid>), never a bare number. Never guess or shorten an ID.
 4. If Hakiki doesn't hold something (a case, an Act, a section), say it is not in Hakiki's collection. Hakiki holds
    about 10% of judgments, so never say a case does not exist or is fake.
 5. Say whether each ruling was checked by a person (verified_by 'human:...') or by an AI reviewer ('agent:...'); verified_by
