@@ -20,8 +20,9 @@ from api.status import provision_status
 
 HERE = Path(__file__).parent
 OUT = Path(os.environ["LEXHACK_DATA"]) / "review" / "agent"
-NOT_HELD_OK = re.compile(r"not (?:in|part of|held in) (?:Hakiki'?s|our|the) collection|Hakiki does not (?:hold|have)"
-                         r"|Hakiki doesn'?t (?:hold|have)", re.I)
+NOT_HELD_OK = re.compile(r"(?:not|n'?t) (?:currently )?(?:in|part of|(?:held|included|available) in) "
+                         r"(?:Hakiki'?s|our|the) collection"
+                         r"|Hakiki(?:'?s collection)? (?:does not|doesn'?t) (?:hold|include|contain|have)", re.I)
 MODEL_QUOTE = re.compile(r'["“][^"“”]{20,}["”]')   # a quotation of 20+ characters the model wrote itself
 NOT_HELD_BAD = re.compile(r"\b(?:does not|doesn'?t|did not|didn'?t) exist|\bfake\b|\binvalid\b|fabricated", re.I)
 
@@ -60,6 +61,12 @@ def selftest():
     out["answer"] = "That case does not exist. [[event:7]]"
     s = score(q, out, {"7", "9"}, {"7": "p1"})
     assert s["not_held_wording"] is False and s["key_rulings"] is False and s["section_found"] is True, s
+    for text, ok in [("Hakiki's collection does not hold the Land Registration Act or its section 26.", True),
+                     ("The Data Protection Act, 2019 is not currently held in Hakiki's collection of statute law.", True),
+                     ("That case does not exist.", False),
+                     ("Hakiki's collection holds the Act; section 26 is in force.", False)]:
+        got = score(q, {"answer": text, "seen": out["seen"]}, set(), {})["not_held_wording"]
+        assert got is ok, (text, got)
     q = {"expected_provisions": "p2", "expect_not_held": ""}
     assert score(q, out, set(), {"7": "p1"}) == {"invented": 0, "model_quotes": 0, "section_found": False}
     q = {"expected_provisions": "", "expect_not_held": ""}   # nothing expected: neither metric applies
