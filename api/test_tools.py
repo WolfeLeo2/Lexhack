@@ -68,6 +68,12 @@ def test_search_and_cases():
     expect("partial match: not referenceable", out["ids"]["judgment"], [])
     out = tools.find_case("Zzyzx Quabble v Republic [2019] eKLR")
     expect("invented case not found", out["result"]["cases"][0]["result"] != "found", True)
+    out = tools.find_case("Republic v Mwangi [2019] eKLR")   # vague: the matcher offers candidates only
+    case = out["result"]["cases"][0]
+    cand = {j["judgment_id"] for j in case["candidates"]}
+    expect("possible match: returned", (case["result"], len(cand) > 0), ("possible_match", True))
+    expect("possible match: no candidate id", cand & set(out["ids"]["judgment"]), set())
+    expect("possible match: no candidate event", [e for e in out["result"]["events"] if e["judgment_id"] in cand], [])
 
 
 def test_call():

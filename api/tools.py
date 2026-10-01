@@ -92,12 +92,13 @@ def find_case(citation: str):
     means the case doesn't exist). With only party names, returns title matches with words_matched / words_total and
     confirmed: a title matching only some of the words, or a single party word, is not a confirmed case. Also lists
     the checked rulings Hakiki records from the judgments found by citation or by a confirmed title (none from
-    unconfirmed matches, which can't be referenced)."""
+    unconfirmed matches, which can't be referenced). Possible matches are listed but not confirmed, and carry no
+    rulings."""
     with main.db() as conn:
         cases = [f["case"] for f in filing.check(conn, citation)["findings"] if f["kind"] == "case"]
-        judgments = [j for c in cases for j in ([c["judgment"]] if c["judgment"] else []) + c["candidates"]]
+        judgments = [c["judgment"] for c in cases if c["judgment"]]   # possible_match candidates stay in cases only
         titles = [] if cases else title_search(conn, citation)
-        ruled = [j["judgment_id"] for j in judgments + titles if j.get("confirmed", True)]   # citation matches: always
+        ruled = [j["judgment_id"] for j in judgments + titles if j.get("confirmed", True)]   # citation findings: always
         events = [dict(zip(("event_id", "provision_id", "event_type", "judgment_id", "verified_by"), r))
                   for r in conn.execute("""SELECT event_id, provision_id, event_type, judgment_id, verified_by
                                            FROM citation_events WHERE judgment_id = ANY(%s) AND verified
