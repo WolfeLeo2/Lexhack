@@ -21,6 +21,7 @@ from .status import statuses
 MODEL, MAX_ROUNDS = "gemini-3.5-flash-lite", 8
 URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 REF = re.compile(r"\[\[(section|event|judgment):([^\]\s]+)\]\]")
+BRACKETS = re.compile(r"\[\[[^\]]*\]\]")   # anything in [[...]]: a REF, or a malformed one like [[event:1, 2]]
 LABELS = [("human:", "checked by a person"), ("agent:", "checked by an AI reviewer"),
           ("source:", "from Kenya Law's reviser's note")]
 
@@ -115,8 +116,14 @@ def run(question, history=(), api_key=None):
     raise AssertionError("unreachable: the last round has tools disabled")
 
 
+def ref(text):
+    """'[[kind:ID]]' -> (kind, ID); a malformed reference -> (None, text): no tool returned it, so it is invented."""
+    m = REF.fullmatch(text)
+    return m.groups() if m else (None, text)
+
+
 def refs(answer):
-    return REF.findall(answer)
+    return [ref(t) for t in BRACKETS.findall(answer)]
 
 
 def render(answer, seen, conn):
@@ -139,7 +146,7 @@ def render(answer, seen, conn):
 
     def sub(m):
         nonlocal invented
-        k, v = m.groups()
+        k, v = ref(m.group())
         if (k, v) in ok and k == "event" and v in ev:
             quote, para, by, title, cite, court, url = ev[v]
             who = next((label for prefix, label in LABELS if (by or "").startswith(prefix)), "unverified")
@@ -155,7 +162,7 @@ def render(answer, seen, conn):
         invented += 1
         return "[unverified reference removed]"
 
-    return REF.sub(sub, answer), invented
+    return BRACKETS.sub(sub, answer), invented
 
 
 if __name__ == "__main__":

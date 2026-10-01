@@ -5,8 +5,8 @@
   uv run python -m ground_truth.eval_agent --set dev        # run + score; answers for the grader
   uv run python -m ground_truth.eval_agent --set heldout    # once, after tuning on dev
 
-Scored in code: invented references (the headline), section found, key rulings cited, not-held wording. The judgement
-calls (contradicts the status, advice, verdict, lead as status) go to the answer-grader agent.
+Scored in code: invented references (the headline), model-written quotes, section found, key rulings cited, not-held
+wording. The judgement calls (contradicts the status, advice, verdict, lead as status) go to the answer-grader agent.
 """
 import argparse
 import csv
@@ -22,6 +22,7 @@ HERE = Path(__file__).parent
 OUT = Path(os.environ["LEXHACK_DATA"]) / "review" / "agent"
 NOT_HELD_OK = re.compile(r"not (?:in|part of|held in) (?:Hakiki'?s|our|the) collection|Hakiki does not (?:hold|have)"
                          r"|Hakiki doesn'?t (?:hold|have)", re.I)
+MODEL_QUOTE = re.compile(r'["“][^"“”]{20,}["”]')   # a quotation of 20+ characters the model wrote itself
 NOT_HELD_BAD = re.compile(r"\b(?:does not|doesn'?t|did not|didn'?t) exist|\bfake\b|\binvalid\b|fabricated", re.I)
 
 
@@ -31,14 +32,19 @@ def split(s):
 
 def score(q, out, key_ids, event_section):
     """q: a question row; out: agent.run's result; key_ids: event_ids (str) the answer must cite; event_section:
-    {event_id: provision_id} for every event the answer references."""
+    {event_id: provision_id} for every event the answer references. Only references a tool returned earn credit;
+    section_found and key_rulings are left out when the question expects no section or no ruling."""
     rs = agent.refs(out["answer"])
     seen = {(k, v) for k, vs in out["seen"].items() for v in vs}
-    cited_events = {v for k, v in rs if k == "event"}
-    cited_sections = {v for k, v in rs if k == "section"} | {event_section.get(v) for v in cited_events}
+    cited_events = {v for k, v in rs if k == "event" and (k, v) in seen}
+    cited_sections = ({v for k, v in rs if k == "section" and (k, v) in seen}
+                      | {event_section.get(v) for v in cited_events})
     s = {"invented": sum((k, v) not in seen for k, v in rs),
-         "section_found": all(p in cited_sections for p in split(q["expected_provisions"])),
-         "key_rulings": key_ids <= cited_events}
+         "model_quotes": len(MODEL_QUOTE.findall(agent.BRACKETS.sub("", out["answer"])))}
+    if split(q["expected_provisions"]):
+        s["section_found"] = all(p in cited_sections for p in split(q["expected_provisions"]))
+    if key_ids:
+        s["key_rulings"] = key_ids <= cited_events
     if q["expect_not_held"] == "yes":
         s["not_held_wording"] = bool(NOT_HELD_OK.search(out["answer"])) and not NOT_HELD_BAD.search(out["answer"])
     return s
@@ -49,12 +55,24 @@ def selftest():
     out = {"answer": "[[section:p1]] [[event:7]] [[event:8]] It is not in Hakiki's collection.",
            "seen": {"section": ["p1"], "event": ["7"], "judgment": []}}
     s = score(q, out, {"7"}, {"7": "p1"})
-    assert s == {"invented": 1, "section_found": True, "key_rulings": True, "not_held_wording": True}, s
+    assert s == {"invented": 1, "model_quotes": 0, "section_found": True, "key_rulings": True,
+                 "not_held_wording": True}, s
     out["answer"] = "That case does not exist. [[event:7]]"
     s = score(q, out, {"7", "9"}, {"7": "p1"})
     assert s["not_held_wording"] is False and s["key_rulings"] is False and s["section_found"] is True, s
     q = {"expected_provisions": "p2", "expect_not_held": ""}
-    assert score(q, out, set(), {"7": "p1"}) == {"invented": 0, "section_found": False, "key_rulings": True}
+    assert score(q, out, set(), {"7": "p1"}) == {"invented": 0, "model_quotes": 0, "section_found": False}
+    q = {"expected_provisions": "", "expect_not_held": ""}   # nothing expected: neither metric applies
+    assert score(q, out, set(), {"7": "p1"}) == {"invented": 0, "model_quotes": 0}
+    q = {"expected_provisions": "p1", "expect_not_held": ""}
+    out = {"answer": "[[section:p1]] [[event:7]]", "seen": {"section": [], "event": [], "judgment": []}}
+    s = score(q, out, {"7"}, {"7": "p1"})   # invented but correct references earn nothing
+    assert s == {"invented": 2, "model_quotes": 0, "section_found": False, "key_rulings": False}, s
+    out = {"answer": 'It held "the mandatory nature of the death sentence" was void, “a short one” and '
+                     '“to the extent that it covers other offences” [[event:7, 8]]',
+           "seen": {"section": ["p1"], "event": ["7", "8"], "judgment": []}}
+    s = score(q, out, set(), {})   # malformed reference is invented; two quotes of 20+ characters
+    assert s == {"invented": 1, "model_quotes": 2, "section_found": False}, s
     print("selftest ok")
 
 
@@ -111,11 +129,12 @@ def evaluate(name):
     OUT.mkdir(parents=True, exist_ok=True)
     (OUT / f"{name}_answers.json").write_text(json.dumps(results, indent=1, ensure_ascii=False), encoding="utf-8")
     n = len(qs)
-    print(f"\n{name}: {sum(totals['invented'])} invented references in {n} answers; "
-          f"section found {sum(totals['section_found'])}/{n}; key rulings {sum(totals['key_rulings'])}/{n}"
-          + (f"; not-held wording {sum(totals['not_held_wording'])}/{len(totals['not_held_wording'])}"
-             if "not_held_wording" in totals else ""))
 
+    def frac(k, label):   # over the questions the metric applies to
+        return f"; {label} {sum(totals[k])}/{len(totals[k])}" if k in totals else ""
+    print(f"\n{name}: {sum(totals['invented'])} invented references in {n} answers; "
+          f"{sum(totals['model_quotes'])} model-written quotes" + frac("section_found", "section found")
+          + frac("key_rulings", "key rulings") + frac("not_held_wording", "not-held wording"))
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()

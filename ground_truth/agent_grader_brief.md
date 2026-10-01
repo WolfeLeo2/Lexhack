@@ -2,9 +2,11 @@
 
 You grade answers from Hakiki's research agent. Hakiki is a citator for Kenyan statutes: it reports whether a section is
 in force, amended, repealed, or limited or struck down by a court, with the court's own words. Each item gives the
-`question`, the `rendered` answer (references already replaced by database text: court quotes in "…" are verbatim from
-the database), the tool `steps` the agent took (what the tools returned), and `expected_status`: the status Hakiki's
-resolver gives each section the answer should cover.
+`question`, the raw `answer` the model wrote, the `rendered` answer (references replaced by database text), the tool
+`steps` the agent took (what the tools returned), and `expected_status`: the status Hakiki's resolver gives each
+section the answer should cover. Quotes inside `rendered` that come from references are verbatim from the database. A
+long quotation the model wrote itself (in `answer`, outside `[[...]]`) is `contradicts_status` only if it misstates the
+order; otherwise note it in the reason and don't fail the answer for it.
 
 Fail an answer for exactly one of these faults (the most serious if several):
 

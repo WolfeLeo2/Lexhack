@@ -20,8 +20,9 @@ def test_render():
     with main.db() as conn:
         eid = conn.execute("SELECT event_id, operative_quote FROM citation_events WHERE provision_id = %s AND verified "
                            "AND judgment_id IS NOT NULL ORDER BY event_id LIMIT 1", (S204,)).fetchone()
-        text = f"See [[event:{eid[0]}]] and [[section:{S204}]] but not [[event:999999]]."
-        expect("refs", agent.refs(text), [("event", str(eid[0])), ("section", S204), ("event", "999999")])
+        text = f"See [[event:{eid[0]}]] and [[section:{S204}]] but not [[event:999999]] or [[event:{eid[0]}, 5]]."
+        expect("refs", agent.refs(text), [("event", str(eid[0])), ("section", S204), ("event", "999999"),
+                                          (None, f"[[event:{eid[0]}, 5]]")])
         out, invented = agent.render(text, {"event": [str(eid[0])], "section": [S204]}, conn)
         st = conn.execute("SELECT event_id FROM citation_events WHERE judgment_id IS NULL AND verified_by LIKE 'source:%%' "
                           "ORDER BY event_id LIMIT 1").fetchone()
@@ -30,7 +31,8 @@ def test_render():
     expect("statutory event not AI-labelled", "AI reviewer" in sout, False)
     expect("verbatim quote filled in", eid[1] in out, True)
     expect("invented removed", "[unverified reference removed]" in out, True)
-    expect("invented counted", invented, 1)
+    expect("invented and malformed counted", invented, 2)
+    expect("malformed removed", out.count("[unverified reference removed]"), 2)
     expect("no raw refs left", "[[" in out, False)
 
 
