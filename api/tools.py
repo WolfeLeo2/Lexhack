@@ -7,8 +7,6 @@ work; nothing here queries what an endpoint already answers.
 import inspect
 import re
 
-from . import filing, main   # main's names are used only inside functions: main imports this module's server
-
 MAX_TEXT, MAX_HISTORY, MAX_QUOTE = 3000, 15, 600
 TYPES = {str: "string", int: "integer", bool: "boolean"}
 NAME_NOISE = {"the", "and", "another", "others", "republic", "attorney", "general", "ekl", "eklr", "kesc", "keca",
@@ -68,7 +66,8 @@ def citing_judgments(provision_id: str, limit: int = 10):
 
 def title_search(conn, name):
     """Titles with every party word (whole words); only if none, titles missing one word (needs 3+ words). Judgments
-    with checked rulings first, then newest."""
+    with checked rulings first, then newest. confirmed: every word matched and there are 2+ (one word, e.g. 'Mwangi',
+    is in too many titles to name a case)."""
     words = [rf"\m{w}\M" for w in dict.fromkeys(re.findall(r"[A-Za-z]{3,}", name.lower())) if w not in NAME_NOISE][:6]
     if not words:
         return []
@@ -84,29 +83,28 @@ def title_search(conn, name):
     if rows and rows[0][6] == n:   # all-words matches exist: drop the partial ones
         rows = [r for r in rows if r[6] == n]
     return [dict(zip(("judgment_id", "title", "court", "decision_date", "neutral_citation", "source_url",
-                      "words_matched"), r[:7]), words_total=n) for r in rows]
+                      "words_matched"), r[:7]), words_total=n, confirmed=n >= 2 and r[6] == n) for r in rows]
 
 
 def find_case(citation: str):
     """Look up a case, e.g. 'Muruatetu & another v Republic [2017] eKLR' or '[2017] KESC 2 (KLR)'. Result per case:
     found | name_mismatch | possible_match | not_in_collection (Hakiki holds ~10% of judgments: not_in_collection never
-    means the case doesn't exist). With only party names, returns title matches with words_matched / words_total; a
-    title matching only some of the words is not a confirmed case. Also lists the checked rulings Hakiki records from
-    the judgments found by citation or by a title matching every word (none from partial title matches)."""
+    means the case doesn't exist). With only party names, returns title matches with words_matched / words_total and
+    confirmed: a title matching only some of the words, or a single party word, is not a confirmed case. Also lists
+    the checked rulings Hakiki records from the judgments found by citation or by a confirmed title (none from
+    unconfirmed matches, which can't be referenced)."""
     with main.db() as conn:
         cases = [f["case"] for f in filing.check(conn, citation)["findings"] if f["kind"] == "case"]
         judgments = [j for c in cases for j in ([c["judgment"]] if c["judgment"] else []) + c["candidates"]]
         titles = [] if cases else title_search(conn, citation)
-        jids = [j["judgment_id"] for j in judgments + titles]
-        ruled = [j["judgment_id"] for j in judgments] + [t["judgment_id"] for t in titles
-                                                          if t["words_matched"] == t["words_total"]]
+        ruled = [j["judgment_id"] for j in judgments + titles if j.get("confirmed", True)]   # citation matches: always
         events = [dict(zip(("event_id", "provision_id", "event_type", "judgment_id", "verified_by"), r))
                   for r in conn.execute("""SELECT event_id, provision_id, event_type, judgment_id, verified_by
                                            FROM citation_events WHERE judgment_id = ANY(%s) AND verified
                                            ORDER BY event_id""", (ruled,))]
     return {"result": {"cases": cases, "title_matches": titles, "events": events},
             "ids": ids(section=sorted({e["provision_id"] for e in events}), event=[e["event_id"] for e in events],
-                       judgment=jids)}
+                       judgment=ruled)}
 
 
 def check_text(text: str):
@@ -155,3 +153,7 @@ def declaration(fn):
 
 
 DECLARATIONS = [declaration(f) for f in TOOLS.values()]
+
+# Last, so `import api.tools` works on its own: main imports mcp_server, which reads TOOLS (defined above) from this
+# partly loaded module. main's names are used only inside functions.
+from . import filing, main   # noqa: E402

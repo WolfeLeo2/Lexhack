@@ -47,8 +47,13 @@ def test_search_and_cases():
     expect("Okuta found", out["result"]["cases"][0]["result"], "found")
     expect("Okuta events", any(e["provision_id"] == S194 for e in out["result"]["events"]), True)
     out = tools.find_case("Okuta")
-    expect("name only falls back to titles", len(out["ids"]["judgment"]) > 0, True)
-    out = tools.find_case("the ruling in Kimaru & 17 others v Attorney General")   # 9 titles say Kimaru; Okimaru isn't one
+    expect("name only falls back to titles", len(out["result"]["title_matches"]) > 0, True)
+    expect("one word: unconfirmed, no ids", (out["result"]["title_matches"][0]["confirmed"], out["ids"]["judgment"]),
+           (False, []))
+    out = tools.find_case("Mwangi")   # one word in many titles: no rulings from unrelated judgments
+    expect("one word: no rulings", out["ids"]["event"], [])
+    out = tools.find_case("the ruling in Kimaru v Attorney General; Kenya National Human Rights and Equality "
+                          "Commission")   # 9 titles say Kimaru; Okimaru isn't one
     expect("name only: held case with rulings first", out["ids"]["judgment"][:1], ["ke/judgment/kehc/2022/114"])
     expect("name only: whole words", any("Okimaru" in t["title"] for t in out["result"]["title_matches"]), False)
     expect("name only: its rulings listed", len(out["ids"]["event"]) > 0, True)
@@ -58,8 +63,9 @@ def test_search_and_cases():
     expect("one shared word: no titles, no rulings", (out["result"]["title_matches"], out["ids"]["event"]), ([], []))
     out = tools.find_case("Zzyzx Mwangi Kamau")   # 2 of 3 words: partial matches allowed, but carry no rulings
     expect("partial match: no rulings", out["ids"]["event"], [])
-    expect("partial match: labelled", all(t["words_matched"] < t["words_total"] for t in out["result"]["title_matches"]),
-           True)
+    expect("partial match: labelled", all(t["words_matched"] < t["words_total"] and not t["confirmed"]
+                                          for t in out["result"]["title_matches"]), True)
+    expect("partial match: not referenceable", out["ids"]["judgment"], [])
     out = tools.find_case("Zzyzx Quabble v Republic [2019] eKLR")
     expect("invented case not found", out["result"]["cases"][0]["result"] != "found", True)
 

@@ -7,9 +7,6 @@ Read-only; every answer is what published sources say, not legal advice.
 """
 import functools
 
-from . import main   # first: main imports this module, so loading main first settles the import cycle
-from . import tools
-
 from mcp.server.mcpserver import MCPServer
 from mcp.server.transport_security import TransportSecuritySettings
 
@@ -21,6 +18,14 @@ by a person or an AI reviewer (verified_by), and never present an unverified lea
 sources say; this is not legal advice."""
 
 mcp = MCPServer("hakiki", instructions=INSTRUCTIONS)
+http_app = mcp.streamable_http_app(
+    stateless_http=True, json_response=True, streamable_http_path="/mcp",
+    # public, read-only, no cookies or auth: nothing for a DNS-rebinding attack to reach
+    transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False))
+
+# Import cycle: main mounts http_app at import, and tools imports main. mcp and http_app are defined above these
+# imports so main finds them whichever module loads first (tools are listed per request, so registering later is fine).
+from . import main, tools   # noqa: E402
 
 
 def result_only(fn):
@@ -32,12 +37,6 @@ def result_only(fn):
 
 for fn in tools.TOOLS.values():
     mcp.tool()(result_only(fn))
-
-http_app = mcp.streamable_http_app(
-    stateless_http=True, json_response=True, streamable_http_path="/mcp",
-    # public, read-only, no cookies or auth: nothing for a DNS-rebinding attack to reach
-    transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False))
-
 
 if __name__ == "__main__":
     from api import mcp_server as served   # this file runs as __main__; serve the copy main imported, so tools register once

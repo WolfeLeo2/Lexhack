@@ -5,6 +5,7 @@ the rate limit.
 """
 import asyncio
 import json
+import subprocess
 import sys
 
 from mcp import ClientSession, StdioServerParameters
@@ -43,6 +44,12 @@ def http():
         expect("REST still served", c.get("/api/acts").status_code, 200)
 
 
+def imports():
+    for m in ("api.tools", "api.mcp_server"):   # each loads alone, not only after api.main (the import cycle)
+        r = subprocess.run([sys.executable, "-c", f"import {m}"], capture_output=True, text=True)
+        expect(f"import {m} alone", (r.returncode, r.stderr[-300:]), (0, ""))
+
+
 def rate_limit():
     hits = {}
     expect("under limit", all(main.allow("ip", 0.0, hits) for _ in range(main.RATE)), True)
@@ -54,6 +61,7 @@ def rate_limit():
 def run():
     expect("key: last entry", main.client_key("1.1.1.1, 2.2.2.2", "9.9.9.9"), "2.2.2.2")
     expect("key: peer fallback", main.client_key(None, "9.9.9.9"), "9.9.9.9")
+    imports()
     rate_limit()
     http()
     asyncio.run(stdio())
