@@ -18,6 +18,8 @@ NAME_NOISE = {"the", "and", "another", "others", "republic", "attorney", "genera
               "kehc", "klr", "ruling", "judgment", "case", "court", "summarise", "summarize", "what", "did", "hold",
               "held", "about", "ors", "anor", "petition", "appeal", "high", "supreme", "decision", "kenya", "county",
               "commissioner", "judgement"}
+NOT_PARTY = {"the", "and", "for", "summarise", "summarize", "what", "did", "hold", "held", "about", "ruling",
+             "judgment", "judgement", "case", "decision"}   # never in a party name: left out of the full-name tie-break too
 
 
 def ids(section=(), event=(), judgment=()):
@@ -86,9 +88,10 @@ def find_section(act: str, section: str):
     """Use this whenever the user names an Act and a section number (e.g. act 'Penal Code' or 'Cap. 63', section
     '204', 's.8(2)', 'Article 50'), before saying anything is not held. found: true gives the provision_id and
     status (call get_section for the rulings); found with ambiguous: true lists candidates (one number in two Parts:
-    ask which). reason section_not_held: Hakiki holds the Act but not that section; act_not_recognised: the name
-    isn't one of held_acts (retry with the matching title from held_acts, or say the Act isn't in Hakiki's
-    collection if it clearly isn't one of them); no_section_number: give the section as a number."""
+    ask which; or a section renumbered between versions, under two IDs with the version dates of each: report both
+    and say which one has the court rulings). reason section_not_held: Hakiki holds the Act but not that section;
+    act_not_recognised: the name isn't one of held_acts (retry with the matching title from held_acts, or say the Act
+    isn't in Hakiki's collection if it clearly isn't one of them); no_section_number: give the section as a number."""
     with main.db() as conn:
         held = dict(conn.execute("SELECT act_id, title FROM acts ORDER BY title").fetchall())
         act_id = held_act_id(act, held)
@@ -103,13 +106,22 @@ def find_section(act: str, section: str):
         slug = act_id.removeprefix("ke/act/")   # pick_provision: the Employment Act's eId change by date
         one = pick_provision({(slug, number.group(0)): [(r[1], r[0]) for r in rows]}, slug, number.group(0),
                              date.today())
-        rows = [r for r in rows if r[0] == one] or rows
+        ruled = {r[0] for r in conn.execute("""SELECT DISTINCT provision_id FROM citation_events WHERE verified
+                                               AND judgment_id IS NOT NULL AND provision_id = ANY(%s)""",
+                                            ([r[0] for r in rows],))}
+        if one and not ruled - {one}:   # one ID by date, and no court ruling sits on another ID with this number
+            rows = [r for r in rows if r[0] == one]
         status = statuses(conn, [r[0] for r in rows])
+        versions = dict(conn.execute("""SELECT t.provision_id, array_agg(v.version_date::text ORDER BY v.version_date)
+                                        FROM provision_texts t JOIN act_versions v USING (version_id)
+                                        WHERE t.provision_id = ANY(%s) GROUP BY 1""",
+                                     ([r[0] for r in rows],)).fetchall())
     if not rows:
         return {"result": {"found": False, "reason": "section_not_held", "act_id": act_id, "act_title": held[act_id]},
                 "ids": ids()}
     found = [{"provision_id": p, "number": n, "heading": h, "status": status[p]} for p, _, n, h in rows]
-    result = found[0] if len(found) == 1 else {"ambiguous": True, "candidates": found}
+    result = found[0] if len(found) == 1 else {"ambiguous": True, "candidates": [
+        f | {"versions": versions.get(f["provision_id"], [])} for f in found]}
     return {"result": {"found": True, "act_title": held[act_id], **result}, "ids": ids(section=[f["provision_id"]
                                                                                               for f in found])}
 
@@ -140,9 +152,17 @@ def title_search(conn, name):
         rows = [r for r in rows if r[6] == n]
     # ponytail: a word in exactly one title of our ~10% sample confirms that case even if the user meant another;
     # upgrade: confirm single-word matches with the user instead.
+    confirmed = {r[0] for r in rows if r[6] == n and (n >= 2 or r[8] == 1)}
+    if rows and not confirmed and rows[0][8] > 1:   # several matches: a tie-break on every word, 'Attorney' included
+        every = [rf"\m{w}\M" for w in dict.fromkeys(re.findall(r"[A-Za-z]{3,}", name.lower())) if w not in NOT_PARTY]
+        one = conn.execute("""SELECT judgment_id, title, court, decision_date::text, neutral_citation, source_url
+                              FROM judgments WHERE duplicate_of IS NULL AND title ~* ALL(%s) LIMIT 2""",
+                           (every,)).fetchall()
+        if len(every) > n and len(one) == 1:
+            confirmed = {one[0][0]}
+            rows = [(*one[0], n)] + [r for r in rows if r[0] != one[0][0]]
     return [dict(zip(("judgment_id", "title", "court", "decision_date", "neutral_citation", "source_url",
-                      "words_matched"), r[:7]), words_total=n, confirmed=r[6] == n and (n >= 2 or r[8] == 1))
-            for r in rows]
+                      "words_matched"), r[:7]), words_total=n, confirmed=r[0] in confirmed) for r in rows]
 
 
 def find_case(citation: str):

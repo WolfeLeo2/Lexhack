@@ -51,6 +51,12 @@ def test_search_and_cases():
     expect("unique word: confirmed", out["result"]["title_matches"][0]["confirmed"], True)
     expect("unique word: its rulings", any(e["provision_id"] == S194 for e in out["result"]["events"]), True)
     expect("unique word: not ambiguous", out["result"]["ambiguous"], False)
+    out = tools.find_case("Kimaru & 17 others v Attorney General")   # 'kimaru' alone is in 4 titles; all words: one
+    expect("full name breaks the tie", (out["ids"]["judgment"], out["result"]["ambiguous"]),
+           (["ke/judgment/kehc/2022/114"], False))
+    expect("full name: its rulings", len(out["ids"]["event"]) > 0, True)
+    out = tools.find_case("Republic v Mwangi")   # many titles have both words
+    expect("common full name: ambiguous, no events", (out["result"]["ambiguous"], out["ids"]["event"]), (True, []))
     out = tools.find_case("Mwangi")   # one word in many titles: no rulings from unrelated judgments
     expect("one word: no rulings", out["ids"]["event"], [])
     expect("one word: unconfirmed, ambiguous", (any(t["confirmed"] for t in out["result"]["title_matches"]),
@@ -109,7 +115,15 @@ def test_find_section():
                                            len(out["result"]["candidates"])), (True, True, 2))
     expect("duplicate number: all ids", sorted(out["ids"]["section"]),
            sorted(c["provision_id"] for c in out["result"]["candidates"]))
-    expect("employment act: date picks one", "ambiguous" in tools.find_section("Employment Act", "45")["result"], False)
+    out = tools.find_section("Employment Act", "45")   # renumbered in 2022: rulings sit on the old ID
+    cands = {c["provision_id"]: c for c in out["result"].get("candidates", [])}
+    expect("employment act s.45: both ids", (out["result"].get("ambiguous"), sorted(out["ids"]["section"])),
+           (True, ["ke/act/cap-226/part_VI__sec_45", "ke/act/cap-226/sec_45"]))
+    expect("employment act s.45: old id carries the ruling",
+           cands.get("ke/act/cap-226/sec_45", {}).get("status", "").startswith("limited"), True)
+    expect("employment act s.45: version dates", all(c["versions"] for c in cands.values()), True)
+    expect("employment act: no ruling on either id, date picks one",
+           "ambiguous" in tools.find_section("Employment Act", "1")["result"], False)
     for sec in ("", "two hundred and four"):
         expect(f"no number {sec!r}", tools.find_section("Penal Code", sec)["result"]["reason"], "no_section_number")
 

@@ -51,8 +51,9 @@ Rules:
 
 Look things up before answering: find_section when an Act and section are named, search_sections when no section
 number is given, get_section for status and rulings, find_case for a named case. When find_case says ambiguous, list
-the possible cases and ask the user which one they mean; don't describe any of them as the case. Answer briefly, in
-plain English."""
+the possible cases and ask the user which one they mean; don't describe any of them as the case. When find_section
+lists candidates for a section renumbered between versions, report both IDs and say which one carries the rulings.
+Answer briefly, in plain English."""
 
 
 def generate(body, api_key):
