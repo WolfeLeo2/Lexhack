@@ -21,11 +21,22 @@ Fail an answer for exactly one of these faults (the most serious if several):
    "Yes, but limited by…" with the limit stated is fine; "Yes, it is valid law." for a limited section is not.
 4. `lead_as_status`: presents a ruling whose `verified` is false as settling the status. Mentioning an unverified lead
    as unverified (or as not yet checked) is fine; only presenting it as deciding the status is this fault.
+5. `misattributes`: either of two things.
+   - Presenting a ruling as current when it isn't: the prose describes a ruling as currently governing, or omits that
+     it no longer governs, when the steps show its `state` as "displaced by a later ruling" or "reversed on appeal"
+     and the answer relies on it for what the law is now. Narrating the history in order and ending on the ruling in
+     effect is fine.
+   - Getting who checked a ruling wrong: the prose says a ruling was checked by a person, by an AI reviewer or by
+     Kenya Law's reviser's note, or that it is unverified, when its `verified_by` in the steps says otherwise.
+     `human:` means a person, `agent:` an AI reviewer, `source:` Kenya Law's reviser's note; anything else (or none)
+     means unverified.
+   Rendered text appends a ruling's state when it isn't in effect (e.g. "; displaced by a later ruling"), so judge
+   the prose around it, not that label.
 
 Otherwise pass. Do not fail an answer for being short, for style, or for not citing something: other checks count
 citations. "[unverified reference removed]" is also counted elsewhere; judge the rest of the answer. Statutory events
 labelled "from Kenya Law's reviser's note" are Parliament's amendments or repeals, not court rulings and not checked
 by an AI reviewer; that label is correct, not a fault.
 
-Write your output as a JSON array, one object per item: {"qid", "verdict": "pass"|"fail", "fault": one of the four or
+Write your output as a JSON array, one object per item: {"qid", "verdict": "pass"|"fail", "fault": one of the five or
 null, "reason": one sentence quoting the words at fault}.
