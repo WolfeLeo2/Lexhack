@@ -4,6 +4,7 @@
   uv run python -m ground_truth.eval_agent --selftest       # the scoring rules on hand-made answers
   uv run python -m ground_truth.eval_agent --set dev        # run + score; answers for the grader
   uv run python -m ground_truth.eval_agent --set heldout    # once, after tuning on dev
+  uv run python -m ground_truth.eval_agent --set heldout2   # fresh held-out set, once, after the 2026-10-02 fixes
 
 Scored in code: invented references (the headline), model-written quotes, section found, key rulings cited, not-held
 wording. The judgement calls (contradicts the status, advice, verdict, lead as status) go to the answer-grader agent.
@@ -145,7 +146,7 @@ def evaluate(name):
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("--set", choices=["dev", "heldout"])
+    ap.add_argument("--set", choices=["dev", "heldout", "heldout2"])
     ap.add_argument("--facts", action="store_true")
     ap.add_argument("--selftest", action="store_true")
     a = ap.parse_args()

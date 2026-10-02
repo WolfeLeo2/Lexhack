@@ -27,7 +27,7 @@ async def stdio():
     async with stdio_client(params) as (r, w), ClientSession(r, w) as s:
         await s.initialize()
         names = sorted(t.name for t in (await s.list_tools()).tools)
-        expect("six tools", len(names), 6)
+        expect("seven tools", len(names), 7)
         res = await s.call_tool("get_section", {"provision_id": S204})
         body = json.loads(res.content[0].text)
         expect("s.204 status present", bool(body.get("status")), True)
@@ -40,7 +40,7 @@ def http():
         r = c.post("/mcp", headers={"accept": "application/json, text/event-stream"},
                    json={"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}})
         expect("public Host accepted", r.status_code, 200)
-        expect("tools over HTTP", len(r.json()["result"]["tools"]), 6)
+        expect("tools over HTTP", len(r.json()["result"]["tools"]), 7)
         expect("REST still served", c.get("/api/acts").status_code, 200)
 
 

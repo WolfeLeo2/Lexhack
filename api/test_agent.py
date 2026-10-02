@@ -34,6 +34,13 @@ def test_render():
     expect("invented and malformed counted", invented, 2)
     expect("malformed removed", out.count("[unverified reference removed]"), 2)
     expect("no raw refs left", "[[" in out, False)
+    expect("in-effect ruling: no state", "displaced" in out or "reversed" in out, False)
+    with main.db() as conn:   # on s.204 the 2017 Muruatetu rulings are displaced by the 2021 directions
+        from .status import provision_status
+        d = next(e["event_id"] for e in provision_status(conn, S204)["history"]
+                 if e["state"] == "displaced by a later ruling")
+        dout, _ = agent.render(f"[[event:{d}]]", {"event": [str(d)]}, conn)
+    expect("displaced ruling: state shown", "; displaced by a later ruling)" in dout, True)
 
 
 def fake_model(replies, bodies=None):

@@ -6,6 +6,11 @@ work; nothing here queries what an endpoint already answers.
 """
 import inspect
 import re
+from datetime import date
+
+from pipeline.extract_citations import CAPS, canonical, pick_provision, provision_lookup
+
+from .status import statuses
 
 MAX_TEXT, MAX_HISTORY, MAX_QUOTE = 3000, 15, 600
 TYPES = {str: "string", int: "integer", bool: "boolean"}
@@ -58,6 +63,29 @@ def get_section(provision_id: str, include_leads: bool = False):
                                          judgment=sorted({e["judgment_id"] for e in shown if e["judgment_id"]}))}
 
 
+def find_section(act: str, section: str):
+    """Use this whenever the user names an Act and a section number (e.g. act 'Penal Code' or 'Cap. 63', section
+    '204', 's.8(2)', 'Article 50'), before saying anything is not held. found: true gives the provision_id and
+    status (call get_section for the rulings); reason section_not_held: Hakiki holds the Act but not that section;
+    reason act_not_held: Hakiki doesn't hold the Act (list_acts has the Acts it holds)."""
+    cap = re.search(r"\bcap\.?\s*(\d+[a-z]?)\b", act, re.I)   # the extractor's Cap numbers and Act names
+    slug = CAPS.get(cap.group(1).lower()) if cap else canonical(re.sub(r"\(.*?\)|,?\s*\d{4}\s*$", "", act))[1]
+    number = re.search(r"\d+[A-Z]{0,2}", section.upper())
+    with main.db() as conn:
+        held = slug and conn.execute("SELECT act_id, title FROM acts WHERE act_id = %s", (f"ke/act/{slug}",)).fetchone()
+        if not held:
+            return {"result": {"found": False, "reason": "act_not_held"}, "ids": ids()}
+        pid = number and pick_provision(provision_lookup(conn), slug, number.group(0), date.today())
+        if not pid:
+            return {"result": {"found": False, "reason": "section_not_held", "act_id": held[0], "act_title": held[1]},
+                    "ids": ids()}
+        number, heading = conn.execute("SELECT number, heading FROM provisions WHERE provision_id = %s",
+                                       (pid,)).fetchone()
+        status = statuses(conn, [pid])[pid]
+    return {"result": {"found": True, "provision_id": pid, "act_title": held[1], "number": number, "heading": heading,
+                       "status": status}, "ids": ids(section=[pid])}
+
+
 def citing_judgments(provision_id: str, limit: int = 10):
     """Judgments Hakiki holds that cite a section, highest court first, then newest."""
     c = main.citations(provision_id, min(limit, 20), 0).model_dump()
@@ -66,13 +94,13 @@ def citing_judgments(provision_id: str, limit: int = 10):
 
 def title_search(conn, name):
     """Titles with every party word (whole words); only if none, titles missing one word (needs 3+ words). Judgments
-    with checked rulings first, then newest. confirmed: every word matched and there are 2+ (one word, e.g. 'Mwangi',
-    is in too many titles to name a case)."""
+    with checked rulings first, then newest. confirmed: every word matched and there are 2+, or the one word is in
+    exactly one held title ('Okuta' names a case; 'Mwangi', in hundreds of titles, doesn't)."""
     words = [rf"\m{w}\M" for w in dict.fromkeys(re.findall(r"[A-Za-z]{3,}", name.lower())) if w not in NAME_NOISE][:6]
     if not words:
         return []
     n = len(words)
-    rows = conn.execute("""SELECT * FROM (
+    rows = conn.execute("""SELECT *, count(*) OVER () FROM (   -- the count: matching titles before the LIMIT
                              SELECT judgment_id, title, court, decision_date::text AS d, neutral_citation, source_url,
                                     (SELECT count(*) FROM unnest(%s::text[]) w WHERE j.title ~* w) AS hits,
                                     EXISTS (SELECT 1 FROM citation_events e WHERE e.judgment_id = j.judgment_id
@@ -83,14 +111,16 @@ def title_search(conn, name):
     if rows and rows[0][6] == n:   # all-words matches exist: drop the partial ones
         rows = [r for r in rows if r[6] == n]
     return [dict(zip(("judgment_id", "title", "court", "decision_date", "neutral_citation", "source_url",
-                      "words_matched"), r[:7]), words_total=n, confirmed=n >= 2 and r[6] == n) for r in rows]
+                      "words_matched"), r[:7]), words_total=n, confirmed=r[6] == n and (n >= 2 or r[8] == 1))
+            for r in rows]
 
 
 def find_case(citation: str):
     """Look up a case, e.g. 'Muruatetu & another v Republic [2017] eKLR' or '[2017] KESC 2 (KLR)'. Result per case:
     found | name_mismatch | possible_match | not_in_collection (Hakiki holds ~10% of judgments: not_in_collection never
     means the case doesn't exist). With only party names, returns title matches with words_matched / words_total and
-    confirmed: a title matching only some of the words, or a single party word, is not a confirmed case. Also lists
+    confirmed: a title matching only some of the words, or a single party word in several titles, is not a confirmed
+    case (ambiguous: several matches, none confirmed: ask the user which case they mean). Also lists
     the checked rulings Hakiki records from the judgments found by citation or by a confirmed title (none from
     unconfirmed matches, which can't be referenced). Possible matches are listed but not confirmed, and carry no
     rulings."""
@@ -103,7 +133,8 @@ def find_case(citation: str):
                   for r in conn.execute("""SELECT event_id, provision_id, event_type, judgment_id, verified_by
                                            FROM citation_events WHERE judgment_id = ANY(%s) AND verified
                                            ORDER BY event_id""", (ruled,))]
-    return {"result": {"cases": cases, "title_matches": titles, "events": events},
+    ambiguous = len(titles) > 1 and not any(t["confirmed"] for t in titles)
+    return {"result": {"cases": cases, "title_matches": titles, "ambiguous": ambiguous, "events": events},
             "ids": ids(section=sorted({e["provision_id"] for e in events}), event=[e["event_id"] for e in events],
                        judgment=ruled)}
 
@@ -134,7 +165,8 @@ def check_text(text: str):
     return {"result": out, "ids": ids(section=sorted(sec), event=sorted(ev), judgment=sorted(jud))}
 
 
-TOOLS = {f.__name__: f for f in (list_acts, search_sections, get_section, citing_judgments, find_case, check_text)}
+TOOLS = {f.__name__: f for f in (list_acts, search_sections, get_section, find_section, citing_judgments, find_case,
+                                  check_text)}
 
 
 def call(name, args):

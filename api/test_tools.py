@@ -16,8 +16,8 @@ def expect(name, got, want):
 
 def test_declarations():
     d = {x["name"]: x for x in tools.DECLARATIONS}
-    expect("six tools", sorted(d), sorted(["list_acts", "search_sections", "get_section", "citing_judgments",
-                                           "find_case", "check_text"]))
+    expect("seven tools", sorted(d), sorted(["list_acts", "search_sections", "get_section", "find_section",
+                                             "citing_judgments", "find_case", "check_text"]))
     expect("required arg", d["get_section"]["parameters"]["required"], ["provision_id"])
     expect("bool type", d["get_section"]["parameters"]["properties"]["include_leads"], {"type": "boolean"})
     expect("no params", "parameters" in d["list_acts"], False)
@@ -46,12 +46,15 @@ def test_search_and_cases():
     out = tools.find_case("Jacqueline Okuta & another v Attorney General & 2 others [2017] eKLR")
     expect("Okuta found", out["result"]["cases"][0]["result"], "found")
     expect("Okuta events", any(e["provision_id"] == S194 for e in out["result"]["events"]), True)
-    out = tools.find_case("Okuta")
+    out = tools.find_case("Okuta")   # one word in exactly one held title: that case
     expect("name only falls back to titles", len(out["result"]["title_matches"]) > 0, True)
-    expect("one word: unconfirmed, no ids", (out["result"]["title_matches"][0]["confirmed"], out["ids"]["judgment"]),
-           (False, []))
+    expect("unique word: confirmed", out["result"]["title_matches"][0]["confirmed"], True)
+    expect("unique word: its rulings", any(e["provision_id"] == S194 for e in out["result"]["events"]), True)
+    expect("unique word: not ambiguous", out["result"]["ambiguous"], False)
     out = tools.find_case("Mwangi")   # one word in many titles: no rulings from unrelated judgments
     expect("one word: no rulings", out["ids"]["event"], [])
+    expect("one word: unconfirmed, ambiguous", (any(t["confirmed"] for t in out["result"]["title_matches"]),
+                                                out["result"]["ambiguous"]), (False, True))
     out = tools.find_case("the ruling in Kimaru v Attorney General; Kenya National Human Rights and Equality "
                           "Commission")   # 9 titles say Kimaru; Okimaru isn't one
     expect("name only: held case with rulings first", out["ids"]["judgment"][:1], ["ke/judgment/kehc/2022/114"])
@@ -76,6 +79,25 @@ def test_search_and_cases():
     expect("possible match: no candidate event", [e for e in out["result"]["events"] if e["judgment_id"] in cand], [])
 
 
+def test_find_section():
+    out = tools.find_section("Penal Code", "189")
+    expect("found s.189", (out["result"]["found"], out["result"]["status"]), (True, "repealed"))
+    expect("s.189 id", out["ids"]["section"], [out["result"]["provision_id"]])
+    expect("cap number", tools.find_section("cap 63", "204")["result"]["provision_id"], S204)
+    expect("s. prefix", tools.find_section("Cap. 63", "s.204")["result"]["provision_id"], S204)
+    expect("lower case", tools.find_section("penal code", "194")["result"]["provision_id"], S194)
+    expect("subsection", tools.find_section("Sexual Offences Act", "8(2)")["result"]["number"], "8")
+    expect("article", tools.find_section("Constitution", "Article 50")["result"]["found"], True)
+    expect("year after the name", tools.find_section("Constitution of Kenya 2010", "50")["result"]["found"], True)
+    expect("cap in brackets", tools.find_section("Penal Code (Cap. 63)", "204")["result"].get("provision_id"), S204)
+    out = tools.find_section("Penal Code", "999")
+    expect("section not held", (out["result"]["found"], out["result"]["reason"], out["result"]["act_id"]),
+           (False, "section_not_held", "ke/act/cap-63"))
+    expect("section not held: no ids", out["ids"]["section"], [])
+    expect("act not held", tools.find_section("Land Registration Act", "26")["result"],
+           {"found": False, "reason": "act_not_held"})
+
+
 def test_call():
     expect("dispatch", tools.call("list_acts", {})["result"][0].keys() >= {"act_id", "title"}, True)
     out = tools.citing_judgments(S204, 3)
@@ -85,7 +107,7 @@ def test_call():
 
 def main_():
     with main.POOL:   # opens the pool and closes it on exit
-        for t in (test_declarations, test_get_section, test_search_and_cases, test_call):
+        for t in (test_declarations, test_get_section, test_find_section, test_search_and_cases, test_call):
             t()
     for f in fails:
         print("FAIL", *f)
