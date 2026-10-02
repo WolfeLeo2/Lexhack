@@ -16,3 +16,13 @@ Provenance of changes after the agent wrote the sets: d18, h26 and h27 replaced 
 (Anarita Karimi Njeru, Matemu v Trusted Society, Ayuma v Kenya Railways scheme); the new not-held cases (Rose Wangui
 Mambo v Limuru Country Club, Ann Njogu v AG, KACC v Online Enterprises) have no title match in `judgments`. Repealed
 rows confirmed `repealed`; no_rulings rows have no verified court events. d07 and h14 kept as written.
+
+## Fresh held-out set (2026-10-02)
+
+- `agent_questions_heldout2.csv` (30, qids n01..n30): written after the first held-out set was scored, to measure the
+  2026-10-02 fixes (`find_section`, single-word case names, ruling state in rendering). No section in common with dev;
+  it may reuse sections of the first held-out set, with new questions. Kinds: status 5, topic 5, case 6 (2+ by a single
+  party word), history 3, repealed 2, no_rulings 2, not_held 4, advice 3. Checked mechanically (provisions and events
+  exist and belong to their rows, no dev overlap, repealed/no-rulings statuses confirmed). n26 and n27 replaced:
+  Mitu-Bell and BAT v Ministry of Health are held; replaced with Mukisa Biscuit and Giella v Cassman Brown (no title
+  match). Scored once.
