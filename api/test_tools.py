@@ -55,6 +55,17 @@ def test_search_and_cases():
     expect("full name breaks the tie", (out["ids"]["judgment"], out["result"]["ambiguous"]),
            (["ke/judgment/kehc/2022/114"], False))
     expect("full name: its rulings", len(out["ids"]["event"]) > 0, True)
+    for q in ("Summarise the ruling in Kimaru & 17 others v Attorney General",
+              "Did the court in Kimaru & 17 others v Attorney General strike anything down?"):
+        expect(f"question around a full name: {q}", tools.find_case(q)["ids"]["judgment"],
+               ["ke/judgment/kehc/2022/114"])
+    for q in ("What did the court hold in Republic v Mwangi?",   # 'court' once tied this to an unrelated case
+              "What did the High Court and the Court of Appeal decide in Republic v Mwangi?"):
+        out = tools.find_case(q)
+        expect(f"question, court words don't count: {q}", (out["result"]["ambiguous"], out["ids"]["event"],
+               any(t["confirmed"] for t in out["result"]["title_matches"])), (True, [], False))
+    expect("party span", tools.party_span("What did the High Court decide in Okuta v Attorney General on criminal "
+                                          "defamation?"), "Okuta v Attorney General")
     out = tools.find_case("Republic v Mwangi")   # many titles have both words
     expect("common full name: ambiguous, no events", (out["result"]["ambiguous"], out["ids"]["event"]), (True, []))
     out = tools.find_case("Mwangi")   # one word in many titles: no rulings from unrelated judgments

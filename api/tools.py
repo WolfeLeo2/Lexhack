@@ -18,8 +18,10 @@ NAME_NOISE = {"the", "and", "another", "others", "republic", "attorney", "genera
               "kehc", "klr", "ruling", "judgment", "case", "court", "summarise", "summarize", "what", "did", "hold",
               "held", "about", "ors", "anor", "petition", "appeal", "high", "supreme", "decision", "kenya", "county",
               "commissioner", "judgement"}
-NOT_PARTY = {"the", "and", "for", "summarise", "summarize", "what", "did", "hold", "held", "about", "ruling",
-             "judgment", "judgement", "case", "decision"}   # never in a party name: left out of the full-name tie-break too
+# Never party words, so never in the full-name tie-break; 'Republic', 'Attorney', 'General', 'others' do count there
+NOT_PARTY = {"the", "and", "for", "court", "courts", "judge", "judges", "justice", "petition", "application", "appeal",
+             "high", "supreme", "magistrate", "magistrates", "tribunal", "ruling", "judgment", "judgement", "case",
+             "matter", "decision", "ekl", "eklr", "kesc", "keca", "kehc", "klr", "ors", "anor"}
 
 
 def ids(section=(), event=(), judgment=()):
@@ -132,11 +134,27 @@ def citing_judgments(provision_id: str, limit: int = 10):
     return {"result": c, "ids": ids(judgment=[j["judgment_id"] for j in c["judgments"]])}
 
 
+def party_span(text):
+    """'What did the court hold in Kimaru & 17 others v Attorney General on X?' -> 'Kimaru & 17 others v Attorney
+    General': filing.cited_name drops the lead-in; the name ends at the first lowercase word after the 'v'. None
+    without a 'v'."""
+    words = (filing.cited_name(text, len(text)) or "").split()
+    vi = next((i for i, w in enumerate(words) if w.lower() in filing.V), None)
+    if vi is None:
+        return None
+    end = next((i for i in range(vi + 1, len(words)) if words[i][0].islower() and words[i] not in filing.GLUE),
+               len(words))
+    return " ".join(words[:end]).rstrip("?.,;") or None
+
+
 def title_search(conn, name):
     """Titles with every party word (whole words); only if none, titles missing one word (needs 3+ words). Judgments
     with checked rulings first, then newest. confirmed: every word matched and there are 2+, or the one word is in
-    exactly one held title ('Okuta' names a case; 'Mwangi', in hundreds of titles, doesn't)."""
-    words = [rf"\m{w}\M" for w in dict.fromkeys(re.findall(r"[A-Za-z]{3,}", name.lower())) if w not in NAME_NOISE][:6]
+    exactly one held title ('Okuta' names a case; 'Mwangi', in hundreds of titles, doesn't), or, among several
+    matches, exactly one title has every party word of the 'X v Y' span ('Attorney General' included)."""
+    span = party_span(name)   # 'X v Y' inside a question: only its words name the case
+    words = [rf"\m{w}\M" for w in dict.fromkeys(re.findall(r"[A-Za-z]{3,}", (span or name).lower()))
+             if w not in NAME_NOISE][:6]
     if not words:
         return []
     n = len(words)
@@ -153,8 +171,8 @@ def title_search(conn, name):
     # ponytail: a word in exactly one title of our ~10% sample confirms that case even if the user meant another;
     # upgrade: confirm single-word matches with the user instead.
     confirmed = {r[0] for r in rows if r[6] == n and (n >= 2 or r[8] == 1)}
-    if rows and not confirmed and rows[0][8] > 1:   # several matches: a tie-break on every word, 'Attorney' included
-        every = [rf"\m{w}\M" for w in dict.fromkeys(re.findall(r"[A-Za-z]{3,}", name.lower())) if w not in NOT_PARTY]
+    if span and rows and not confirmed and rows[0][8] > 1:   # several matches: tie-break on every party word
+        every = [rf"\m{w}\M" for w in dict.fromkeys(re.findall(r"[A-Za-z]{3,}", span.lower())) if w not in NOT_PARTY]
         one = conn.execute("""SELECT judgment_id, title, court, decision_date::text, neutral_citation, source_url
                               FROM judgments WHERE duplicate_of IS NULL AND title ~* ALL(%s) LIMIT 2""",
                            (every,)).fetchall()
