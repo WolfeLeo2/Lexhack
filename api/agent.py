@@ -16,7 +16,7 @@ from pathlib import Path
 import requests
 
 from . import main, tools
-from .status import provision_status, statuses
+from .status import RULES, load_events_many, statuses, with_leads
 
 MODEL, MAX_ROUNDS = "gemini-3.5-flash-lite", 8
 URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
@@ -39,8 +39,10 @@ Rules:
 3. Only use IDs that a tool returned in this conversation, copied character for character: a section ID is the full
    provision_id (shaped like ke/act/<act>/<eid>), never a bare number. Never guess or shorten an ID.
 4. Say something (a case, an Act, a section) is not in Hakiki's collection only after list_acts, find_section or
-   find_case said so; when the user names an Act and a section, call find_section first. Hakiki holds about 10% of
-   judgments, so never say a case does not exist or is fake.
+   find_case said so; when the user names an Act and a section, call find_section first. find_section's
+   act_not_recognised means the name didn't match the held Acts it lists: if the user's Act is one of those titles
+   under another name, retry with that title; say the Act is not in Hakiki's collection only if it clearly isn't one
+   of them. Hakiki holds about 10% of judgments, so never say a case does not exist or is fake.
 5. Say whether each ruling was checked by a person (verified_by 'human:...') or by an AI reviewer ('agent:...'); verified_by
    'source:...' means the event was transcribed from Kenya Law's reviser's notes. Never present an unverified lead as
    the status.
@@ -138,8 +140,9 @@ def render(answer, seen, conn):
                   j.court, j.source_url, e.provision_id FROM citation_events e LEFT JOIN judgments j USING (judgment_id)
            WHERE e.event_id = ANY(%s)""", ([int(v) for k, v in good if k == "event" and v.isdigit()],))}
     # each cited ruling's state from the resolver (leads included, so an unverified one has a state too)
-    state = {str(e["event_id"]): e["state"] for p in {r[-1] for r in ev.values()}
-             for e in provision_status(conn, p, include_unverified=True)["history"]}
+    state = {str(e["event_id"]): e["state"]
+             for p, es in load_events_many(conn, {r[-1] for r in ev.values()}, include_unverified=True).items()
+             for e in with_leads(RULES[p.split("/", 1)[0]].resolve, es)["history"]}   # one query, as statuses()
     sec_ids = [v for k, v in good if k == "section"]
     sec = {r[0]: r[1:] for r in conn.execute(
         """SELECT p.provision_id, a.title, p.number, p.heading FROM provisions p JOIN acts a USING (act_id)

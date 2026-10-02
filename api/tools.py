@@ -8,7 +8,7 @@ import inspect
 import re
 from datetime import date
 
-from pipeline.extract_citations import CAPS, canonical, pick_provision, provision_lookup
+from pipeline.extract_citations import canonical, pick_provision
 
 from .status import statuses
 
@@ -63,27 +63,55 @@ def get_section(provision_id: str, include_leads: bool = False):
                                          judgment=sorted({e["judgment_id"] for e in shown if e["judgment_id"]}))}
 
 
+def act_key(name):
+    """'The Penal Code Act' / 'Sexual Offences Act No. 3 of 2006' / 'KICA Act' -> 'penal code' / 'sexual offences' /
+    'kica': for whole-name comparison with the held Acts' titles."""
+    name = re.sub(r"\(.*?\)|\bno\.?\s*\d+\s+of\s+\d{4}|\d{4}|[^\w\s]", " ", name.lower())
+    return re.sub(r"^the\s+|\s+act$", "", " ".join(name.split()))
+
+
+def held_act_id(act, held):
+    """An Act as the user names it -> its act_id if held ({act_id: title}), else None."""
+    cap = re.search(r"\bcap\.?\s*(\d+[a-z]?)\b", act, re.I)
+    name = re.sub(r"\bCode\s+Act\b", "Code", re.sub(r"\bNo\.?\s*\d+\s+of\s+\d{4}|\(.*?\)|,?\s*\d{4}\s*$", "", act,
+                                                     flags=re.I), flags=re.I)
+    keys = {act_key(t): a for a, t in held.items()} | {"kica": "ke/act/cap-411a"}
+    slug = canonical(name)[1]   # the extractor's Act names first, then a held Cap number, then a title
+    act_id = ((f"ke/act/{slug}" if slug else None) or (cap and f"ke/act/cap-{cap.group(1).lower()}")
+              or keys.get(act_key(name)))
+    return act_id if act_id in held else None
+
+
 def find_section(act: str, section: str):
     """Use this whenever the user names an Act and a section number (e.g. act 'Penal Code' or 'Cap. 63', section
     '204', 's.8(2)', 'Article 50'), before saying anything is not held. found: true gives the provision_id and
-    status (call get_section for the rulings); reason section_not_held: Hakiki holds the Act but not that section;
-    reason act_not_held: Hakiki doesn't hold the Act (list_acts has the Acts it holds)."""
-    cap = re.search(r"\bcap\.?\s*(\d+[a-z]?)\b", act, re.I)   # the extractor's Cap numbers and Act names
-    slug = CAPS.get(cap.group(1).lower()) if cap else canonical(re.sub(r"\(.*?\)|,?\s*\d{4}\s*$", "", act))[1]
-    number = re.search(r"\d+[A-Z]{0,2}", section.upper())
+    status (call get_section for the rulings); found with ambiguous: true lists candidates (one number in two Parts:
+    ask which). reason section_not_held: Hakiki holds the Act but not that section; act_not_recognised: the name
+    isn't one of held_acts (retry with the matching title from held_acts, or say the Act isn't in Hakiki's
+    collection if it clearly isn't one of them); no_section_number: give the section as a number."""
     with main.db() as conn:
-        held = slug and conn.execute("SELECT act_id, title FROM acts WHERE act_id = %s", (f"ke/act/{slug}",)).fetchone()
-        if not held:
-            return {"result": {"found": False, "reason": "act_not_held"}, "ids": ids()}
-        pid = number and pick_provision(provision_lookup(conn), slug, number.group(0), date.today())
-        if not pid:
-            return {"result": {"found": False, "reason": "section_not_held", "act_id": held[0], "act_title": held[1]},
+        held = dict(conn.execute("SELECT act_id, title FROM acts ORDER BY title").fetchall())
+        act_id = held_act_id(act, held)
+        if not act_id:
+            return {"result": {"found": False, "reason": "act_not_recognised", "held_acts": list(held.values())},
                     "ids": ids()}
-        number, heading = conn.execute("SELECT number, heading FROM provisions WHERE provision_id = %s",
-                                       (pid,)).fetchone()
-        status = statuses(conn, [pid])[pid]
-    return {"result": {"found": True, "provision_id": pid, "act_title": held[1], "number": number, "heading": heading,
-                       "status": status}, "ids": ids(section=[pid])}
+        number = re.search(r"\d+[A-Z]{0,2}", section.upper())
+        if not number:
+            return {"result": {"found": False, "reason": "no_section_number"}, "ids": ids()}
+        rows = conn.execute("SELECT provision_id, eid, number, heading FROM provisions WHERE act_id = %s AND number = %s",
+                            (act_id, number.group(0))).fetchall()
+        slug = act_id.removeprefix("ke/act/")   # pick_provision: the Employment Act's eId change by date
+        one = pick_provision({(slug, number.group(0)): [(r[1], r[0]) for r in rows]}, slug, number.group(0),
+                             date.today())
+        rows = [r for r in rows if r[0] == one] or rows
+        status = statuses(conn, [r[0] for r in rows])
+    if not rows:
+        return {"result": {"found": False, "reason": "section_not_held", "act_id": act_id, "act_title": held[act_id]},
+                "ids": ids()}
+    found = [{"provision_id": p, "number": n, "heading": h, "status": status[p]} for p, _, n, h in rows]
+    result = found[0] if len(found) == 1 else {"ambiguous": True, "candidates": found}
+    return {"result": {"found": True, "act_title": held[act_id], **result}, "ids": ids(section=[f["provision_id"]
+                                                                                              for f in found])}
 
 
 def citing_judgments(provision_id: str, limit: int = 10):
@@ -110,6 +138,8 @@ def title_search(conn, name):
                         (words, words, n - 1 if n >= 3 else n)).fetchall()
     if rows and rows[0][6] == n:   # all-words matches exist: drop the partial ones
         rows = [r for r in rows if r[6] == n]
+    # ponytail: a word in exactly one title of our ~10% sample confirms that case even if the user meant another;
+    # upgrade: confirm single-word matches with the user instead.
     return [dict(zip(("judgment_id", "title", "court", "decision_date", "neutral_citation", "source_url",
                       "words_matched"), r[:7]), words_total=n, confirmed=r[6] == n and (n >= 2 or r[8] == 1))
             for r in rows]

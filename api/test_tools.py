@@ -94,8 +94,24 @@ def test_find_section():
     expect("section not held", (out["result"]["found"], out["result"]["reason"], out["result"]["act_id"]),
            (False, "section_not_held", "ke/act/cap-63"))
     expect("section not held: no ids", out["ids"]["section"], [])
-    expect("act not held", tools.find_section("Land Registration Act", "26")["result"],
-           {"found": False, "reason": "act_not_held"})
+    out = tools.find_section("Land Registration Act", "26")["result"]
+    expect("act not recognised", (out["found"], out["reason"], "Penal Code" in out["held_acts"]),
+           (False, "act_not_recognised", True))
+    for act, sec, slug in [("Cap 7", "34", "cap-7"), ("Elections Act, Cap 7", "34", "cap-7"),
+                           ("Sexual Offences Act No. 3 of 2006", "8", "cap-63a"),
+                           ("Elections Act No. 24 of 2011", "34", "cap-7"), ("The Penal Code Act", "204", "cap-63"),
+                           ("KICA Act", "29", "cap-411a")]:
+        out = tools.find_section(act, sec)["result"]
+        expect(f"act named as {act!r}", (out["found"], (out.get("provision_id") or "").startswith(f"ke/act/{slug}/")),
+               (True, True))
+    out = tools.find_section("Law of Succession Act", "43")
+    expect("duplicate number: ambiguous", (out["result"]["found"], out["result"]["ambiguous"],
+                                           len(out["result"]["candidates"])), (True, True, 2))
+    expect("duplicate number: all ids", sorted(out["ids"]["section"]),
+           sorted(c["provision_id"] for c in out["result"]["candidates"]))
+    expect("employment act: date picks one", "ambiguous" in tools.find_section("Employment Act", "45")["result"], False)
+    for sec in ("", "two hundred and four"):
+        expect(f"no number {sec!r}", tools.find_section("Penal Code", sec)["result"]["reason"], "no_section_number")
 
 
 def test_call():
