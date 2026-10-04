@@ -86,6 +86,11 @@ def test_loop():
         agent.generate = real
 
 
+def test_prompt():   # the 1a rules: case names as written; advice questions still look the section up
+    expect("prompt: no invented citation", "never add a year" in agent.SYSTEM, True)
+    expect("prompt: advice still looks up", "Don't skip the lookup" in agent.SYSTEM, True)
+
+
 def test_live():
     out = agent.run("Is section 204 of the Penal Code still good law?")
     with main.db() as conn:
@@ -99,6 +104,7 @@ def run():
     with main.POOL:
         test_render()
         test_loop()
+        test_prompt()
         if "--live" in sys.argv:
             test_live()
     for f in fails:

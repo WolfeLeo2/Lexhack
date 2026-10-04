@@ -49,6 +49,8 @@ def score(q, out, key_ids, event_section):
         s["key_rulings"] = key_ids <= cited_events
     if q["expect_not_held"] == "yes":
         s["not_held_wording"] = bool(NOT_HELD_OK.search(out["answer"])) and not NOT_HELD_BAD.search(out["answer"])
+    else:   # a 'not held' claim where the question expects none (the Wachira fault)
+        s["false_not_held"] = int(bool(NOT_HELD_OK.search(out["answer"])))
     return s
 
 
@@ -69,18 +71,25 @@ def selftest():
         got = score(q, {"answer": text, "seen": out["seen"]}, set(), {})["not_held_wording"]
         assert got is ok, (text, got)
     q = {"expected_provisions": "p2", "expect_not_held": ""}
-    assert score(q, out, set(), {"7": "p1"}) == {"invented": 0, "model_quotes": 0, "section_found": False}
+    assert score(q, out, set(), {"7": "p1"}) == {"invented": 0, "model_quotes": 0, "section_found": False,
+                                                 "false_not_held": 0}
     q = {"expected_provisions": "", "expect_not_held": ""}   # nothing expected: neither metric applies
-    assert score(q, out, set(), {"7": "p1"}) == {"invented": 0, "model_quotes": 0}
+    assert score(q, out, set(), {"7": "p1"}) == {"invented": 0, "model_quotes": 0, "false_not_held": 0}
     q = {"expected_provisions": "p1", "expect_not_held": ""}
     out = {"answer": "[[section:p1]] [[event:7]]", "seen": {"section": [], "event": [], "judgment": []}}
     s = score(q, out, {"7"}, {"7": "p1"})   # invented but correct references earn nothing
-    assert s == {"invented": 2, "model_quotes": 0, "section_found": False, "key_rulings": False}, s
+    assert s == {"invented": 2, "model_quotes": 0, "section_found": False, "key_rulings": False,
+                 "false_not_held": 0}, s
     out = {"answer": 'It held "the mandatory nature of the death sentence" was void, “a short one” and '
                      '“to the extent that it covers other offences” [[event:7, 8]]',
            "seen": {"section": ["p1"], "event": ["7", "8"], "judgment": []}}
     s = score(q, out, set(), {})   # malformed reference is invented; two quotes of 20+ characters
-    assert s == {"invented": 1, "model_quotes": 2, "section_found": False}, s
+    assert s == {"invented": 1, "model_quotes": 2, "section_found": False, "false_not_held": 0}, s
+    q = {"expected_provisions": "p1", "expect_not_held": ""}   # held, but the answer says it isn't
+    s = score(q, {"answer": "That case is not in Hakiki's collection.", "seen": out["seen"]}, set(), {})
+    assert s["false_not_held"] == 1, s
+    q = {"expected_provisions": "", "expect_not_held": "yes"}
+    assert "false_not_held" not in score(q, {"answer": "Not in Hakiki's collection.", "seen": out["seen"]}, set(), {})
     print("selftest ok")
 
 
@@ -142,11 +151,12 @@ def evaluate(name):
         return f"; {label} {sum(totals[k])}/{len(totals[k])}" if k in totals else ""
     print(f"\n{name}: {sum(totals['invented'])} invented references in {n} answers; "
           f"{sum(totals['model_quotes'])} model-written quotes" + frac("section_found", "section found")
-          + frac("key_rulings", "key rulings") + frac("not_held_wording", "not-held wording"))
+          + frac("key_rulings", "key rulings") + frac("not_held_wording", "not-held wording")
+          + f"; {sum(totals.get('false_not_held', []))} false not-held claims")
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("--set", choices=["dev", "heldout", "heldout2"])
+    ap.add_argument("--set", choices=["dev", "heldout", "heldout2", "heldout3"])
     ap.add_argument("--facts", action="store_true")
     ap.add_argument("--selftest", action="store_true")
     a = ap.parse_args()

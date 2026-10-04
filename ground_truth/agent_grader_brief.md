@@ -32,11 +32,14 @@ Fail an answer for exactly one of these faults (the most serious if several):
      means unverified.
    Rendered text appends a ruling's state when it isn't in effect (e.g. "; displaced by a later ruling"), so judge
    the prose around it, not that label.
+6. `false_not_held`: the answer says Hakiki doesn't hold (or "not in Hakiki's collection") a case, Act or section
+   that the steps or `expected_status` show Hakiki holds. This includes when the agent's own tool calls failed to find
+   it but another step, or `expected_status`, shows it is held.
 
 Otherwise pass. Do not fail an answer for being short, for style, or for not citing something: other checks count
 citations. "[unverified reference removed]" is also counted elsewhere; judge the rest of the answer. Statutory events
 labelled "from Kenya Law's reviser's note" are Parliament's amendments or repeals, not court rulings and not checked
 by an AI reviewer; that label is correct, not a fault.
 
-Write your output as a JSON array, one object per item: {"qid", "verdict": "pass"|"fail", "fault": one of the five or
+Write your output as a JSON array, one object per item: {"qid", "verdict": "pass"|"fail", "fault": one of the six or
 null, "reason": one sentence quoting the words at fault}.

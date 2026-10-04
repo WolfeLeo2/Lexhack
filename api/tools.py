@@ -137,7 +137,8 @@ def citing_judgments(provision_id: str, limit: int = 10):
 def party_span(text):
     """'What did the court hold in Kimaru & 17 others v Attorney General on X?' -> 'Kimaru & 17 others v Attorney
     General': filing.cited_name drops the lead-in; the name ends at the first lowercase word after the 'v'. None
-    without a 'v'."""
+    without a 'v'. The name ends before a bracketed citation ('X v Y [2022] eKLR')."""
+    text = text.split("[")[0]
     words = (filing.cited_name(text, len(text)) or "").split()
     vi = next((i for i, w in enumerate(words) if w.lower() in filing.V), None)
     if vi is None:
@@ -174,8 +175,10 @@ def title_search(conn, name):
     if span and rows and not confirmed and rows[0][8] > 1:   # several matches: tie-break on every party word
         every = [rf"\m{w}\M" for w in dict.fromkeys(re.findall(r"[A-Za-z]{3,}", span.lower())) if w not in NOT_PARTY]
         one = conn.execute("""SELECT judgment_id, title, court, decision_date::text, neutral_citation, source_url
-                              FROM judgments WHERE duplicate_of IS NULL AND title ~* ALL(%s) LIMIT 2""",
+                              FROM judgments WHERE duplicate_of IS NULL AND title ~* ALL(%s) LIMIT 20""",
                            (every,)).fetchall()
+        if len(one) > 1:   # still several: the one title that starts with the name as written ('Wachira & 12 others v')
+            one = [r for r in one if r[1].lower().startswith(span.lower())]
         if len(every) > n and len(one) == 1:
             confirmed = {one[0][0]}
             rows = [(*one[0], n)] + [r for r in rows if r[0] != one[0][0]]
@@ -190,17 +193,23 @@ def find_case(citation: str):
     confirmed: a title matching only some of the words, or a single party word in several titles, is not a confirmed
     case (ambiguous: several matches, none confirmed: ask the user which case they mean). Also lists
     the checked rulings Hakiki records from the judgments found by citation or by a confirmed title (none from
-    unconfirmed matches, which can't be referenced). Possible matches are listed but not confirmed, and carry no
-    rulings."""
+    unconfirmed matches, which can't be referenced), each with its Act title and section number. Possible matches are
+    listed but not confirmed, and carry no rulings; when a citation isn't confirmed, the party names are searched too."""
     with main.db() as conn:
         cases = [f["case"] for f in filing.check(conn, citation)["findings"] if f["kind"] == "case"]
         judgments = [c["judgment"] for c in cases if c["judgment"]]   # possible_match candidates stay in cases only
-        titles = [] if cases else title_search(conn, citation)
+        # no judgment confirmed by citation (possible_match, not_in_collection, none parsed): try the party names too;
+        # a confirmed title wins over the unconfirmed candidates, which stay in cases for transparency
+        titles = [] if judgments else title_search(conn, citation)
         ruled = [j["judgment_id"] for j in judgments + titles if j.get("confirmed", True)]   # citation findings: always
-        events = [dict(zip(("event_id", "provision_id", "event_type", "judgment_id", "verified_by"), r))
-                  for r in conn.execute("""SELECT event_id, provision_id, event_type, judgment_id, verified_by
-                                           FROM citation_events WHERE judgment_id = ANY(%s) AND verified
-                                           ORDER BY event_id""", (ruled,))]
+        events = [dict(zip(("event_id", "provision_id", "event_type", "judgment_id", "verified_by", "act_title",
+                            "section_number", "heading"), r))
+                  for r in conn.execute("""SELECT e.event_id, e.provision_id, e.event_type, e.judgment_id, e.verified_by,
+                                                  a.title, p.number, p.heading
+                                           FROM citation_events e JOIN provisions p USING (provision_id)
+                                           JOIN acts a ON a.act_id = p.act_id
+                                           WHERE e.judgment_id = ANY(%s) AND e.verified
+                                           ORDER BY e.event_id""", (ruled,))]
     ambiguous = len(titles) > 1 and not any(t["confirmed"] for t in titles)
     return {"result": {"cases": cases, "title_matches": titles, "ambiguous": ambiguous, "events": events},
             "ids": ids(section=sorted({e["provision_id"] for e in events}), event=[e["event_id"] for e in events],
