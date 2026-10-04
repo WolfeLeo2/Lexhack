@@ -53,7 +53,8 @@ def test_search_and_cases():
     expect("unconfirmed citation falls back to titles", ("ke/judgment/kehc/2022/12795" in out["ids"]["judgment"],
                                                          "979" in out["ids"]["event"]), (True, True))
     for c in ("Otieno v Republic [2019] eKLR", "Republic v Kamau [2018] eKLR",   # 9 / many titles start so
-              "Joseph Otieno v Republic", "Peter Mwangi v Republic [2019] eKLR"):
+              "Joseph Otieno v Republic", "Peter Mwangi v Republic [2019] eKLR",
+              "Okuta v Republic", "Andare v Republic", "Republic v Ibrahim"):   # wrong party; a name cut short
         out = tools.find_case(c)
         expect(f"common name with citation: nothing confirmed: {c}",
                (any(t["confirmed"] for t in out["result"]["title_matches"]), out["ids"]["event"],

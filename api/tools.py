@@ -152,10 +152,10 @@ def title_search(conn, name):
     """Titles with every party word (whole words); only if none, titles missing one word (needs 3+ words). Up to 5,
     a year the user gave first, then judgments with checked rulings, then newest. One rule confirms: a title is
     confirmed only if it is the single title in the whole table left by these filters, applied in order until one
-    remains: every party word; every word of the 'X v Y' span ('Attorney General' included); starts with the span
-    as written; the year the user gave ('[2019]', '(2019)'). A filter that leaves none, or several left at the end:
-    nothing confirmed ('Okuta' names a case; 'Mwangi', in hundreds of titles, doesn't). A single survivor whose
-    [YYYY] and decision year both differ from the user's year gets year_mismatch, not confirmed."""
+    remains: every party word and every word of the 'X v Y' span ('Republic', 'Attorney General' included; always
+    required); starts with the span as written, the name ending there; the year the user gave ('[2019]', '(2019)').
+    A filter that leaves none, or several left at the end: nothing confirmed ('Okuta' names a case; 'Mwangi', in
+    hundreds of titles, doesn't). A single survivor whose [YYYY] and decision year both differ from the user's year gets year_mismatch, not confirmed."""
     span = party_span(name)   # 'X v Y' inside a question: only its words name the case
     words = [rf"\m{w}\M" for w in dict.fromkeys(re.findall(r"[A-Za-z]{3,}", (span or name).lower()))
              if w not in NAME_NOISE][:6]
@@ -178,11 +178,14 @@ def title_search(conn, name):
         rows = [r for r in rows if r[6] == n]
     # the one rule: narrow the whole table (LIMIT 2: enough to tell one from several) until a single title is left
     filters = [("title ~* ALL(%s)", (words,))]
-    if span:
+    if span:   # every span word ('Republic' included) always: 'Okuta v Republic' is not Okuta v Attorney General
         every = [rf"\m{w}\M" for w in dict.fromkeys(re.findall(r"[A-Za-z]{3,}", span.lower())) if w not in NOT_PARTY]
-        filters += [("title ~* ALL(%s)", (every,)),   # compared by prefix: no LIKE wildcards to escape
-                    ("left(lower(title), %s) = lower(%s) AND substr(title, %s, 1) IN (' ', '(', '[')",
-                     (len(span), span, len(span) + 1))]
+        filters[0] = ("title ~* ALL(%s) AND title ~* ALL(%s)", (words, every))
+        # compared by prefix (no LIKE wildcards); the name must end there: 'Republic v Ibrahim' isn't
+        # 'Republic v Ibrahim Busolo & 3 others'
+        filters.append(("left(lower(title), %s) = lower(%s) AND (substr(lower(title), %s, 3) = ' v ' OR "
+                        "substr(title, %s, 2) IN (' &', ' (', ' [') OR substr(title, %s, 1) IN ('(', '[', ''))",
+                        (len(span), span, *[len(span) + 1] * 3)))
     if year:
         filters.append((in_year, (year, year)))
     left, conds, params = [], [], []
@@ -203,7 +206,8 @@ def title_search(conn, name):
     for r in rows:
         t = dict(zip(("judgment_id", "title", "court", "decision_date", "neutral_citation", "source_url",
                       "words_matched"), r[:7]), words_total=n, confirmed=bool(one) and r[0] == one[0])
-        if year and r[6] == n and year not in re.findall(r"\[(\d{4})\]", t["title"]) + [(t["decision_date"] or "")[:4]]:
+        years = re.findall(r"\[(\d{4})\]", t["title"]) + [(t["decision_date"] or "")[:4]]
+        if year and t["confirmed"] and year not in years:   # only the survivor can be a year mismatch
             t |= {"confirmed": False, "year_mismatch": True}
         out.append(t)
     return out
