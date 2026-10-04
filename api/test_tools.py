@@ -52,11 +52,20 @@ def test_search_and_cases():
     out = tools.find_case("Wachira & 12 others v Republic & 2 others [2022] eKLR")   # eKLR path: one-word candidates
     expect("unconfirmed citation falls back to titles", ("ke/judgment/kehc/2022/12795" in out["ids"]["judgment"],
                                                          "979" in out["ids"]["event"]), (True, True))
-    for c in ("Otieno v Republic [2019] eKLR", "Republic v Kamau [2018] eKLR"):   # 9 / many titles start so
+    for c in ("Otieno v Republic [2019] eKLR", "Republic v Kamau [2018] eKLR",   # 9 / many titles start so
+              "Joseph Otieno v Republic", "Peter Mwangi v Republic [2019] eKLR"):
         out = tools.find_case(c)
         expect(f"common name with citation: nothing confirmed: {c}",
                (any(t["confirmed"] for t in out["result"]["title_matches"]), out["ids"]["event"],
                 out["ids"]["judgment"]), (False, [], []))
+    out = tools.find_case("John Kamau v Republic")   # 3 titles hold the words; one is exactly that name
+    expect("only the title named exactly so is confirmed",
+           [t["judgment_id"] for t in out["result"]["title_matches"] if t["confirmed"]], ["ke/judgment/keca/2007/472"])
+    out = tools.find_case("Muruatetu v Republic (2021)")   # 2016/2017/2021 titles: at most one confirmed
+    conf = [t for t in out["result"]["title_matches"] if t["confirmed"]]
+    print("Muruatetu (2021) confirmed:", [(t["judgment_id"], t["decision_date"]) for t in conf])
+    expect("Muruatetu (2021): at most one, of that year", all(t["decision_date"][:4] == "2021" or "[2021]" in t["title"]
+                                                             for t in conf) and len(conf) <= 1, True)
     out = tools.find_case("Okuta v Attorney General (2017)")
     expect("year agrees: confirmed", any(t["confirmed"] for t in out["result"]["title_matches"]), True)
     out = tools.find_case("Okuta v Attorney General (2015)")

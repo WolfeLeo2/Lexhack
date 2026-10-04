@@ -149,49 +149,61 @@ def party_span(text):
 
 
 def title_search(conn, name):
-    """Titles with every party word (whole words); only if none, titles missing one word (needs 3+ words). Judgments
-    with checked rulings first, then newest. confirmed: every word matched and there are 2+, or the one word is in
-    exactly one held title ('Okuta' names a case; 'Mwangi', in hundreds of titles, doesn't), or, among several
-    matches, exactly one title has every party word of the 'X v Y' span ('Attorney General' included), or exactly
-    one such title starts with the span as written. A year in the input ('[2019]', '(2019)') that differs from the
-    title's [YYYY] and its decision year blocks confirmation: that match gets year_mismatch."""
+    """Titles with every party word (whole words); only if none, titles missing one word (needs 3+ words). Up to 5,
+    a year the user gave first, then judgments with checked rulings, then newest. One rule confirms: a title is
+    confirmed only if it is the single title in the whole table left by these filters, applied in order until one
+    remains: every party word; every word of the 'X v Y' span ('Attorney General' included); starts with the span
+    as written; the year the user gave ('[2019]', '(2019)'). A filter that leaves none, or several left at the end:
+    nothing confirmed ('Okuta' names a case; 'Mwangi', in hundreds of titles, doesn't). A single survivor whose
+    [YYYY] and decision year both differ from the user's year gets year_mismatch, not confirmed."""
     span = party_span(name)   # 'X v Y' inside a question: only its words name the case
     words = [rf"\m{w}\M" for w in dict.fromkeys(re.findall(r"[A-Za-z]{3,}", (span or name).lower()))
              if w not in NAME_NOISE][:6]
     if not words:
         return []
     n = len(words)
-    rows = conn.execute("""SELECT *, count(*) OVER () FROM (   -- the count: matching titles before the LIMIT
+    y = re.search(r"[\[(]\s*((?:19|20)\d\d)\s*[\])]", name)
+    year = y and y[1]
+    in_year = "(position('[' || %s || ']' in title) > 0 OR extract(year FROM decision_date)::int::text = %s)"
+    rows = conn.execute(f"""SELECT * FROM (
                              SELECT judgment_id, title, court, decision_date::text AS d, neutral_citation, source_url,
                                     (SELECT count(*) FROM unnest(%s::text[]) w WHERE j.title ~* w) AS hits,
                                     EXISTS (SELECT 1 FROM citation_events e WHERE e.judgment_id = j.judgment_id
-                                            AND e.verified) AS ruled
+                                            AND e.verified) AS ruled,
+                                    coalesce({in_year}, false) AS ym
                              FROM judgments j WHERE duplicate_of IS NULL AND title ~* ANY(%s)) x
-                           WHERE hits >= %s ORDER BY hits DESC, ruled DESC, d DESC NULLS LAST LIMIT 5""",
-                        (words, words, n - 1 if n >= 3 else n)).fetchall()
+                           WHERE hits >= %s ORDER BY hits DESC, ym DESC, ruled DESC, d DESC NULLS LAST LIMIT 5""",
+                        (words, year, year, words, n - 1 if n >= 3 else n)).fetchall()
     if rows and rows[0][6] == n:   # all-words matches exist: drop the partial ones
         rows = [r for r in rows if r[6] == n]
-    # ponytail: a word in exactly one title of our ~10% sample confirms that case even if the user meant another;
-    # upgrade: confirm single-word matches with the user instead.
-    confirmed = {r[0] for r in rows if r[6] == n and (n >= 2 or r[8] == 1)}
-    if span and rows and not confirmed and rows[0][8] > 1:   # several matches: tie-break on every party word
+    # the one rule: narrow the whole table (LIMIT 2: enough to tell one from several) until a single title is left
+    filters = [("title ~* ALL(%s)", (words,))]
+    if span:
         every = [rf"\m{w}\M" for w in dict.fromkeys(re.findall(r"[A-Za-z]{3,}", span.lower())) if w not in NOT_PARTY]
-        sql = """SELECT judgment_id, title, court, decision_date::text, neutral_citation, source_url
-                 FROM judgments WHERE duplicate_of IS NULL AND title ~* ALL(%s) {} LIMIT 2"""
-        one = conn.execute(sql.format(""), (every,)).fetchall()
-        if len(one) > 1:   # still several: unique across the table among titles starting with the name as written
-            # ('Wachira & 12 others v Republic & 2 others (Petition ...'); compared by prefix, so no LIKE wildcards
-            starts = "AND left(lower(title), %s) = lower(%s) AND substr(title, %s, 1) IN (' ', '(', '[')"
-            one = conn.execute(sql.format(starts), (every, len(span), span, len(span) + 1)).fetchall()
-        if len(every) > n and len(one) == 1:
-            confirmed = {one[0][0]}
-            rows = [(*one[0], n)] + [r for r in rows if r[0] != one[0][0]]
-    year = re.search(r"[\[(]\s*((?:19|20)\d\d)\s*[\])]", name)
+        filters += [("title ~* ALL(%s)", (every,)),   # compared by prefix: no LIKE wildcards to escape
+                    ("left(lower(title), %s) = lower(%s) AND substr(title, %s, 1) IN (' ', '(', '[')",
+                     (len(span), span, len(span) + 1))]
+    if year:
+        filters.append((in_year, (year, year)))
+    left, conds, params = [], [], []
+    for cond, ps in filters:
+        conds.append(cond)
+        params += ps
+        left = conn.execute("""SELECT judgment_id, title, court, decision_date::text, neutral_citation, source_url
+                               FROM judgments WHERE duplicate_of IS NULL AND """ + " AND ".join(conds) + " LIMIT 2",
+                            params).fetchall()
+        if len(left) != 2:
+            break
+    # ponytail: a name unique in our ~10% sample confirms that case even if the user meant another;
+    # upgrade: confirm with the user instead.
+    one = left[0] if len(left) == 1 else None
+    if one and not any(r[0] == one[0] for r in rows):
+        rows = [(*one, n, False, False)] + rows[:4]
     out = []
     for r in rows:
         t = dict(zip(("judgment_id", "title", "court", "decision_date", "neutral_citation", "source_url",
-                      "words_matched"), r[:7]), words_total=n, confirmed=r[0] in confirmed)
-        if year and year[1] not in re.findall(r"\[(\d{4})\]", t["title"]) + [(t["decision_date"] or "")[:4]]:
+                      "words_matched"), r[:7]), words_total=n, confirmed=bool(one) and r[0] == one[0])
+        if year and r[6] == n and year not in re.findall(r"\[(\d{4})\]", t["title"]) + [(t["decision_date"] or "")[:4]]:
             t |= {"confirmed": False, "year_mismatch": True}
         out.append(t)
     return out
