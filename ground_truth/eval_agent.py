@@ -49,7 +49,8 @@ def score(q, out, key_ids, event_section):
         s["key_rulings"] = key_ids <= cited_events
     if q["expect_not_held"] == "yes":
         s["not_held_wording"] = bool(NOT_HELD_OK.search(out["answer"])) and not NOT_HELD_BAD.search(out["answer"])
-    else:   # a 'not held' claim where the question expects none (the Wachira fault)
+    else:   # a 'not held' claim where the question expects none (the Wachira fault). An upper bound: it also fires
+        # when an answer rightly says some other item isn't held
         s["false_not_held"] = int(bool(NOT_HELD_OK.search(out["answer"])))
     return s
 

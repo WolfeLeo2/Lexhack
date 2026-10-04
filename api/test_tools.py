@@ -52,6 +52,17 @@ def test_search_and_cases():
     out = tools.find_case("Wachira & 12 others v Republic & 2 others [2022] eKLR")   # eKLR path: one-word candidates
     expect("unconfirmed citation falls back to titles", ("ke/judgment/kehc/2022/12795" in out["ids"]["judgment"],
                                                          "979" in out["ids"]["event"]), (True, True))
+    for c in ("Otieno v Republic [2019] eKLR", "Republic v Kamau [2018] eKLR"):   # 9 / many titles start so
+        out = tools.find_case(c)
+        expect(f"common name with citation: nothing confirmed: {c}",
+               (any(t["confirmed"] for t in out["result"]["title_matches"]), out["ids"]["event"],
+                out["ids"]["judgment"]), (False, [], []))
+    out = tools.find_case("Okuta v Attorney General (2017)")
+    expect("year agrees: confirmed", any(t["confirmed"] for t in out["result"]["title_matches"]), True)
+    out = tools.find_case("Okuta v Attorney General (2015)")
+    t = out["result"]["title_matches"][0]
+    expect("year conflicts: flagged, not confirmed", (t["confirmed"], t.get("year_mismatch"), out["ids"]["event"]),
+           (False, True, []))
     out = tools.find_case("Okuta")   # one word in exactly one held title: that case
     expect("name only falls back to titles", len(out["result"]["title_matches"]) > 0, True)
     expect("unique word: confirmed", out["result"]["title_matches"][0]["confirmed"], True)

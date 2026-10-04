@@ -137,8 +137,8 @@ def citing_judgments(provision_id: str, limit: int = 10):
 def party_span(text):
     """'What did the court hold in Kimaru & 17 others v Attorney General on X?' -> 'Kimaru & 17 others v Attorney
     General': filing.cited_name drops the lead-in; the name ends at the first lowercase word after the 'v'. None
-    without a 'v'. The name ends before a bracketed citation ('X v Y [2022] eKLR')."""
-    text = text.split("[")[0]
+    without a 'v'. The name ends before a bracketed citation or year ('X v Y [2022] eKLR', 'X v Y (2022)')."""
+    text = re.split(r"\[|\(\s*(?:19|20)\d\d\s*\)", text)[0]
     words = (filing.cited_name(text, len(text)) or "").split()
     vi = next((i for i, w in enumerate(words) if w.lower() in filing.V), None)
     if vi is None:
@@ -152,7 +152,9 @@ def title_search(conn, name):
     """Titles with every party word (whole words); only if none, titles missing one word (needs 3+ words). Judgments
     with checked rulings first, then newest. confirmed: every word matched and there are 2+, or the one word is in
     exactly one held title ('Okuta' names a case; 'Mwangi', in hundreds of titles, doesn't), or, among several
-    matches, exactly one title has every party word of the 'X v Y' span ('Attorney General' included)."""
+    matches, exactly one title has every party word of the 'X v Y' span ('Attorney General' included), or exactly
+    one such title starts with the span as written. A year in the input ('[2019]', '(2019)') that differs from the
+    title's [YYYY] and its decision year blocks confirmation: that match gets year_mismatch."""
     span = party_span(name)   # 'X v Y' inside a question: only its words name the case
     words = [rf"\m{w}\M" for w in dict.fromkeys(re.findall(r"[A-Za-z]{3,}", (span or name).lower()))
              if w not in NAME_NOISE][:6]
@@ -174,16 +176,25 @@ def title_search(conn, name):
     confirmed = {r[0] for r in rows if r[6] == n and (n >= 2 or r[8] == 1)}
     if span and rows and not confirmed and rows[0][8] > 1:   # several matches: tie-break on every party word
         every = [rf"\m{w}\M" for w in dict.fromkeys(re.findall(r"[A-Za-z]{3,}", span.lower())) if w not in NOT_PARTY]
-        one = conn.execute("""SELECT judgment_id, title, court, decision_date::text, neutral_citation, source_url
-                              FROM judgments WHERE duplicate_of IS NULL AND title ~* ALL(%s) LIMIT 20""",
-                           (every,)).fetchall()
-        if len(one) > 1:   # still several: the one title that starts with the name as written ('Wachira & 12 others v')
-            one = [r for r in one if r[1].lower().startswith(span.lower())]
+        sql = """SELECT judgment_id, title, court, decision_date::text, neutral_citation, source_url
+                 FROM judgments WHERE duplicate_of IS NULL AND title ~* ALL(%s) {} LIMIT 2"""
+        one = conn.execute(sql.format(""), (every,)).fetchall()
+        if len(one) > 1:   # still several: unique across the table among titles starting with the name as written
+            # ('Wachira & 12 others v Republic & 2 others (Petition ...'); compared by prefix, so no LIKE wildcards
+            starts = "AND left(lower(title), %s) = lower(%s) AND substr(title, %s, 1) IN (' ', '(', '[')"
+            one = conn.execute(sql.format(starts), (every, len(span), span, len(span) + 1)).fetchall()
         if len(every) > n and len(one) == 1:
             confirmed = {one[0][0]}
             rows = [(*one[0], n)] + [r for r in rows if r[0] != one[0][0]]
-    return [dict(zip(("judgment_id", "title", "court", "decision_date", "neutral_citation", "source_url",
-                      "words_matched"), r[:7]), words_total=n, confirmed=r[0] in confirmed) for r in rows]
+    year = re.search(r"[\[(]\s*((?:19|20)\d\d)\s*[\])]", name)
+    out = []
+    for r in rows:
+        t = dict(zip(("judgment_id", "title", "court", "decision_date", "neutral_citation", "source_url",
+                      "words_matched"), r[:7]), words_total=n, confirmed=r[0] in confirmed)
+        if year and year[1] not in re.findall(r"\[(\d{4})\]", t["title"]) + [(t["decision_date"] or "")[:4]]:
+            t |= {"confirmed": False, "year_mismatch": True}
+        out.append(t)
+    return out
 
 
 def find_case(citation: str):
@@ -194,7 +205,8 @@ def find_case(citation: str):
     case (ambiguous: several matches, none confirmed: ask the user which case they mean). Also lists
     the checked rulings Hakiki records from the judgments found by citation or by a confirmed title (none from
     unconfirmed matches, which can't be referenced), each with its Act title and section number. Possible matches are
-    listed but not confirmed, and carry no rulings; when a citation isn't confirmed, the party names are searched too."""
+    listed but not confirmed, and carry no rulings; when a citation isn't confirmed, the party names are searched too.
+    A title match with year_mismatch has the names but not the year the user gave: say so and ask."""
     with main.db() as conn:
         cases = [f["case"] for f in filing.check(conn, citation)["findings"] if f["kind"] == "case"]
         judgments = [c["judgment"] for c in cases if c["judgment"]]   # possible_match candidates stay in cases only
