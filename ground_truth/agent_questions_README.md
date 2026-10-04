@@ -26,3 +26,12 @@ rows confirmed `repealed`; no_rulings rows have no verified court events. d07 an
   exist and belong to their rows, no dev overlap, repealed/no-rulings statuses confirmed). n26 and n27 replaced:
   Mitu-Bell and BAT v Ministry of Health are held; replaced with Mukisa Biscuit and Giella v Cassman Brown (no title
   match). Scored once.
+
+## Third held-out set (2026-10-04)
+
+- `agent_questions_heldout3.csv` (30, qids m01..m30): written to measure the 1a fixes (find_case falls back to the
+  party-name search after an unconfirmed citation, rulings carry their Act, advice still looks the section up, false
+  "not held" counted). No dev sections; reuses earlier held-out sections with new questions (few others have checked
+  rulings). Kinds: status 4, topic 5, case 6 (2 by one word, 2 "X v Y (year)", 2 full names), history 3, repealed 2,
+  no_rulings 2, not_held 4, advice 4. Checked mechanically. m25 and m26 replaced (Macharia v KCB and Speaker v Karume
+  are held) with Karisa Chengo v Republic and Shah v Mbogo (no title match). Scored once.
