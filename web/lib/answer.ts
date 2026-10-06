@@ -15,8 +15,8 @@ export type Ruling = {
 export type SectionRef = { kind: 'section'; provision_id: string; act: string; number: string | null; heading: string | null; status: string }
 export type CaseRef = { kind: 'case'; judgment_id: string; title: string; citation: string | null; url: string | null }
 export type Part = { kind: 'text'; text: string } | Ruling | SectionRef | CaseRef | { kind: 'removed' }
-/** Draft mode: what the filing checker still flags in the draft after one revision (empty when clean). */
-export type CheckFlag = { raw_text: string; kind: 'case' | 'section' | 'quote'; result: string; note: string }
+/** Draft mode: every item the check judged in the final draft, flagged ones first (contract.md "Draft mode"). */
+export type CheckFlag = { raw_text: string; kind: 'case' | 'section' | 'quote' | 'note'; result: string; note: string; flagged: boolean }
 export type Answer = { text: string; parts: Part[]; removed: number; check?: CheckFlag[]; label?: string }
 export type Step = { tool: string; label: string }
 export type ChatEvent =

@@ -98,13 +98,16 @@ def test_draft(c):
     expect("revise turn lists the fake case", "[2031] eKLR" in sent, True)
     ans = ev[3]
     expect("revised draft used", any(p["kind"] == "ruling" and p["event_id"] == ids[0] for p in ans["parts"]), True)
-    expect("clean after revision", ans["check"], [])
+    expect("clean after revision", [f for f in ans["check"] if f["flagged"]], [])
+    expect("passing items listed", [(f["kind"], f["result"], f["flagged"]) for f in ans["check"]],
+           [("section", "limit_mentioned", False)])
     expect("draft label", ans["label"], agent.DRAFT_LABEL)
 
     # the revision keeps the invented case: still reported
-    agent.generate = fake_model([part(text=first), part(text=revised + " See Wanjiru v Kamau [2031] eKLR.")])
+    agent.generate = fake_model([part(functionCall={"name": "get_section", "args": {"provision_id": S204}}),
+                                 part(text=first), part(text=revised + " See Wanjiru v Kamau [2031] eKLR.")])
     ans = [e for e in lines(c.post("/api/chat", json={"question": "Draft", "mode": "draft"})) if e["type"] == "answer"][0]
-    expect("fake case reported", [(f["kind"], f["raw_text"], f["result"]) for f in ans["check"]],
+    expect("fake case reported", [(f["kind"], f["raw_text"], f["result"]) for f in ans["check"] if f["flagged"]],
            [("case", "[2031] eKLR", "not_in_collection")])
 
     # clean first time: no revise step, one model call
@@ -114,6 +117,67 @@ def test_draft(c):
     agent.generate = fake_model([part(text="ok")])
     expect("answer mode: no check", "check" in lines(c.post("/api/chat", json={"question": "q"}))[-2], False)
     expect("bad mode 422", c.post("/api/chat", json={"question": "q", "mode": "essay"}).status_code, 422)
+
+
+def draft_answer(c, replies, question="Draft", bodies=None):
+    agent.generate = fake_model(replies, bodies)
+    ev = lines(c.post("/api/chat", json={"question": question, "mode": "draft"}))
+    return [e.get("tool") for e in ev if e["type"] == "step"], next(e for e in ev if e["type"] == "answer")
+
+
+def flagged(ans):
+    return [(f["kind"], f["result"]) for f in ans["check"] if f["flagged"]]
+
+
+def test_draft_checks(c):
+    with main.db() as conn:
+        summary = provision_status(conn, S204)["summary_events"]
+    limit = next(e["event_id"] for e in summary if e["event_type"] == "declared_unconstitutional")
+    other = next(e["event_id"] for e in summary if e["event_type"] == "interpreted")
+    get = part(functionCall={"name": "get_section", "args": {"provision_id": S204}})
+    clean = f"[[section:{S204}]] is limited by [[event:{limit}]]."
+
+    # a section's limiting ruling absent, another of its rulings cited: flagged and revised
+    steps, ans = draft_answer(c, [get, part(text=f"[[section:{S204}]] see [[event:{other}]]."), part(text=clean)])
+    expect("unrelated event: revised", steps, ["get_section", "check", "revise"])
+    expect("unrelated event: clean after", flagged(ans), [])
+
+    # an Act Hakiki doesn't hold: reported, no revision
+    steps, ans = draft_answer(c, [get, part(text=clean + " Section 3 of the Land Act applies.")])
+    expect("not_covered: no revision", steps, ["get_section", "check"])
+    expect("not_covered reported", flagged(ans), [("section", "not_covered")])
+
+    # quoted words with no case: not_checked, no revision
+    steps, ans = draft_answer(c, [get, part(text=clean + " The court said “the sentence is no longer mandatory for murder”.")])
+    expect("uncited quote: no revision", steps, ["get_section", "check"])
+    expect("uncited quote not_checked", flagged(ans), [("quote", "not_checked")])
+
+    # a case the user named that find_case couldn't confirm, missing from the draft: not_confirmed, revised
+    bodies = []
+    steps, ans = draft_answer(c, [get, part(functionCall={"name": "find_case", "args": {"citation": "Zyxwq v Qopqlr"}}),
+                                  part(text=clean), part(text=clean + " Zyxwq v Qopqlr could not be confirmed.")],
+                              question="Draft on s.204 citing Zyxwq v Qopqlr", bodies=bodies)
+    expect("dropped case: revised", steps, ["get_section", "find_case", "check", "revise"])
+    expect("dropped case reported", flagged(ans), [("case", "not_confirmed")])
+    expect("dropped case in the revise turn", "You named Zyxwq v Qopqlr" in json.dumps(bodies[-1]["contents"]), True)
+
+    # past the revision deadline: first draft returned with its items and a note
+    agent.REVISE_AFTER, real = -1, agent.REVISE_AFTER
+    try:
+        first = f"[[section:{S204}]] see [[event:{other}]]."
+        steps, ans = draft_answer(c, [get, part(text=first)])
+    finally:
+        agent.REVISE_AFTER = real
+    expect("deadline: no revision", steps, ["get_section", "check"])
+    expect("deadline: skipped + first draft's flag", sorted(flagged(ans)),
+           [("note", "revision_skipped"), ("section", "limit_not_mentioned")])
+    expect("deadline: first draft", any(p["kind"] == "ruling" and p["event_id"] == other for p in ans["parts"]), True)
+
+    # the revision adds an invented reference: removed, counted and reported
+    steps, ans = draft_answer(c, [get, part(text=first), part(text=clean + " [[event:999999]]")])
+    expect("invented in revision: removed", ans["removed"], 1)
+    expect("references_removed item", flagged(ans), [("note", "references_removed")])
+    expect("flagged first", [f["flagged"] for f in ans["check"]], sorted((f["flagged"] for f in ans["check"]), reverse=True))
 
 
 def test_limits(c):
@@ -195,6 +259,7 @@ def run():
             main._chat_hits.clear()
             test_stream(c)
             test_draft(c)
+            test_draft_checks(c)
             test_limits(c)
             test_error(c)
             test_proxy_key(c)

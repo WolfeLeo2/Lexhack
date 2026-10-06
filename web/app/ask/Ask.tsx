@@ -1,5 +1,5 @@
 'use client'
-import { ArrowUp, BookOpen, Check, ClipboardCheck, Copy, FileSearch, Gavel, Library, type LucideIcon, PenLine, RotateCcw, ScrollText, Search, Sparkles } from 'lucide-react'
+import { ArrowUp, BookOpen, Check, CircleAlert, ClipboardCheck, Copy, FileSearch, Gavel, Library, type LucideIcon, PenLine, RotateCcw, ScrollText, Search, Sparkles } from 'lucide-react'
 import Link from 'next/link'
 import { Fragment, type ReactNode, useEffect, useRef, useState } from 'react'
 import { CourtWords } from '@/components/court'
@@ -232,16 +232,15 @@ function TurnView({ t, onRetry }: { t: Turn; onRetry?: () => void }) {
   )
 }
 
-/** Answer | Draft: a two-option radio group. */
+/** Answer | Draft: two toggle buttons, the pressed one is the mode. */
 function ModeToggle({ mode, onChange }: { mode: Mode; onChange: (m: Mode) => void }) {
   return (
-    <div role="radiogroup" aria-label="Mode" className="inline-flex rounded-full border border-rule bg-paper p-0.5 text-sm">
+    <div role="group" aria-label="Mode" className="inline-flex rounded-full border border-rule bg-paper p-0.5 text-sm">
       {(['answer', 'draft'] as const).map((m) => (
         <button
           key={m}
           type="button"
-          role="radio"
-          aria-checked={mode === m}
+          aria-pressed={mode === m}
           onClick={() => onChange(m)}
           className={`ask-mode rounded-full px-3.5 py-1 ${mode === m ? 'bg-ink text-paper' : 'text-ink-2 hover:text-ink'}`}
         >
@@ -252,7 +251,8 @@ function ModeToggle({ mode, onChange }: { mode: Mode; onChange: (m: Mode) => voi
   )
 }
 
-// What each check result means, in the /check page's words. No verdict colours: the note says what the check found.
+// Results with fixed words, in the /check page's language; the rest (sections, notes, not_checked, not_confirmed) show
+// the server's note, which says what the check found. No verdict colours: flagged vs checked is in words and icon.
 const CHECK_WORDS: Record<string, string> = {
   found: 'Verified: in Hakiki’s collection',
   verbatim: 'Quote matches the judgment, word for word',
@@ -261,57 +261,73 @@ const CHECK_WORDS: Record<string, string> = {
   name_mismatch: 'The citation belongs to a different case in Hakiki’s collection',
   close: 'The quote is close to the judgment, but not word for word',
   not_found: 'The quoted words are not in the judgment',
-  not_checked: 'Quote not checked: we don’t hold this judgment’s text',
-  limit_not_mentioned: 'A court has ruled on this section — the draft doesn’t say so',
 }
-const KIND_WORDS: Record<CheckFlag['kind'], string> = { case: 'Case', quote: 'Quote', section: 'Section' }
+const KIND_WORDS: Record<CheckFlag['kind'], string> = { case: 'Case', quote: 'Quote', section: 'Section', note: 'Note' }
 
-/** A draft: the label, the draft on a sheet of paper (copy = the plain text), then what Hakiki's check still flags. */
+/** The draft as plain citations for pasting: the label first, without the "[status: …]" and "<url>" markers. */
+function draftCopy(a: Answer) {
+  const body = a.text.replace(/ ?\[status: [^\]]*\]/g, '').replace(/ ?<https?:[^>\s]*>/g, '')
+  return `${a.label}\n\n${body}`
+}
+
+/** A draft: the label, the draft on a sheet of paper (copy = label + plain text), then everything Hakiki checked. */
 function Draft({ a }: { a: Answer }) {
-  const [copied, setCopied] = useState(false)
+  const [copy, setCopy] = useState<'idle' | 'copied' | 'failed'>('idle')
   useEffect(() => {
-    if (!copied) return
-    const id = setTimeout(() => setCopied(false), 2000)
+    if (copy === 'idle') return
+    const id = setTimeout(() => setCopy('idle'), 2000)
     return () => clearTimeout(id)
-  }, [copied])
+  }, [copy])
   const check = a.check ?? []
+  const anyFlagged = check.some((f) => f.flagged)
+  const doCopy = () => {
+    const p = navigator.clipboard?.writeText(draftCopy(a))
+    if (!p) return setCopy('failed')
+    p.then(() => setCopy('copied'), () => setCopy('failed'))
+  }
   return (
     <div className="answer-in mt-5 max-w-[72ch]">
       <p className="text-sm text-ink-2">{a.label}</p>
       <div className="draft-paper relative mt-3 rounded-sm bg-paper px-6 pt-5 pb-6 shadow-[0_14px_30px_-22px_rgba(24,33,43,0.7)] ring-1 ring-rule sm:px-8">
         <button
           type="button"
-          onClick={() => navigator.clipboard?.writeText(a.text).then(() => setCopied(true), () => {})}
+          onClick={doCopy}
           className="link absolute top-3 right-3 inline-flex items-center gap-1.5 rounded-sm px-1.5 py-0.5 text-sm text-ink-2 hover:text-ink"
         >
-          {copied ? <Check className="h-4 w-4" aria-hidden /> : <Copy className="h-4 w-4" aria-hidden />}
-          <span aria-live="polite">{copied ? 'Copied' : 'Copy text'}</span>
+          {copy === 'copied' ? <Check className="h-4 w-4" aria-hidden /> : <Copy className="h-4 w-4" aria-hidden />}
+          <span aria-live="polite">{copy === 'copied' ? 'Copied' : copy === 'failed' ? 'Couldn’t copy' : 'Copy text'}</span>
         </button>
         <div className="statute mt-4 space-y-4 text-[1.05rem] leading-relaxed">
           <AnswerBody parts={a.parts} />
         </div>
       </div>
       <section className="mt-6" aria-label="Checked by Hakiki">
-        <h3 className="statute flex items-center gap-2 text-lg font-medium">
+        <h2 className="statute flex items-center gap-2 text-lg font-medium">
           <ClipboardCheck className="h-5 w-5 text-ink-2" aria-hidden />
           Checked by Hakiki
-        </h3>
-        {check.length === 0 ? (
+        </h2>
+        {!anyFlagged && (
           <p className="mt-2 text-ink-2">
-            Nothing flagged. Every case Hakiki could read in the draft is in its collection, every quote matches the judgment, and every section with court rulings cites them.
+            Hakiki found nothing to flag in what it could check. {check.length} item{check.length === 1 ? '' : 's'} checked.
           </p>
-        ) : (
+        )}
+        {check.length > 0 && (
           <ul className="mt-2 space-y-3">
-            {check.map((f, k) => (
-              <li key={k} className="step-in border-l-2 border-rule pl-3" style={{ animationDelay: `${k * 0.06}s` }}>
-                <p>
-                  <span className="text-sm text-ink-2">{KIND_WORDS[f.kind] ?? f.kind}: </span>
-                  <span className="statute">{f.kind === 'quote' ? `“${f.raw_text}”` : f.raw_text}</span>
-                </p>
-                <p className="text-[0.95rem]">{CHECK_WORDS[f.result] ?? f.note}</p>
-                {f.kind === 'section' && CHECK_WORDS[f.result] && <p className="text-sm text-ink-2">{f.note}.</p>}
-              </li>
-            ))}
+            {check.map((f, k) => {
+              const Icon = f.flagged ? CircleAlert : Check
+              return (
+                <li key={k} className="step-in flex gap-2.5 border-l-2 border-rule pl-3" style={{ animationDelay: `${k * 0.06}s` }}>
+                  <Icon className="mt-1 h-4 w-4 shrink-0 text-ink-2" aria-hidden />
+                  <div>
+                    <p>
+                      <span className="text-sm text-ink-2">{f.flagged ? 'Flagged' : 'Checked'} · {KIND_WORDS[f.kind] ?? f.kind}{f.raw_text ? ': ' : ''}</span>
+                      {f.raw_text && <span className="statute">{f.kind === 'quote' ? `“${f.raw_text}”` : f.raw_text}</span>}
+                    </p>
+                    <p className="text-[0.95rem]">{CHECK_WORDS[f.result] ?? cap(f.note)}</p>
+                  </div>
+                </li>
+              )
+            })}
           </ul>
         )}
       </section>

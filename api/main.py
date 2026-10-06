@@ -456,7 +456,7 @@ def chat(req: ChatRequest, request: Request):
         try:
             history = agent.history_from_turns([t.model_dump() for t in req.history])
             if req.mode == "draft":
-                d = agent.draft(req.question, history, on_step=step, attempts=2)
+                d = agent.draft(req.question, history, on_step=step, attempts=2, started=now)
                 parts, removed, extra = d["parts"], d["removed"], {"check": d["check"], "label": agent.DRAFT_LABEL}
             else:
                 out = agent.run(req.question, history, on_step=step, attempts=2)   # few Gemini retries: a deadline

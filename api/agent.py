@@ -71,15 +71,19 @@ rules above still apply.
 - Cite cases only as [[judgment:ID]] or [[event:ID]]. Never type a case name with a citation, an eKLR or neutral
   citation, or quoted words yourself: Hakiki fills them in from the database.
 - When a section you cite has court rulings, cite them ([[event:ID]]) so the draft says what the court did.
+- If a case the user named can't be confirmed (find_case found no single case), say so plainly in the draft.
 - The draft is for an advocate's review. Don't advise the user on their own case or tell them what to do."""
 DRAFT_LABEL = "Draft for an advocate's review. Hakiki reports what sources say; this is not legal advice."
-PLAIN_STATUS = {"in force; no recorded court rulings", "in force"}
 CASE_NOTES = {"not_in_collection": "Not in Hakiki's collection — check before relying on it",
               "possible_match": "Fits more than one case in Hakiki's collection, so Hakiki can't say which",
               "name_mismatch": "The citation belongs to a different case in Hakiki's collection"}
 QUOTE_NOTES = {"close": "Close to the judgment, but not word for word",
                "not_found": "The quoted words are not in the judgment",
                "not_checked": "Not checked: Hakiki doesn't hold the cited judgment's text"}
+COURT_LIMITS = {"declared_unconstitutional", "read_down", "severed"}   # a court's limiting ruling (status_ke LIMITING)
+NO_FIX = {"not_checked", "not_covered", "revision_skipped", "references_removed"}   # reported, never sent for revision
+QUOTED = re.compile(r'["“]([^"“”]+)["”]')
+REVISE_AFTER = 35   # seconds into the chat run: later than this, skip the revision (the chat's deadline is 55)
 
 
 def generate(body, api_key, attempts=10):
@@ -284,10 +288,40 @@ def render(answer, seen, conn):
     return "".join(map(part_text, parts)), removed
 
 
-def draft_check(conn, parts):
-    """The rendered draft through the filing checker. -> flags [{raw_text, kind, result, note, cite}] (cite: event IDs
-    the model should reference for a section). Only what the model wrote is judged: a case or section inside a
-    reference Hakiki rendered from the database is not, nor a quote that is a ruling's own words."""
+def item(raw, kind, result, note, flagged=False, cite=()):
+    return {"raw_text": raw[:200], "kind": kind, "result": result, "note": note, "flagged": flagged, "cite": list(cite)}
+
+
+def named_in(name, question):
+    """The user's question names this case (find_case gets names as the user wrote them; the first party will do)."""
+    n, q = name.lower().strip(), question.lower()
+    first = re.split(r"\s+v\.?\s+", n)[0].strip()
+    return bool(n) and (n in q or (len(first) >= 3 and first in q))
+
+
+def dropped_cases(parts, question, steps):
+    """find_case lookups for a case the user named that confirmed no single case, and that the draft doesn't cite."""
+    in_draft = {p["judgment_id"] for p in parts if p["kind"] == "case"} | {p["case"] for p in parts if p["kind"] == "ruling"}
+    out = []
+    for s in steps:
+        r, name = s["result"], str(s["args"].get("citation") or "")
+        if s["tool"] != "find_case" or not named_in(name, question) or name in {i["raw_text"] for i in out}:
+            continue
+        cases, titles = r.get("cases", []), r.get("title_matches", [])
+        confirmed = ({c["judgment"]["judgment_id"] for c in cases if c["result"] == "found" and c["judgment"]} |
+                     {t["judgment_id"] for t in titles if t["confirmed"]})
+        cands = ({x for c in cases if c["judgment"] for x in (c["judgment"]["judgment_id"], c["judgment"].get("title"))} |
+                 {x for t in titles for x in (t["judgment_id"], t["title"])})
+        if len(confirmed) != 1 and not in_draft & cands:
+            out.append(item(name, "case", "not_confirmed",
+                            f"You named {name}. Hakiki could not confirm it, so the draft does not cite it.", True))
+    return out
+
+
+def draft_check(conn, parts, question="", steps=()):
+    """The rendered draft through the filing checker. -> every judged item [{raw_text, kind, result, note, flagged,
+    cite}], flagged first (cite: event IDs the model should reference for a section). Only what the model wrote is
+    judged: a case or section inside a reference Hakiki rendered from the database is not, nor a ruling's own words."""
     spans, at = [], 0
     for p in parts:
         n = len(part_text(p))
@@ -297,26 +331,63 @@ def draft_check(conn, parts):
     kind_at = lambda i: next((k for s, e, k in spans if s <= i < e), "text")
     rulings = [p for p in parts if p["kind"] == "ruling"]
     cited = {p["event_id"] for p in rulings}
-    flags, sections = [], set()
+    section_parts = {p["provision_id"] for p in parts if p["kind"] == "section"}
+    items, sections, judged = [], set(), set()
     for f in filing.check(conn, text)["findings"]:
         where = kind_at(f["char_start"])
         if f["kind"] == "case":
             c = f["case"]
-            if where == "text" and c["result"] != "found":
-                flags.append({"raw_text": f["raw_text"], "kind": "case", "result": c["result"],
-                              "note": CASE_NOTES.get(c["result"], c["result"])})
-            flags += [{"raw_text": q["quote"], "kind": "quote", "result": q["result"],
-                       "note": QUOTE_NOTES.get(q["result"], q["result"])}
-                      for q in f["quotes"] if q["result"] != "verbatim" and not any(q["quote"] in r["quote"] for r in rulings)]
-        elif where != "ruling" and (prov := f["section"]["provision"]) and prov["provision_id"] not in sections:
-            s = f["section"]
-            sections.add(prov["provision_id"])
+            if where == "text":
+                items.append(item(f["raw_text"], "case", c["result"], "typed in the draft; found in Hakiki's collection")
+                             if c["result"] == "found" else
+                             item(f["raw_text"], "case", c["result"], CASE_NOTES.get(c["result"], c["result"]), True))
+            # quotes the checker hung on the citation inside a ruling Hakiki rendered: the model attached no case to
+            # them (the scan below reports them as not checked), and the ruling's own words are from the database
+            for q in f["quotes"] if where != "ruling" else ():
+                judged.add(q["quote"])
+                if not any(q["quote"] in r["quote"] for r in rulings):
+                    items.append(item(q["quote"], "quote", "verbatim", "matches the judgment word for word")
+                                 if q["result"] == "verbatim" else
+                                 item(q["quote"], "quote", q["result"], QUOTE_NOTES.get(q["result"], q["result"]), True))
+            continue
+        if where == "ruling":
+            continue
+        s = f["section"]
+        key = s["provision"]["provision_id"] if s["provision"] else s["act_ref"]
+        if not key or key in sections:   # a bare "section 12" with no Act: nothing to look up
+            continue
+        sections.add(key)
+        if s["provision"]:   # "sections 203 and 204 of the Penal Code" is two findings: name the one judged
+            f = dict(f, raw_text=f"{s['provision']['act_title']} s.{s['provision']['number']}")
+        if not s["provision"]:
+            items.append(item(f["raw_text"], "section", "not_covered",
+                              "Hakiki doesn't hold this Act; check it before relying on it", True))
+        elif s["status"] == "repealed":
             ids = [e["event_id"] for e in s["summary_events"]]
-            if ids and s["status"] not in PLAIN_STATUS and not cited & set(ids):
-                flags.append({"raw_text": f["raw_text"], "kind": "section", "result": "limit_not_mentioned",
-                              "note": f"Hakiki records this section as “{s['status']}”; the draft cites none of the "
-                                      "rulings behind that", "cite": ids})
-    return flags
+            items.append(item(f["raw_text"], "section", "limit_mentioned", "the draft says it is repealed")
+                         if key in section_parts or cited & set(ids) else
+                         item(f["raw_text"], "section", "limit_not_mentioned",
+                              "Hakiki records this section as repealed; the draft doesn't say so", True, ids))
+        elif ids := [e["event_id"] for e in s["summary_events"] if e["event_type"] in COURT_LIMITS]:
+            items.append(item(f["raw_text"], "section", "limit_mentioned", "the draft cites the court's ruling that "
+                              "limits it") if cited & set(ids) else
+                         item(f["raw_text"], "section", "limit_not_mentioned",
+                              f"Hakiki records this section as “{s['status']}”; the draft cites none of the court "
+                              "rulings that limit it", True, ids))
+        else:
+            items.append(item(f["raw_text"], "section", "in_force", f"Hakiki records this section as “{s['status']}”"))
+    for p in parts:   # quoted words the model typed with no case attached: the filing checker can't judge them
+        for m in QUOTED.finditer(p["text"] if p["kind"] == "text" else ""):
+            q = m[1].strip()
+            if len(q.split()) >= 5 and not any(q in j or j in q for j in judged):
+                items.append(item(q, "quote", "not_checked",
+                                  "quoted words with no case attached; Hakiki couldn't check them", True))
+    items += dropped_cases(parts, question, steps)
+    return sorted(items, key=lambda i: not i["flagged"])
+
+
+def fixable(items):
+    return [i for i in items if i["flagged"] and i["result"] not in NO_FIX]
 
 
 def revise_message(flags):
@@ -326,28 +397,39 @@ def revise_message(flags):
             "\nFix these or state them plainly in the draft. Reply with the full revised draft only.")
 
 
-def draft(question, history=(), api_key=None, on_step=None, attempts=10):
+def draft(question, history=(), api_key=None, on_step=None, attempts=10, started=None):
     """Draft mode: research and write, check the rendered draft with the filing checker, one revision turn if anything
-    is flagged, then a second check. -> {parts, removed, check} (check: what is still flagged)."""
+    the model can fix is flagged, then a second check. started: the run's time.monotonic() start; past REVISE_AFTER
+    seconds the revision is skipped. -> {parts, removed, check} (check: every judged item, flagged first)."""
+    started = time.monotonic() if started is None else started
     step = on_step or (lambda name, args: None)
     out = run(question, history, api_key, on_step, attempts, system=SYSTEM + DRAFT)
-    seen = {k: set(v) for k, v in out["seen"].items()}
+    seen, steps = {k: set(v) for k, v in out["seen"].items()}, out["steps"]
     step("check", {})
     with main.db() as conn:
         parts, removed = render_parts(out["answer"], seen, conn)
-        flags = draft_check(conn, parts)
-    if flags:
+        items = draft_check(conn, parts, question, steps)
+    notes = []
+    if (fix := fixable(items)) and time.monotonic() - started > REVISE_AFTER:
+        notes.append(item("", "note", "revision_skipped", "Hakiki ran out of time to revise the draft, so this is its "
+                          "first draft with what the check found", True))
+    elif fix:
         step("revise", {})
-        for f in flags:   # the check told the model these IDs, so they count as returned to it
-            seen["event"].update(str(i) for i in f.get("cite", ()))
-        out = run(revise_message(flags), out["contents"], api_key, on_step, attempts, system=SYSTEM + DRAFT)
+        for f in fix:   # the check told the model these IDs, so they count as returned to it
+            seen["event"].update(str(i) for i in f["cite"])
+        out = run(revise_message(fix), out["contents"], api_key, on_step, attempts, system=SYSTEM + DRAFT)
         for k, v in out["seen"].items():
             seen[k].update(v)
+        steps = steps + out["steps"]
         with main.db() as conn:
             parts, removed = render_parts(out["answer"], seen, conn)
-            flags = draft_check(conn, parts)
+            items = draft_check(conn, parts, question, steps)
+    if removed:
+        notes.append(item("", "note", "references_removed", f"{removed} reference{'s' if removed > 1 else ''} the model "
+                          "wrote couldn't be traced to Hakiki's records and were removed", True))
+    items = sorted(notes + items, key=lambda i: not i["flagged"])
     return {"parts": parts, "removed": removed,
-            "check": [{k: f[k] for k in ("raw_text", "kind", "result", "note")} for f in flags]}
+            "check": [{k: i[k] for k in ("raw_text", "kind", "result", "note", "flagged")} for i in items]}
 
 
 if __name__ == "__main__":
