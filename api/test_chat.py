@@ -258,6 +258,7 @@ def run():
         with TestClient(main.app) as c:
             main._chat_hits.clear()
             test_stream(c)
+            agent.REVISE_AFTER = 10**6   # a slow Neon connection must not skip the revision these tests expect
             test_draft(c)
             test_draft_checks(c)
             test_limits(c)
