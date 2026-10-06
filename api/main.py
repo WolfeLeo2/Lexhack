@@ -24,7 +24,8 @@ from typing import Literal
 
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
+from starlette.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
 from scalar_fastapi import get_scalar_api_reference
 
@@ -32,7 +33,7 @@ import crawler.config  # noqa: F401  (loads .env)
 
 from psycopg_pool import ConnectionPool
 
-from . import agent, extract, filing
+from . import agent, export, extract, filing
 from .status import members, provision_status, renumbering, statuses
 from . import mcp_server
 
@@ -89,6 +90,9 @@ CHAT_RATE = 10            # /api/chat questions per client IP per minute (each c
 CHAT_GLOBAL_RATE = 30     # /api/chat questions per minute from everyone (key "*")
 _chat_hits = {}
 CHAT_SLOTS = threading.BoundedSemaphore(4)   # agent runs at once
+EXPORT_RATE = 20          # /api/export files per client IP per minute
+_export_hits = {}
+MAX_EXPORT = 200_000      # bytes of request body
 CHAT_DEADLINE = 55        # seconds; the web proxy's maxDuration is 60
 START_TIME = time.time()
 
@@ -980,6 +984,40 @@ def chat(req: ChatRequest, request: Request):
 
     threading.Thread(target=work, daemon=True).start()
     return StreamingResponse(stream(), media_type="application/x-ndjson")
+
+
+class ExportRequest(BaseModel):
+    format: Literal["docx", "pdf"]
+    question: str = Field(min_length=1, max_length=2000)
+    mode: Literal["answer", "draft"] = "answer"
+    parts: list[dict] = Field(max_length=2000)   # the chat's Parts; rulings and sections are re-read from the DB
+    check: list[dict] | None = Field(None, max_length=500)
+    label: str | None = None   # accepted for the client's convenience; the file's title is the server's
+
+
+@app.post("/api/export", tags=["Ask"])
+async def export_file(request: Request):
+    """An Ask Hakiki answer or draft as a Word (.docx) or PDF file (api/export.py). No model call: built from the
+    parts sent, with every ruling's words, source and state and every section's status re-read from the database.
+    Body up to 200 KB; not stored."""
+    if not allow(chat_key(request), time.monotonic(), _export_hits, EXPORT_RATE):
+        raise HTTPException(429, f"rate limit: {EXPORT_RATE} files a minute")
+    if int(request.headers.get("content-length") or 0) > MAX_EXPORT:
+        raise HTTPException(413, "That answer is too large to export.")
+    body = await request.body()
+    if len(body) > MAX_EXPORT:
+        raise HTTPException(413, "That answer is too large to export.")
+    try:
+        req = ExportRequest.model_validate_json(body)
+    except ValueError as e:
+        raise HTTPException(422, "That answer could not be read.") from e
+
+    def build():
+        with db() as conn:
+            return export.document(conn, req, DISCLAIMER)
+    name, mime, data = await run_in_threadpool(build)
+    return Response(data, media_type=mime, headers={"Content-Disposition": f'attachment; filename="{name}"',
+                                                    "Cache-Control": "no-store"})
 
 
 app.mount("/", mcp_server.http_app)   # serves /mcp; mounted last so every /api route above matches first
