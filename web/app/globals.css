@@ -321,6 +321,16 @@ a:focus-visible > .spine {
 @keyframes paper-in {
   from { opacity: 0; transform: translateY(12px) rotate(-0.6deg); }
 }
+/* Your chats: the sheet slides in from the right edge. */
+.history-sheet[open] {
+  animation: sheet-in 0.32s both cubic-bezier(0.22, 1, 0.36, 1);
+}
+.history-sheet[open]::backdrop {
+  animation: delta-in 0.25s both ease-out;
+}
+@keyframes sheet-in {
+  from { transform: translateX(2.5rem); opacity: 0; }
+}
 .ask-send {
   transition: transform 0.15s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.2s;
 }
@@ -332,7 +342,7 @@ a:focus-visible > .spine {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ask-bubble, .step-in, .step-now svg, .answer-in, .delta-in, .ask-chip, .draft-paper { animation: none; }
+  .ask-bubble, .step-in, .step-now svg, .answer-in, .delta-in, .ask-chip, .draft-paper, .history-sheet[open], .history-sheet[open]::backdrop { animation: none; }
   .ask-chip, .ask-send, .ask-mode { transition: none; }
   .pinned-note { animation: none; transform: rotate(-1.2deg); }
   .spine { transition: none; }
