@@ -6,6 +6,7 @@ Every answer reports what the sources say, with the court's verbatim words and a
 bare yes/no.
 """
 import functools
+import hmac
 import json
 import logging
 import os
@@ -52,7 +53,10 @@ app.add_middleware(CORSMiddleware, allow_origins=os.environ.get("CORS_ORIGINS", 
 RATE, WINDOW = 60, 60.0   # /mcp requests per client IP per minute
 _hits = {}
 CHAT_RATE = 10            # /api/chat questions per client IP per minute (each costs Gemini calls)
+CHAT_GLOBAL_RATE = 30     # /api/chat questions per minute from everyone (key "*")
 _chat_hits = {}
+CHAT_SLOTS = threading.BoundedSemaphore(4)   # agent runs at once
+CHAT_DEADLINE = 55        # seconds; the web proxy's maxDuration is 60
 
 
 def allow(key, now, hits=_hits, rate=RATE, window=WINDOW):
@@ -70,6 +74,16 @@ def allow(key, now, hits=_hits, rate=RATE, window=WINDOW):
 def client_key(forwarded, peer):
     # the last entry is the one Railway's edge wrote; earlier ones are client-supplied and can be spoofed
     return (forwarded.split(",")[-1].strip() if forwarded else peer) or ""
+
+
+def chat_key(request):
+    """Rate-limit key. Behind the web proxy every request comes from Vercel's IP, so when the proxy proves itself with
+    CHAT_PROXY_SECRET, trust the client IP it forwards; otherwise the caller's own IP (client_key)."""
+    secret = os.environ.get("CHAT_PROXY_SECRET", "")
+    given = request.headers.get("x-hakiki-proxy-key", "")
+    if secret and hmac.compare_digest(given.encode(), secret.encode()):
+        return "web:" + request.headers.get("x-hakiki-client-ip", "")
+    return client_key(request.headers.get("x-forwarded-for"), request.client.host if request.client else "")
 
 
 @app.middleware("http")
@@ -412,35 +426,62 @@ class ChatRequest(BaseModel):
 
 
 CHAT_ERROR = "Hakiki couldn't finish that answer. Please try again in a minute."
+CHAT_TIMEOUT = "Hakiki took too long on that answer. Please try again, or ask a narrower question."
+CHAT_BUSY = "Hakiki is busy, try again in a moment"
+
+
+class Stopped(Exception):
+    """The reader went away (disconnect or deadline): end the agent run at its next tool call."""
 
 
 @app.post("/api/chat")
 def chat(req: ChatRequest, request: Request):
     """The research agent (api/agent.py), streamed as NDJSON: step events as tools run, then the answer (references
     filled in from the database) and done; or one error event. Over-long input is a 422 (Pydantic), not a 413."""
-    ip = client_key(request.headers.get("x-forwarded-for"), request.client.host if request.client else "")
-    if not allow(ip, time.monotonic(), _chat_hits, CHAT_RATE):
+    now = time.monotonic()
+    if not allow(chat_key(request), now, _chat_hits, CHAT_RATE):
         raise HTTPException(429, f"rate limit: {CHAT_RATE} questions a minute")
-    events = queue.Queue()
+    if not allow("*", now, _chat_hits, CHAT_GLOBAL_RATE) or not CHAT_SLOTS.acquire(blocking=False):
+        raise HTTPException(429, CHAT_BUSY)
+    events, stop = queue.Queue(), threading.Event()
+
+    def step(name, args):
+        if stop.is_set():
+            raise Stopped
+        events.put({"type": "step", "tool": name, "label": agent.step_label(name, args)})
 
     def work():
         try:
             out = agent.run(req.question, agent.history_from_turns([t.model_dump() for t in req.history]),
-                            on_step=lambda name, args: events.put(
-                                {"type": "step", "tool": name, "label": agent.step_label(name, args)}))
+                            on_step=step, attempts=2)   # few Gemini retries: the answer has a deadline
             with db() as conn:
                 parts, removed = agent.render_parts(out["answer"], out["seen"], conn)
             events.put({"type": "answer", "text": "".join(map(agent.part_text, parts)), "parts": parts,
                         "removed": removed})
             events.put({"type": "done", "disclaimer": DISCLAIMER})
+        except Stopped:
+            pass
         except Exception:
             logging.exception("chat failed")   # the real error stays in the server log
             events.put({"type": "error", "message": CHAT_ERROR})
+        finally:
+            CHAT_SLOTS.release()
         events.put(None)
 
     def stream():   # a sync generator: Starlette iterates it in a worker thread, so the blocking get is fine
-        while (e := events.get()) is not None:
-            yield json.dumps(e) + "\n"
+        deadline = time.monotonic() + CHAT_DEADLINE
+        try:
+            while True:
+                try:
+                    e = events.get(timeout=max(0.0, deadline - time.monotonic()))
+                except queue.Empty:
+                    yield json.dumps({"type": "error", "message": CHAT_TIMEOUT}) + "\n"
+                    return
+                if e is None:
+                    return
+                yield json.dumps(e) + "\n"
+        finally:   # closed early (client gone) or past the deadline: stop the agent at its next tool call
+            stop.set()
 
     threading.Thread(target=work, daemon=True).start()
     return StreamingResponse(stream(), media_type="application/x-ndjson")

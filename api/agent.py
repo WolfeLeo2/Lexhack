@@ -7,6 +7,7 @@ the verbatim text from the database. A reference no tool returned is removed and
 """
 import hashlib
 import json
+import logging
 import os
 import re
 import sys
@@ -21,6 +22,7 @@ from .status import RULES, load_events_many, statuses, with_leads
 MODEL, MAX_ROUNDS = "gemini-3.5-flash-lite", 8
 URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 REF = re.compile(r"\[\[(section|event|judgment):([^\]\s]+)\]\]")
+ACT = re.compile(r"\[\[act:\s*([^\]]+?)\s*\]\]")   # not a reference kind; naming a held Act is allowed (render_parts)
 BRACKETS = re.compile(r"\[\[[^\]]*\]\]")   # anything in [[...]]: a REF, or a malformed one like [[event:1, 2]]
 LABELS = [("human:", "checked by a person"), ("agent:", "checked by an AI reviewer"),
           ("source:", "from Kenya Law's reviser's note")]
@@ -61,7 +63,7 @@ candidates for a section renumbered between versions, report both IDs and say wh
 Answer briefly, in plain English."""
 
 
-def generate(body, api_key):
+def generate(body, api_key, attempts=10):
     """One generateContent call, cached by request body (temperature 0: same request, same answer)."""
     data_dir = os.environ.get("LEXHACK_DATA")   # unset on Railway: no disk cache there
     path = None
@@ -71,26 +73,28 @@ def generate(body, api_key):
         path = cache / f"{hashlib.sha256(json.dumps(body, sort_keys=True).encode()).hexdigest()}.json"
     if path and path.exists():
         return json.loads(path.read_text(encoding="utf-8"))
-    for attempt in range(10):   # per-minute quotas can take a minute or two to clear (as pipeline/llm_resolve.call)
+    for attempt in range(attempts):   # per-minute quotas can take a minute or two to clear (as pipeline/llm_resolve.call)
         wait = min(120, 10 * 2 ** attempt)
         try:
             r = requests.post(URL.format(model=MODEL), json=body, headers={"x-goog-api-key": api_key}, timeout=180)
         except (requests.ConnectionError, requests.Timeout) as e:
             print(f"  network error ({type(e).__name__}); retrying in {wait}s", file=sys.stderr, flush=True)
-            time.sleep(wait)
+            if attempt + 1 < attempts:
+                time.sleep(wait)
             continue
         if r.status_code == 429 and "PerDay" in r.text:
             raise RuntimeError(f"Gemini daily quota exhausted for {MODEL}; answers so far are cached")
         if r.status_code == 429 or r.status_code >= 500:
             print(f"  HTTP {r.status_code}; retrying in {wait}s", file=sys.stderr, flush=True)
-            time.sleep(wait)
+            if attempt + 1 < attempts:
+                time.sleep(wait)
             continue
         r.raise_for_status()
         data = r.json()
         if path and ((data.get("candidates") or [{}])[0].get("content") or {}).get("parts"):   # never cache an empty reply
             path.write_text(r.text, encoding="utf-8")
         return data
-    raise RuntimeError("Gemini call failed after 10 attempts (network or rate limit)")
+    raise RuntimeError(f"Gemini call failed after {attempts} attempts (network or rate limit)")
 
 
 def history_from_turns(turns):
@@ -104,7 +108,8 @@ def step_label(name, args):
     def arg(k):
         s = str(args.get(k) or "")
         return s if len(s) <= 80 else s[:80] + "…"
-    return {"find_section": lambda: f"Looking up {arg('act')} s.{arg('section')}",
+    return {"find_section": lambda: f"Looking up {arg('act')} s.{arg('section')}" if arg("act") and arg("section")
+            else "Looking up the section",
             "search_sections": lambda: f"Searching sections for “{arg('query')}”",
             "get_section": lambda: "Reading the section and its rulings",
             "find_case": lambda: f"Looking for the case “{arg('citation')}”",
@@ -113,7 +118,8 @@ def step_label(name, args):
             "check_text": lambda: "Checking the citations in the text"}.get(name, lambda: "Looking things up")()
 
 
-def run(question, history=(), api_key=None, on_step=None):
+def run(question, history=(), api_key=None, on_step=None, attempts=10):
+    """attempts: Gemini tries per call (the chat passes fewer: it has a deadline)."""
     api_key = api_key or os.environ["GEMINI_API_KEY"]
     contents = [*history, {"role": "user", "parts": [{"text": question}]}]
     steps, seen = [], {"section": set(), "event": set(), "judgment": set()}
@@ -122,7 +128,7 @@ def run(question, history=(), api_key=None, on_step=None):
                 "tools": [{"functionDeclarations": tools.DECLARATIONS}], "generationConfig": {"temperature": 0}}
         if rnd == MAX_ROUNDS:   # out of rounds: answer with what you have
             body["toolConfig"] = {"functionCallingConfig": {"mode": "NONE"}}
-        resp = generate(body, api_key)
+        resp = generate(body, api_key, attempts=attempts)
         cand = (resp.get("candidates") or [{}])[0]
         content = cand.get("content")
         if not content or not content.get("parts"):
@@ -144,8 +150,9 @@ def run(question, history=(), api_key=None, on_step=None):
                 for k, v in out["ids"].items():
                     seen[k].update(v)
                 result = out["result"]
-            except Exception as e:   # a bad ID or argument goes back to the model to correct
-                result = {"error": f"{type(e).__name__}: {e}"}
+            except Exception as e:   # the model sees the type only: a message could carry internals into a public answer
+                logging.warning("tool %s failed: %s: %s", c["name"], type(e).__name__, e)
+                result = {"error": f"tool failed: {type(e).__name__}"}
             steps.append({"tool": c["name"], "args": args, "result": result})
             replies.append({"functionResponse": {"name": c["name"], "response": {"result": result}}})
         contents.append({"role": "user", "parts": replies})
@@ -153,9 +160,20 @@ def run(question, history=(), api_key=None, on_step=None):
 
 
 def ref(text):
-    """'[[kind:ID]]' -> (kind, ID); a malformed reference -> (None, text): no tool returned it, so it is invented."""
-    m = REF.fullmatch(text)
-    return m.groups() if m else (None, text)
+    """'[[kind:ID]]' -> (kind, ID); '[[act:X]]' -> ('act', X); a malformed reference -> (None, text): no tool returned
+    it, so it is invented."""
+    m = REF.fullmatch(text) or ACT.fullmatch(text)
+    return (m.groups() if m.re is REF else ("act", m.group(1))) if m else (None, text)
+
+
+def held_acts(conn):
+    """{lower-cased act_id or title: title} for the Acts Hakiki holds."""
+    return {k.lower(): title for a, title in conn.execute("SELECT act_id, title FROM acts") for k in (a, title)}
+
+
+def is_invented(k, v, ok, acts):
+    """A reference no tool returned. Naming a held Act ([[act:Penal Code]]) is not a claim about rulings, so not one."""
+    return (k, v) not in ok and not (k == "act" and v.lower() in acts)
 
 
 def refs(answer):
@@ -180,12 +198,15 @@ def render_parts(answer, seen, conn):
         """SELECT p.provision_id, a.title, p.number, p.heading FROM provisions p JOIN acts a USING (act_id)
            WHERE p.provision_id = ANY(%s)""", (sec_ids,))}
     status = statuses(conn, list(sec))
+    acts = held_acts(conn)
     jud = {r[0]: r[1:] for r in conn.execute(
         "SELECT judgment_id, title, neutral_citation, source_url FROM judgments WHERE judgment_id = ANY(%s)",
         ([v for k, v in good if k == "judgment"],))}
 
     def part(text):
         k, v = ref(text)
+        if k == "act" and v.lower() in acts:
+            return {"kind": "text", "text": acts[v.lower()]}
         if (k, v) in ok and k == "event" and v in ev:
             quote, para, by, title, cite, court, url, _ = ev[v]
             st = state.get(v, "in effect")
@@ -213,17 +234,24 @@ def render_parts(answer, seen, conn):
     return parts, sum(p["kind"] == "removed" for p in parts)
 
 
+def in_title(cite, title):
+    """The citation, or None when the title already carries it ('… [2017] KEHC 8382 (KLR)')."""
+    return None if cite and title and cite in title else cite
+
+
 def part_text(p):
     """One Part as plain text (the agent's CLI, the eval and the chat's `text`)."""
     if p["kind"] == "ruling":
-        src = ", ".join(x for x in (p["case"] or "Parliament (Kenya Law reviser's note)", p["citation"], p["court"],
+        src = ", ".join(x for x in (p["case"] or "Parliament (Kenya Law reviser's note)", in_title(p["citation"], p["case"]),
+                                    p["court"],
                                     p["paragraph"] and f"para {p['paragraph']}") if x)
         who = p["checked_by"] + (f"; {p['state']}" if p["state"] else "")
         return f'"{p["quote"]}" ({src}; {who}){f" <{p['url']}>" if p["url"] else ""}'
     if p["kind"] == "section":
         return f"{p['act']} s.{p['number']}{f' ({p['heading']})' if p['heading'] else ''} [status: {p['status']}]"
     if p["kind"] == "case":
-        return f"{p['title']}{f' {p['citation']}' if p['citation'] else ''}{f' <{p['url']}>' if p['url'] else ''}"
+        cite = in_title(p["citation"], p["title"])
+        return f"{p['title']}{f' {cite}' if cite else ''}{f' <{p['url']}>' if p['url'] else ''}"
     if p["kind"] == "removed":
         return "[unverified reference removed]"
     return p["text"]

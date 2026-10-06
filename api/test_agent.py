@@ -41,13 +41,22 @@ def test_render():
                  if e["state"] == "displaced by a later ruling")
         dout, _ = agent.render(f"[[event:{d}]]", {"event": [str(d)]}, conn)
     expect("displaced ruling: state shown", "; displaced by a later ruling)" in dout, True)
+    with main.db() as conn:   # naming a held Act is plain text, not a removed reference; an Act we don't hold is
+        aparts, aremoved = agent.render_parts("[[act:penal code]], [[act:ke/act/cap-63a]] and [[act:Land Act]]", {}, conn)
+        j = conn.execute("SELECT judgment_id, title, neutral_citation FROM judgments WHERE position(neutral_citation "
+                         "in title) > 0 LIMIT 1").fetchone()
+        jout, _ = agent.render(f"[[judgment:{j[0]}]]", {"judgment": [j[0]]}, conn)
+    expect("act refs", [p.get("text", p["kind"]) for p in aparts],
+           ["Penal Code", ", ", "Sexual Offences Act", " and ", "removed"])
+    expect("act refs: only the unheld one removed", aremoved, 1)
+    expect("citation not repeated after a title carrying it", jout.count(j[2]), j[1].count(j[2]))
 
 
 def fake_model(replies, bodies=None):
     """generate() stand-in: returns the queued replies in order; records each request body in bodies."""
     it = iter(replies)
 
-    def gen(body, api_key):
+    def gen(body, api_key, **kw):
         if bodies is not None:
             bodies.append(body)
         return next(it)
@@ -65,6 +74,7 @@ def test_loop():
                                      part(text="Not in Hakiki's collection.")])
         out = agent.run("What about section nope?", api_key="x")
         expect("tool error goes back to the model", "error" in out["steps"][0]["result"], True)
+        expect("tool error: type only, no message", out["steps"][0]["result"]["error"].startswith("tool failed: "), True)
         expect("answer", out["answer"], "Not in Hakiki's collection.")
         agent.generate = fake_model([part(functionCall={"name": "get_section", "args": {"provision_id": S204}}),
                                      part(text=f"[[section:{S204}]]")])

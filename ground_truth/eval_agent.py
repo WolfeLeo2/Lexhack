@@ -32,16 +32,17 @@ def split(s):
     return [x.strip() for x in (s or "").split(";") if x.strip()]
 
 
-def score(q, out, key_ids, event_section):
+def score(q, out, key_ids, event_section, acts=()):
     """q: a question row; out: agent.run's result; key_ids: event_ids (str) the answer must cite; event_section:
-    {event_id: provision_id} for every event the answer references. Only references a tool returned earn credit;
+    {event_id: provision_id} for every event the answer references; acts: agent.held_acts() (naming a held Act with
+    [[act:X]] is not an invented reference). Only references a tool returned earn credit;
     section_found and key_rulings are left out when the question expects no section or no ruling."""
     rs = agent.refs(out["answer"])
     seen = {(k, v) for k, vs in out["seen"].items() for v in vs}
     cited_events = {v for k, v in rs if k == "event" and (k, v) in seen}
     cited_sections = ({v for k, v in rs if k == "section" and (k, v) in seen}
                       | {event_section.get(v) for v in cited_events})
-    s = {"invented": sum((k, v) not in seen for k, v in rs),
+    s = {"invented": sum(agent.is_invented(k, v, seen, acts) for k, v in rs),
          "model_quotes": len(MODEL_QUOTE.findall(agent.BRACKETS.sub("", out["answer"])))}
     if split(q["expected_provisions"]):
         s["section_found"] = all(p in cited_sections for p in split(q["expected_provisions"]))
@@ -91,6 +92,10 @@ def selftest():
     assert s["false_not_held"] == 1, s
     q = {"expected_provisions": "", "expect_not_held": "yes"}
     assert "false_not_held" not in score(q, {"answer": "Not in Hakiki's collection.", "seen": out["seen"]}, set(), {})
+    out = {"answer": "[[act:penal code]] [[act:ke/act/cap-63]] [[act:Land Act]]", "seen": out["seen"]}
+    s = score({"expected_provisions": "", "expect_not_held": ""}, out, set(), {},
+              {"penal code": "Penal Code", "ke/act/cap-63": "Penal Code"})
+    assert s["invented"] == 1, s   # a held Act by title or act_id is fine; one we don't hold is invented
     print("selftest ok")
 
 
@@ -138,7 +143,8 @@ def evaluate(name):
                                                   "WHERE event_id = ANY(%s)", ([int(v) for v in ev],)).fetchall())
                 rendered, _ = agent.render(out["answer"], out["seen"], conn)
                 expected = {p: provision_status(conn, p)["status"] for p in split(q["expected_provisions"])}
-            s = score(q, out, key_ids, event_section)
+                acts = agent.held_acts(conn)
+            s = score(q, out, key_ids, event_section, acts)
             results.append({"qid": q["qid"], "kind": q["kind"], "question": q["question"], "answer": out["answer"],
                             "rendered": rendered, "steps": out["steps"], "expected_status": expected, "scores": s})
             for k, v in s.items():
