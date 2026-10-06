@@ -145,6 +145,7 @@ class Event(BaseModel):
 
 class Numbering(BaseModel):
     provision_id: str
+    number: str | None             # the section number under this ID (Employment Act old s.85 is new s.84)
     versions: list[str]            # version dates under this ID, oldest first
 
 
@@ -271,10 +272,10 @@ class ExtractResult(BaseModel):
     ocr_pages: list[int] = []      # pages read by OCR (scans): slips there can look like misquotes
 
 
-def counts(conn, provision_ids):
+def counts(conn, provision_ids, chain_map=None):
     """{provision_id: Counts}, over every ID of a renumbered section. Leads are counted as load_events shows them: one
     per judgment and event type, and not when a verified event already records the same ruling."""
-    chain_map = renumbering(conn, provision_ids)
+    chain_map = renumbering(conn, provision_ids) if chain_map is None else chain_map
     rows = conn.execute("""
         SELECT g.key,
                (SELECT count(DISTINCT coalesce(j.duplicate_of, m.judgment_id)) FROM citation_mentions m
@@ -310,8 +311,8 @@ def act_provisions(act_id: str):
             raise HTTPException(404, f"no act {act_id}")
         chain_map = renumbering(conn, [r[0] for r in rows])   # a renumbered section is listed once, by its current ID
         rows = [r for r in rows if r[0] == chain_map.get(r[0], [{"provision_id": r[0]}])[-1]["provision_id"]]
-        status = statuses(conn, [r[0] for r in rows])
-        n = counts(conn, [r[0] for r in rows])
+        status = statuses(conn, [r[0] for r in rows], chain_map=chain_map)
+        n = counts(conn, [r[0] for r in rows], chain_map)
     key = lambda r: (int("".join(c for c in (r[3] or "0") if c.isdigit()) or 0), r[3] or "")
     return [ActSection(**ref_row(r), **n[r[0]].model_dump(), status=status[r[0]]) for r in sorted(rows, key=key)]
 
@@ -365,9 +366,10 @@ def provision(provision_id: str, include_unverified: bool = False):
             ORDER BY v.version_date DESC LIMIT 1""", (provision_id,)).fetchone()
         if not row:
             raise HTTPException(404, f"no provision {provision_id}")
-        res = provision_status(conn, provision_id, include_unverified)
-        n = counts(conn, [provision_id])[provision_id]
-        chain = renumbering(conn, [provision_id]).get(provision_id, [])
+        chain_map = renumbering(conn, [provision_id])
+        res = provision_status(conn, provision_id, include_unverified, chain_map)
+        n = counts(conn, [provision_id], chain_map)[provision_id]
+        chain = chain_map.get(provision_id, [])
     i = next((k for k, x in enumerate(chain) if x["provision_id"] == provision_id), 0)
     moved = {"renumbered_from": chain[i - 1] if i > 0 else None, "renumbered_to": chain[i + 1] if i + 1 < len(chain) else None}
     prov = Provision(**ref_row(row[:5]), text=row[5], version_date=row[6], source_url=row[7])
@@ -406,8 +408,9 @@ def search(q: str = Query(min_length=2), limit: int = Query(10, le=50)):
             FROM fused f JOIN provisions p USING (provision_id) JOIN acts a USING (act_id)
             JOIN latest l USING (provision_id) ORDER BY f.score DESC LIMIT %(n)s""",
                             {"q": q, "v": vec, "n": limit}).fetchall()
-        status = statuses(conn, [r[0] for r in rows])
-        n = counts(conn, [r[0] for r in rows])
+        chain_map = renumbering(conn, [r[0] for r in rows])
+        status = statuses(conn, [r[0] for r in rows], chain_map=chain_map)
+        n = counts(conn, [r[0] for r in rows], chain_map)
     return [SearchHit(**ref_row(r[:5]), **n[r[0]].model_dump(), snippet=r[5], status=status[r[0]]) for r in rows]
 
 

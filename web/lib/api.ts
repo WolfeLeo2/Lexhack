@@ -80,6 +80,7 @@ export interface CourtEvent {
 /** The section under another ID in earlier / later versions (Kenya Law renumbered it). */
 export interface Numbering {
   provision_id: string
+  number: string | null // differs from the page's number when the section moved (Employment Act old s.85 is new s.84)
   versions: string[] // version dates, oldest first
 }
 

@@ -48,7 +48,11 @@ export default async function ProvisionPage(props: Props) {
   const srcUrl = cleanUrl(p.source_url)
   const from = data.renumbered_from
   const to = data.renumbered_to
-  const eid = (pid: string) => pid.split('/').pop()
+  // 'sec_85', or 's.85 (sec_85)' when the number itself changed
+  const other = (n: { provision_id: string; number: string | null }) => {
+    const eid = <code className="text-[0.9em]">{n.provision_id.split('/').pop()}</code>
+    return n.number !== p.number ? <>s.{n.number} ({eid})</> : eid
+  }
   const onOld = from && data.history.some((e) => !isStatutory(e) && e.provision_id === from.provision_id)
 
   return (
@@ -93,7 +97,7 @@ export default async function ProvisionPage(props: Props) {
                 <>
                   Kenya Law renumbered this section from the version of {fmtDate(to.versions[0])}: it is now{' '}
                   <Link href={sectionHref(to.provision_id)} className="link">
-                    <code className="text-[0.9em]">{eid(to.provision_id)}</code>
+                    {other(to)}
                   </Link>
                   . The status and rulings here cover both numberings.
                 </>
@@ -102,7 +106,7 @@ export default async function ProvisionPage(props: Props) {
                   <>
                     Up to Kenya Law’s version of {fmtDate(from.versions.at(-1) ?? null)} this section was{' '}
                     <Link href={sectionHref(from.provision_id)} className="link">
-                      <code className="text-[0.9em]">{eid(from.provision_id)}</code>
+                      {other(from)}
                     </Link>
                     .{onOld && ' The court rulings below were made on that numbering.'}
                   </>

@@ -80,12 +80,29 @@ def main():
                 effective_date="2021-07-06", stance="validates")
     if states(resolve([kit, dirs]))["KIT"] != "displaced by a later ruling":
         fails.append(("stance did not displace", states(resolve([kit, dirs]))))
-    # renumbering: same number, versions one after the other -> one chain; overlapping versions -> two sections
-    rows = [("a", "45", "sec_45", ["2007", "2022-04"]), ("a", "45", "part_VI__sec_45", ["2022-12", "2024"]),
-            ("a", "43", "part_V__sec_43", ["1972", "2022"]), ("a", "43", "part_VI__sec_43", ["2021", "2024"]),
-            ("a", "1", "sec_1", ["2007", "2024"])]
-    got = {k: [x["provision_id"] for x in v] for k, v in chains(rows).items()}
-    if got != {"sec_45": ["sec_45", "part_VI__sec_45"], "part_VI__sec_45": ["sec_45", "part_VI__sec_45"]}:
+    # renumbering: the same heading in versions one after the other -> one chain, whatever the number; a different
+    # heading, overlapping versions, a placeholder heading or an ambiguous match -> separate sections
+    old, new = ["2007", "2022-04"], ["2022-12", "2024"]
+    rows = [("a", "45", "sec_45", "Unfair termination", old), ("a", "45", "part_VI__sec_45", "Unfair termination", new),
+            ("a", "85", "sec_85", "Security in foreign contract", old),
+            ("a", "84", "part_XI__sec_84", "Security in foreign contract", new),
+            ("a", "86", "sec_86", "Offence to induce", old), ("a", "85", "part_XI__sec_85", "Offence to induce", new),
+            ("a", "91", "sec_91", "Rules", old), ("a", "91", "part_XIII__sec_91", "[Spent]", new),
+            ("a", "71", "sec_71", "Complaint to Industrial Court", old),
+            ("a", "71", "part_VIII__sec_71", "Complaint to Employment and Labour Relations Court", new),
+            ("a", "31A", "sec_31A", "Deleted", old), ("a", "31A", "part_V__sec_31A", "[Deleted by Act No. 20 of 2020]", new),
+            ("a", "2", "sec_2", "Interpretation", old), ("a", "2", "part_1__sec_2", "Interpretation", new),
+            ("a", "52", "sec_52", "Interpretation", old), ("a", "52", "part_VII__sec_52", "Interpretation", new),
+            ("a", "7", "sec_7", "Leave", old), ("a", "8", "part_II__sec_8", "Leave", new),
+            ("a", "9", "part_II__sec_9", "Leave", new),                          # two later 'Leave': ambiguous
+            ("a", "43", "part_V__sec_43", "Survivorship", ["1972", "2022"]),
+            ("a", "43", "part_VI__sec_43", "Survivorship", ["2021", "2024"]),   # overlap: two sections
+            ("a", "1", "sec_1", "Short title", ["2007", "2024"])]
+    got = {v[0]["provision_id"]: v[-1]["provision_id"] for v in chains(rows).values()}
+    want = {"sec_45": "part_VI__sec_45", "sec_85": "part_XI__sec_84", "sec_86": "part_XI__sec_85",
+            "sec_71": "part_VIII__sec_71", "sec_31A": "part_V__sec_31A", "sec_2": "part_1__sec_2",
+            "sec_52": "part_VII__sec_52"}
+    if got != want:
         fails.append(("renumbering chains", got))
     for f in fails:
         print("FAIL", *f)

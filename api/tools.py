@@ -90,9 +90,9 @@ def find_section(act: str, section: str):
     """Use this whenever the user names an Act and a section number (e.g. act 'Penal Code' or 'Cap. 63', section
     '204', 's.8(2)', 'Article 50'), before saying anything is not held. found: true gives the provision_id and
     status (call get_section for the rulings); found with ambiguous: true lists candidates (one number used by two
-    sections, with the version dates of each: ask which). A section renumbered between versions comes back once, by
-    its current ID, with renumbered_from (its older IDs and their version dates); its status and rulings cover every
-    ID, so say when a ruling was made under the older numbering. reason section_not_held: Hakiki holds the Act but not that section;
+    sections, e.g. in different versions, with the version dates of each: ask which). A section renumbered between
+    versions comes back by its current ID and number, with renumbered_from (its older IDs, numbers and version
+    dates); its status and rulings cover every ID, so say when a ruling was made under the older numbering. reason section_not_held: Hakiki holds the Act but not that section;
     act_not_recognised: the name isn't one of held_acts (retry with the matching title from held_acts, or say the Act
     isn't in Hakiki's collection if it clearly isn't one of them); no_section_number: give the section as a number."""
     with main.db() as conn:
@@ -106,9 +106,13 @@ def find_section(act: str, section: str):
             return {"result": {"found": False, "reason": "no_section_number"}, "ids": ids()}
         rows = conn.execute("SELECT provision_id, eid, number, heading FROM provisions WHERE act_id = %s AND number = %s",
                             (act_id, number.group(0))).fetchall()
-        chain_map = renumbering(conn, [r[0] for r in rows])   # renumbered between versions: the current ID only,
-        rows = [r for r in rows if r[0] == members(chain_map, r[0])[-1]]   # whose status covers the older IDs' rulings
-        status = statuses(conn, [r[0] for r in rows])
+        # a renumbered section by its current ID, whose status covers the older IDs' rulings. The number may have
+        # moved (Employment Act old s.85 is new s.84), so old s.85 and new s.85 are two candidates.
+        chain_map = renumbering(conn, [r[0] for r in rows])
+        current = sorted({members(chain_map, r[0])[-1] for r in rows})
+        rows = conn.execute("SELECT provision_id, eid, number, heading FROM provisions WHERE provision_id = ANY(%s)"
+                            " ORDER BY provision_id", (current,)).fetchall()
+        status = statuses(conn, [r[0] for r in rows], chain_map=chain_map)
         versions = dict(conn.execute("""SELECT t.provision_id, array_agg(v.version_date::text ORDER BY v.version_date)
                                         FROM provision_texts t JOIN act_versions v USING (version_id)
                                         WHERE t.provision_id = ANY(%s) GROUP BY 1""",

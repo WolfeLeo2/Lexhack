@@ -8,6 +8,7 @@ fails = []
 S204 = "ke/act/cap-63/part_II__chp_XVIII__subpart_nn_1__sec_204"
 S194 = "ke/act/cap-63/part_II__chp_XVIII__sec_194"
 S45, S45_OLD = "ke/act/cap-226/part_VI__sec_45", "ke/act/cap-226/sec_45"
+S84_NEW, S85_NEW, S85_OLD = "ke/act/cap-226/part_XI__sec_84", "ke/act/cap-226/part_XI__sec_85", "ke/act/cap-226/sec_85"
 
 
 def expect(name, got, want):
@@ -179,6 +180,29 @@ def test_renumbered_pages():
     expect("no renumbering: unchanged", (p.renumbered_from, p.renumbered_to, p.status), (None, None, "limited by a court"))
     s45 = [x.provision_id for x in main.act_provisions("ke/act/cap-226") if x.number == "45"]
     expect("acts list: s.45 once, current id", s45, [S45])
+    # 2022 shifted ss.83-92 down one place: old s.85 'Security in foreign contract of service' is new s.84
+    h84, h85 = main.provision(S84_NEW), main.provision(S85_NEW)
+    expect("old s.85 onto new s.84", (h84.renumbered_from.provision_id, h84.renumbered_from.number,
+                                      {e.provision_id for e in h84.history}), (S85_OLD, "85", {S85_OLD}))
+    expect("new s.85 has none of old s.85", (h85.renumbered_from.provision_id,
+                                             S85_OLD in {e.provision_id for e in h85.history}), ("ke/act/cap-226/sec_86", False))
+    out = tools.find_section("Employment Act", "85")["result"]
+    expect("s.85: old and new s.85 are two sections", sorted(c["provision_id"] for c in out.get("candidates", [])),
+           [S84_NEW, S85_NEW])
+    from .status import norm_heading, renumbering, same_section
+    with main.db() as conn:
+        ids = [r[0] for r in conn.execute("SELECT DISTINCT ON (act_id) provision_id FROM provisions")]
+        heads = dict(conn.execute("SELECT provision_id, heading FROM provisions").fetchall())
+        chain_map = renumbering(conn, ids)
+    bad = [(a["provision_id"], b["provision_id"]) for c in chain_map.values() for a, b in zip(c, c[1:])
+           if not same_section({"heading": heads[a["provision_id"]], "number": a["number"]},
+                               {"heading": heads[b["provision_id"]], "number": b["number"]})]
+    expect("every merged pair's headings match", bad, [])
+    expect("merges: Employment Act and Succession s.43 only",
+           {p.split("/")[2] for p in chain_map}, {"cap-226", "cap-160"})
+    norm = {(norm_heading(heads[c[0]["provision_id"]]), norm_heading(heads[c[-1]["provision_id"]]))
+            for c in chain_map.values() if c[0]["number"] != c[-1]["number"]}
+    expect("moved numbers only with equal headings", all(a == b for a, b in norm), True)
     for sec in ("", "two hundred and four"):
         expect(f"no number {sec!r}", tools.find_section("Penal Code", sec)["result"]["reason"], "no_section_number")
 

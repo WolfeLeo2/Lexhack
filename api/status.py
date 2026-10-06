@@ -2,6 +2,9 @@
 
   uv run python -m api.status ke/act/cap-63/part_II__chp_XVIII__subpart_nn_1__sec_204
 """
+import collections
+import difflib
+import re
 import sys
 
 from . import status_ke
@@ -9,35 +12,77 @@ from . import status_ke
 RULES = {"ke": status_ke}
 
 
-def load_events(conn, provision_id, include_unverified=False):
+def load_events(conn, provision_id, include_unverified=False, chain_map=None):
     """Manual (answer-key) and extracted events. When both record the same ruling (same judgment and type), the
     verified one wins. Extracted rows are unverified and say so."""
-    return load_events_many(conn, [provision_id], include_unverified).get(provision_id, [])
+    return load_events_many(conn, [provision_id], include_unverified, chain_map).get(provision_id, [])
+
+
+# Cosmetic heading changes at a revision (Employment Act s.71: the court was renamed)
+HEADING_ALIASES = {"employment and labour relations court": "industrial court"}
+PLACEHOLDER = re.compile(r"^(spent|deleted|repealed)\b")
+
+
+def norm_heading(h):
+    h = " ".join(re.sub(r"[^a-z0-9]+", " ", (h or "").lower()).split())
+    for a, b in HEADING_ALIASES.items():
+        h = h.replace(a, b)
+    return h
+
+
+def same_section(a, b):
+    """Headings match: equal up to case, punctuation and small slips (s.57 child/children, s.79 'Regiser'). A
+    '[Spent]' / '[Deleted…]' heading matches only another placeholder with the same number (s.31A)."""
+    ha, hb = norm_heading(a["heading"]), norm_heading(b["heading"])
+    if not ha or not hb:
+        return False
+    if PLACEHOLDER.match(ha) or PLACEHOLDER.match(hb):
+        return bool(PLACEHOLDER.match(ha) and PLACEHOLDER.match(hb)) and a["number"] == b["number"]
+    return difflib.SequenceMatcher(None, ha, hb).ratio() >= 0.9
 
 
 def chains(rows):
-    """rows: (act_id, number, provision_id, [version dates]) -> {provision_id: chain, oldest first, of
-    {"provision_id", "versions"}} for sections renumbered between versions: two or more IDs in one Act with the same
-    number whose versions don't overlap (each ID's versions all before the next one's). Overlapping IDs are two
-    different sections that share a number, and stay apart."""
-    groups, out = {}, {}
-    for act, number, pid, versions in rows:
-        groups.setdefault((act, number), []).append({"provision_id": pid, "versions": list(versions)})
-    for g in groups.values():
-        g.sort(key=lambda x: x["versions"][0])
-        if len(g) > 1 and all(a["versions"][-1] < b["versions"][0] for a, b in zip(g, g[1:])):
-            out |= {x["provision_id"]: g for x in g}
+    """rows: (act_id, number, provision_id, heading, [version dates]) -> {provision_id: chain, oldest first, of
+    {"provision_id", "number", "versions"}} for sections Kenya Law renumbered between versions: an ID whose versions
+    all come before another ID's in the same Act, with the same heading (same_section), whatever the numbers (the
+    Employment Act's 2022 revision moved ss.83-92 down one place). The match must be unique: among the earliest later
+    IDs with that heading, the same number breaks a tie (two 'Interpretation' sections); otherwise no merge. Two IDs
+    whose versions overlap are different sections."""
+    acts = {}
+    for act, number, pid, heading, versions in rows:
+        acts.setdefault(act, []).append({"provision_id": pid, "number": number, "heading": heading,
+                                         "versions": list(versions)})
+    out = {}
+    for rs in acts.values():
+        links = {}
+        for a in rs:
+            later = [b for b in rs if a["versions"][-1] < b["versions"][0] and same_section(a, b)]
+            first = min((b["versions"][0] for b in later), default=None)
+            later = [b for b in later if b["versions"][0] == first]
+            if len(later) > 1:
+                later = [b for b in later if b["number"] == a["number"]]
+            if len(later) == 1:
+                links[a["provision_id"]] = later[0]["provision_id"]
+        taken = collections.Counter(links.values())
+        links = {a: b for a, b in links.items() if taken[b] == 1}   # each new ID claimed by one old ID only
+        by_id = {r["provision_id"]: {k: r[k] for k in ("provision_id", "number", "versions")} for r in rs}
+        for head in set(links) - set(links.values()):
+            chain = [head]
+            while chain[-1] in links:
+                chain.append(links[chain[-1]])
+            out |= {x: [by_id[y] for y in chain] for x in chain}
     return out
 
 
 def renumbering(conn, provision_ids):
-    """The renumbered-section lookup (chains) for these provisions, one query. Every caller that merges a section's
-    old and new IDs (status, counts, citations, the Acts list, the agent tools) goes through here."""
+    """The renumbered-section lookup (chains) for the Acts of these provisions, one query. Every caller that merges a
+    section's old and new IDs (status, counts, citations, the Acts list, the agent tools) goes through here; pass its
+    result on as chain_map to avoid repeating it."""
     rows = conn.execute("""
-        SELECT p.act_id, p.number, p.provision_id, array_agg(v.version_date::text ORDER BY v.version_date)
+        SELECT p.act_id, p.number, p.provision_id, p.heading, array_agg(v.version_date::text ORDER BY v.version_date)
         FROM provisions p JOIN provision_texts t USING (provision_id) JOIN act_versions v USING (version_id)
-        WHERE (p.act_id, p.number) IN (SELECT act_id, number FROM provisions WHERE provision_id = ANY(%s))
-        GROUP BY 1, 2, 3""", (list(provision_ids),)).fetchall()
+        WHERE p.act_id IN (SELECT act_id FROM provisions WHERE provision_id = ANY(%s))
+        GROUP BY 1, 2, 3, 4""", (list(provision_ids),)).fetchall()
     return chains(rows)
 
 
@@ -46,11 +91,11 @@ def members(chain_map, provision_id):
     return [x["provision_id"] for x in chain_map.get(provision_id, [{"provision_id": provision_id}])]
 
 
-def load_events_many(conn, provision_ids, include_unverified=False):
+def load_events_many(conn, provision_ids, include_unverified=False, chain_map=None):
     """{provision_id: events} for many provisions in ONE events query (search results). A renumbered section gets the
     events of all its IDs (each event keeps its own provision_id). Extracted events the second-pass checker failed
     (pipeline/verify_events.py) are never returned."""
-    chain_map = renumbering(conn, provision_ids)
+    chain_map = renumbering(conn, provision_ids) if chain_map is None else chain_map
     own = load_own(conn, {q for p in provision_ids for q in members(chain_map, p)}, include_unverified)
     out = {}
     for p in provision_ids:
@@ -99,14 +144,14 @@ def with_leads(resolve, events):
     return {**res, "history": [checked.get(e["event_id"], e) for e in resolve(events)["history"]]}
 
 
-def provision_status(conn, provision_id, include_unverified=False):
+def provision_status(conn, provision_id, include_unverified=False, chain_map=None):
     rules = RULES[provision_id.split("/", 1)[0]]
-    return with_leads(rules.resolve, load_events(conn, provision_id, include_unverified))
+    return with_leads(rules.resolve, load_events(conn, provision_id, include_unverified, chain_map))
 
 
-def statuses(conn, provision_ids, include_unverified=False):
+def statuses(conn, provision_ids, include_unverified=False, chain_map=None):
     """{provision_id: status label} for many provisions, one query."""
-    events = load_events_many(conn, provision_ids, include_unverified)
+    events = load_events_many(conn, provision_ids, include_unverified, chain_map)
     return {p: RULES[p.split("/", 1)[0]].resolve(events.get(p, []))["status"] for p in provision_ids}
 
 

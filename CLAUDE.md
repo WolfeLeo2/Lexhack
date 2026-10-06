@@ -62,7 +62,7 @@ Details of the Internet Archive pilot are in `crawler/REPORT.md`.
 
 ## What the pilot found (facts to build on)
 
-- Statutes carry **stable section IDs (eIds) that don't change between versions**. Exception: the Employment Act's IDs changed at its 2022-12-31 revision (`sec_45` → `part_VI__sec_45`; also Law of Succession s.43); the focus Acts are stable. The API treats same Act + same number + non-overlapping versions as one renumbered section (`api/status.py` `renumbering`: status, rulings and counts merged, `renumbered_from`/`_to` on the section page; README §7c). Examples:
+- Statutes carry **stable section IDs (eIds) that don't change between versions**. Exception: the Employment Act's IDs changed at its 2022-12-31 revision (`sec_45` → `part_VI__sec_45`; also Law of Succession s.43); the focus Acts are stable. The API treats same Act + matching heading + non-overlapping versions as one renumbered section (numbers can move: Employment Act old ss.83–91 are new ss.82–90) (`api/status.py` `renumbering`: status, rulings and counts merged, `renumbered_from`/`_to` on the section page; README §7c). Examples:
   - KICA s.29 → `part_III__sec_29`
   - Penal Code s.194 → `part_II__chp_XVIII__sec_194`
   - Penal Code s.204 → `part_II__chp_XVIII__subpart_nn_1__sec_204`
