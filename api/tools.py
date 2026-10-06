@@ -6,11 +6,10 @@ work; nothing here queries what an endpoint already answers.
 """
 import inspect
 import re
-from datetime import date
 
-from pipeline.extract_citations import canonical, pick_provision
+from pipeline.extract_citations import canonical
 
-from .status import statuses
+from .status import members, renumbering, statuses
 
 MAX_TEXT, MAX_HISTORY, MAX_QUOTE = 3000, 15, 600
 TYPES = {str: "string", int: "integer", bool: "boolean"}
@@ -32,7 +31,7 @@ def ids(section=(), event=(), judgment=()):
 def event_view(e):
     """An event as the model reads it: the court's words capped, how it was checked."""
     return {k: e[k] for k in ("event_id", "event_type", "scope", "subsection", "effective_date", "court", "title",
-                              "neutral_citation", "source_paragraph", "verified", "verified_by", "state",
+                              "neutral_citation", "source_paragraph", "verified", "verified_by", "state", "provision_id",
                               "superseded_by")} | {"operative_quote": e["operative_quote"][:MAX_QUOTE],
                                                     "scope_text": (e["scope_text"] or "")[:MAX_QUOTE] or None}
 
@@ -62,7 +61,8 @@ def get_section(provision_id: str, include_leads: bool = False):
     shown = events[0] + events[1][-MAX_HISTORY:]
     result = {**p["provision"], "text": p["provision"]["text"][:MAX_TEXT], "status": p["status"],
               "summary_events": events[0], "history": events[1][-MAX_HISTORY:],
-              "history_total": len(events[1]), "cited_by": p["cited_by"], "lead_count": p["lead_count"]}
+              "history_total": len(events[1]), "cited_by": p["cited_by"], "lead_count": p["lead_count"],
+              "renumbered_from": p["renumbered_from"], "renumbered_to": p["renumbered_to"]}
     return {"result": result, "ids": ids(section=[provision_id], event=[e["event_id"] for e in shown],
                                          judgment=sorted({e["judgment_id"] for e in shown if e["judgment_id"]}))}
 
@@ -89,9 +89,10 @@ def held_act_id(act, held):
 def find_section(act: str, section: str):
     """Use this whenever the user names an Act and a section number (e.g. act 'Penal Code' or 'Cap. 63', section
     '204', 's.8(2)', 'Article 50'), before saying anything is not held. found: true gives the provision_id and
-    status (call get_section for the rulings); found with ambiguous: true lists candidates (one number in two Parts:
-    ask which; or a section renumbered between versions, under two IDs with the version dates of each: report both
-    and say which one has the court rulings). reason section_not_held: Hakiki holds the Act but not that section;
+    status (call get_section for the rulings); found with ambiguous: true lists candidates (one number used by two
+    sections, with the version dates of each: ask which). A section renumbered between versions comes back once, by
+    its current ID, with renumbered_from (its older IDs and their version dates); its status and rulings cover every
+    ID, so say when a ruling was made under the older numbering. reason section_not_held: Hakiki holds the Act but not that section;
     act_not_recognised: the name isn't one of held_acts (retry with the matching title from held_acts, or say the Act
     isn't in Hakiki's collection if it clearly isn't one of them); no_section_number: give the section as a number."""
     with main.db() as conn:
@@ -105,14 +106,8 @@ def find_section(act: str, section: str):
             return {"result": {"found": False, "reason": "no_section_number"}, "ids": ids()}
         rows = conn.execute("SELECT provision_id, eid, number, heading FROM provisions WHERE act_id = %s AND number = %s",
                             (act_id, number.group(0))).fetchall()
-        slug = act_id.removeprefix("ke/act/")   # pick_provision: the Employment Act's eId change by date
-        one = pick_provision({(slug, number.group(0)): [(r[1], r[0]) for r in rows]}, slug, number.group(0),
-                             date.today())
-        ruled = {r[0] for r in conn.execute("""SELECT DISTINCT provision_id FROM citation_events WHERE verified
-                                               AND judgment_id IS NOT NULL AND provision_id = ANY(%s)""",
-                                            ([r[0] for r in rows],))}
-        if one and not ruled - {one}:   # one ID by date, and no court ruling sits on another ID with this number
-            rows = [r for r in rows if r[0] == one]
+        chain_map = renumbering(conn, [r[0] for r in rows])   # renumbered between versions: the current ID only,
+        rows = [r for r in rows if r[0] == members(chain_map, r[0])[-1]]   # whose status covers the older IDs' rulings
         status = statuses(conn, [r[0] for r in rows])
         versions = dict(conn.execute("""SELECT t.provision_id, array_agg(v.version_date::text ORDER BY v.version_date)
                                         FROM provision_texts t JOIN act_versions v USING (version_id)
@@ -121,7 +116,8 @@ def find_section(act: str, section: str):
     if not rows:
         return {"result": {"found": False, "reason": "section_not_held", "act_id": act_id, "act_title": held[act_id]},
                 "ids": ids()}
-    found = [{"provision_id": p, "number": n, "heading": h, "status": status[p]} for p, _, n, h in rows]
+    found = [{"provision_id": p, "number": n, "heading": h, "status": status[p]}
+             | ({"renumbered_from": chain_map[p][:-1]} if p in chain_map else {}) for p, _, n, h in rows]
     result = found[0] if len(found) == 1 else {"ambiguous": True, "candidates": [
         f | {"versions": versions.get(f["provision_id"], [])} for f in found]}
     return {"result": {"found": True, "act_title": held[act_id], **result}, "ids": ids(section=[f["provision_id"]

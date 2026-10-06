@@ -5,7 +5,7 @@
 import csv
 from pathlib import Path
 
-from .status import with_leads
+from .status import chains, with_leads
 from .status_ke import resolve
 
 COURT = {"kesc": "Supreme Court", "keca": "Court of Appeal", "kehc": "High Court"}
@@ -80,9 +80,16 @@ def main():
                 effective_date="2021-07-06", stance="validates")
     if states(resolve([kit, dirs]))["KIT"] != "displaced by a later ruling":
         fails.append(("stance did not displace", states(resolve([kit, dirs]))))
+    # renumbering: same number, versions one after the other -> one chain; overlapping versions -> two sections
+    rows = [("a", "45", "sec_45", ["2007", "2022-04"]), ("a", "45", "part_VI__sec_45", ["2022-12", "2024"]),
+            ("a", "43", "part_V__sec_43", ["1972", "2022"]), ("a", "43", "part_VI__sec_43", ["2021", "2024"]),
+            ("a", "1", "sec_1", ["2007", "2024"])]
+    got = {k: [x["provision_id"] for x in v] for k, v in chains(rows).items()}
+    if got != {"sec_45": ["sec_45", "part_VI__sec_45"], "part_VI__sec_45": ["sec_45", "part_VI__sec_45"]}:
+        fails.append(("renumbering chains", got))
     for f in fails:
         print("FAIL", *f)
-    print(f"{13 - len(fails)}/13 passed")
+    print(f"{14 - len(fails)}/14 passed")
     raise SystemExit(1 if fails else 0)
 
 

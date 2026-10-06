@@ -27,7 +27,7 @@ import crawler.config  # noqa: F401  (loads .env)
 from psycopg_pool import ConnectionPool
 
 from . import agent, extract, filing
-from .status import provision_status, statuses
+from .status import members, provision_status, renumbering, statuses
 from . import mcp_server
 
 DISCLAIMER = "Hakiki reports what published sources say. It is not legal advice."
@@ -140,6 +140,12 @@ class Event(BaseModel):
     verified_by: str | None        # 'human:…' = checked by a person; 'agent:…' = checked by an AI reviewer
     state: str                     # 'in effect' | 'reversed on appeal' | 'displaced by a later ruling'
     superseded_by: int | None      # event_id of the event that reversed or displaced this one
+    provision_id: str | None = None   # the ID the ruling was recorded on: an older numbering if the section was renumbered
+
+
+class Numbering(BaseModel):
+    provision_id: str
+    versions: list[str]            # version dates under this ID, oldest first
 
 
 class ProvisionStatus(BaseModel):
@@ -149,6 +155,10 @@ class ProvisionStatus(BaseModel):
     history: list[Event]           # every event, oldest first
     cited_by: int                  # distinct judgments we hold that cite this section
     lead_count: int                # unverified leads not shown unless include_unverified=true
+    # The section under another ID in earlier / later versions (Kenya Law renumbered it, e.g. the Employment Act's
+    # 2022-12-31 revision: sec_45 -> part_VI__sec_45). Status, history and counts cover every ID.
+    renumbered_from: Numbering | None = None
+    renumbered_to: Numbering | None = None
     disclaimer: str = DISCLAIMER
 
 
@@ -262,18 +272,20 @@ class ExtractResult(BaseModel):
 
 
 def counts(conn, provision_ids):
-    """{provision_id: Counts}. Leads are counted as load_events shows them: one per judgment and event type, and not
-    when a verified event already records the same ruling."""
+    """{provision_id: Counts}, over every ID of a renumbered section. Leads are counted as load_events shows them: one
+    per judgment and event type, and not when a verified event already records the same ruling."""
+    chain_map = renumbering(conn, provision_ids)
     rows = conn.execute("""
-        SELECT p,
+        SELECT g.key,
                (SELECT count(DISTINCT coalesce(j.duplicate_of, m.judgment_id)) FROM citation_mentions m
-                  JOIN judgments j USING (judgment_id) WHERE m.provision_id = p),
+                  JOIN judgments j USING (judgment_id) WHERE m.provision_id = ANY(ids)),
                (SELECT count(*) FROM (SELECT DISTINCT e.judgment_id, e.event_type FROM citation_events e
                   JOIN judgments dj ON dj.judgment_id = e.judgment_id AND dj.duplicate_of IS NULL
-                  WHERE e.provision_id = p AND NOT e.verified AND e.check_verdict IS DISTINCT FROM 'fail'
-                    AND NOT EXISTS (SELECT 1 FROM citation_events v WHERE v.provision_id = p AND v.verified
+                  WHERE e.provision_id = ANY(ids) AND NOT e.verified AND e.check_verdict IS DISTINCT FROM 'fail'
+                    AND NOT EXISTS (SELECT 1 FROM citation_events v WHERE v.provision_id = ANY(ids) AND v.verified
                                     AND v.judgment_id IS NOT DISTINCT FROM e.judgment_id AND v.event_type = e.event_type)) x)
-        FROM unnest(%s::text[]) p""", (list(provision_ids),)).fetchall()
+        FROM jsonb_each(%s::jsonb) g CROSS JOIN LATERAL (SELECT ARRAY(SELECT jsonb_array_elements_text(g.value)) ids) i""",
+                        (json.dumps({p: members(chain_map, p) for p in provision_ids}),)).fetchall()
     return {p: Counts(cited_by=c, lead_count=n) for p, c, n in rows}
 
 
@@ -296,6 +308,8 @@ def act_provisions(act_id: str):
                                JOIN acts a USING (act_id) WHERE p.act_id = %s""", (act_id,)).fetchall()
         if not rows:
             raise HTTPException(404, f"no act {act_id}")
+        chain_map = renumbering(conn, [r[0] for r in rows])   # a renumbered section is listed once, by its current ID
+        rows = [r for r in rows if r[0] == chain_map.get(r[0], [{"provision_id": r[0]}])[-1]["provision_id"]]
         status = statuses(conn, [r[0] for r in rows])
         n = counts(conn, [r[0] for r in rows])
     key = lambda r: (int("".join(c for c in (r[3] or "0") if c.isdigit()) or 0), r[3] or "")
@@ -324,16 +338,17 @@ def stats():
 @app.get("/api/provisions/{provision_id:path}/citations", response_model=Citations)
 def citations(provision_id: str, limit: int = Query(20, le=100), offset: int = 0):
     with db() as conn:
+        ids = members(renumbering(conn, [provision_id]), provision_id)   # every numbering of the section
         total = conn.execute("""SELECT count(DISTINCT m.judgment_id) FROM citation_mentions m JOIN judgments j USING (judgment_id)
-                                WHERE m.provision_id = %s AND j.duplicate_of IS NULL""", (provision_id,)).fetchone()[0]
+                                WHERE m.provision_id = ANY(%s) AND j.duplicate_of IS NULL""", (ids,)).fetchone()[0]
         rows = conn.execute("""
             SELECT j.judgment_id, j.title, j.court, j.neutral_citation, j.decision_date::text, j.source_url, count(*),
                    (array_agg(m.raw_text ORDER BY m.char_start))[1], (array_agg(m.paragraph ORDER BY m.char_start))[1]
-            FROM citation_mentions m JOIN judgments j USING (judgment_id) WHERE m.provision_id = %s AND j.duplicate_of IS NULL
+            FROM citation_mentions m JOIN judgments j USING (judgment_id) WHERE m.provision_id = ANY(%s) AND j.duplicate_of IS NULL
             GROUP BY j.judgment_id
             ORDER BY CASE j.court WHEN 'Supreme Court' THEN 3 WHEN 'Court of Appeal' THEN 2 ELSE 1 END DESC,
                      j.decision_date DESC NULLS LAST, j.judgment_id
-            LIMIT %s OFFSET %s""", (provision_id, limit, offset)).fetchall()
+            LIMIT %s OFFSET %s""", (ids, limit, offset)).fetchall()
     cols = list(CitingJudgment.model_fields)
     return Citations(total=total, judgments=[CitingJudgment(**dict(zip(cols, r))) for r in rows])
 
@@ -352,10 +367,13 @@ def provision(provision_id: str, include_unverified: bool = False):
             raise HTTPException(404, f"no provision {provision_id}")
         res = provision_status(conn, provision_id, include_unverified)
         n = counts(conn, [provision_id])[provision_id]
+        chain = renumbering(conn, [provision_id]).get(provision_id, [])
+    i = next((k for k, x in enumerate(chain) if x["provision_id"] == provision_id), 0)
+    moved = {"renumbered_from": chain[i - 1] if i > 0 else None, "renumbered_to": chain[i + 1] if i + 1 < len(chain) else None}
     prov = Provision(**ref_row(row[:5]), text=row[5], version_date=row[6], source_url=row[7])
     return ProvisionStatus(provision=prov, status=res["status"],
                            summary_events=[Event(**e) for e in res["summary_events"]],
-                           history=[Event(**e) for e in res["history"]], **n.model_dump())
+                           history=[Event(**e) for e in res["history"]], **n.model_dump(), **moved)
 
 
 @functools.lru_cache(maxsize=2048)   # a repeated query skips the ~1 s Gemini call

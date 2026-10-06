@@ -15,9 +15,58 @@ def load_events(conn, provision_id, include_unverified=False):
     return load_events_many(conn, [provision_id], include_unverified).get(provision_id, [])
 
 
+def chains(rows):
+    """rows: (act_id, number, provision_id, [version dates]) -> {provision_id: chain, oldest first, of
+    {"provision_id", "versions"}} for sections renumbered between versions: two or more IDs in one Act with the same
+    number whose versions don't overlap (each ID's versions all before the next one's). Overlapping IDs are two
+    different sections that share a number, and stay apart."""
+    groups, out = {}, {}
+    for act, number, pid, versions in rows:
+        groups.setdefault((act, number), []).append({"provision_id": pid, "versions": list(versions)})
+    for g in groups.values():
+        g.sort(key=lambda x: x["versions"][0])
+        if len(g) > 1 and all(a["versions"][-1] < b["versions"][0] for a, b in zip(g, g[1:])):
+            out |= {x["provision_id"]: g for x in g}
+    return out
+
+
+def renumbering(conn, provision_ids):
+    """The renumbered-section lookup (chains) for these provisions, one query. Every caller that merges a section's
+    old and new IDs (status, counts, citations, the Acts list, the agent tools) goes through here."""
+    rows = conn.execute("""
+        SELECT p.act_id, p.number, p.provision_id, array_agg(v.version_date::text ORDER BY v.version_date)
+        FROM provisions p JOIN provision_texts t USING (provision_id) JOIN act_versions v USING (version_id)
+        WHERE (p.act_id, p.number) IN (SELECT act_id, number FROM provisions WHERE provision_id = ANY(%s))
+        GROUP BY 1, 2, 3""", (list(provision_ids),)).fetchall()
+    return chains(rows)
+
+
+def members(chain_map, provision_id):
+    """Every ID of the section: itself, plus its other numberings if renumbered."""
+    return [x["provision_id"] for x in chain_map.get(provision_id, [{"provision_id": provision_id}])]
+
+
 def load_events_many(conn, provision_ids, include_unverified=False):
-    """{provision_id: events} for many provisions in ONE query (search results). Extracted events the second-pass
-    checker failed (pipeline/verify_events.py) are never returned."""
+    """{provision_id: events} for many provisions in ONE events query (search results). A renumbered section gets the
+    events of all its IDs (each event keeps its own provision_id). Extracted events the second-pass checker failed
+    (pipeline/verify_events.py) are never returned."""
+    chain_map = renumbering(conn, provision_ids)
+    own = load_own(conn, {q for p in provision_ids for q in members(chain_map, p)}, include_unverified)
+    out = {}
+    for p in provision_ids:
+        seen = set()
+        for q in members(chain_map, p):   # one ruling recorded on both IDs counts once
+            keys = set()
+            for e in own.get(q, []):
+                k = (e["judgment_id"] or (e["source_paragraph"], e["effective_date"]), e["event_type"])
+                if k not in seen:
+                    out.setdefault(p, []).append(e)
+                    keys.add(k)
+            seen |= keys
+    return out
+
+
+def load_own(conn, provision_ids, include_unverified):
     rows = conn.execute("""
         SELECT e.provision_id, e.event_id, e.event_key, e.event_type, e.scope, e.scope_text, e.subsection, e.operative_quote,
                e.source_paragraph, e.effective_date::text, e.affects_event_id, e.method, e.verified, e.verified_by, e.confidence, e.issue, e.stance,
@@ -36,7 +85,7 @@ def load_events_many(conn, provision_ids, include_unverified=False):
         if k in seen:
             continue
         seen.add(k)
-        out.setdefault(pid, []).append(e)
+        out.setdefault(pid, []).append(e | {"provision_id": pid})
     return out
 
 

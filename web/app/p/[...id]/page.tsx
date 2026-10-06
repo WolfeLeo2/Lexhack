@@ -8,7 +8,7 @@ import { Lineage } from '@/components/Lineage'
 import { StatusStamp } from '@/components/Stamp'
 import { StatuteText } from '@/components/StatuteText'
 import { getCitations, getProvision } from '@/lib/api'
-import { EVENT_LABEL, actHref, courtActed, fmtDate, isStatutory, plural, stripHead } from '@/lib/format'
+import { EVENT_LABEL, actHref, courtActed, fmtDate, isStatutory, plural, sectionHref, stripHead } from '@/lib/format'
 import { cleanUrl } from '@/lib/text'
 
 type Props = PageProps<'/p/[...id]'>
@@ -46,6 +46,10 @@ export default async function ProvisionPage(props: Props) {
     return `/p/${id}${q.size ? `?${q}` : ''}`
   }
   const srcUrl = cleanUrl(p.source_url)
+  const from = data.renumbered_from
+  const to = data.renumbered_to
+  const eid = (pid: string) => pid.split('/').pop()
+  const onOld = from && data.history.some((e) => !isStatutory(e) && e.provision_id === from.provision_id)
 
   return (
     <article className="pt-8">
@@ -83,6 +87,29 @@ export default async function ProvisionPage(props: Props) {
 
         <aside className="lg:pt-16" aria-label="Status">
           <StatusStamp status={status} />
+          {(from || to) && (
+            <p className="mt-4 text-[0.95rem] text-ink-2">
+              {to ? (
+                <>
+                  Kenya Law renumbered this section from the version of {fmtDate(to.versions[0])}: it is now{' '}
+                  <Link href={sectionHref(to.provision_id)} className="link">
+                    <code className="text-[0.9em]">{eid(to.provision_id)}</code>
+                  </Link>
+                  . The status and rulings here cover both numberings.
+                </>
+              ) : (
+                from && (
+                  <>
+                    Up to Kenya Law’s version of {fmtDate(from.versions.at(-1) ?? null)} this section was{' '}
+                    <Link href={sectionHref(from.provision_id)} className="link">
+                      <code className="text-[0.9em]">{eid(from.provision_id)}</code>
+                    </Link>
+                    .{onOld && ' The court rulings below were made on that numbering.'}
+                  </>
+                )
+              )}
+            </p>
+          )}
           {status === 'repealed' ? (
             <div className="mt-6 space-y-2 text-[0.95rem] text-ink-2">
               {summary.filter(isStatutory).map((e) => (

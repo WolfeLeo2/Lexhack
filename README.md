@@ -577,6 +577,7 @@ Turns a section's events into a status plus the events behind it. Rules for Keny
 3. `interpreted` events never displace anything; they travel with the events they qualify.
 4. Status labels: "declared unconstitutional", "limited by a court", "in force; its validity has been tested in court", "in force; earlier court limits were reversed", "in force; interpreted by a court", "in force; no recorded court rulings", "repealed". **Always shown with the events and quotes behind it.**
 5. Where the answer key and the extractor record the same ruling, the verified row wins. Extracted rows are returned with `verified: false`.
+6. **Renumbered sections** (2026-10-07; `api/status.py` `renumbering`, the one lookup every caller uses): two IDs in one Act with the same section number whose versions don't overlap (one ID's versions all before the other's) are one section that Kenya Law renumbered: the Employment Act's 2022-12-31 revision (`sec_45` → `part_VI__sec_45`, 93 sections) and Law of Succession s.43 (Part V → Part VI in 2021). Status, history, summary, `cited_by`, leads and citing judgments merge across both IDs (each event keeps its own `provision_id`); the provision response adds `renumbered_from` / `renumbered_to` (`{provision_id, versions}`); the Acts list shows the pair once, by the current ID; `find_section` returns the current ID with `renumbered_from`. Same number with overlapping versions stays two sections (ambiguous in `find_section`). So *Momanyi* (event 925, made on `sec_45`) now limits `part_VI__sec_45` too.
 
 Results: s.204 → "limited by a court" (*Muruatetu* + the 2021 directions in effect; *Mutiso* and *Mwaura* displaced). s.8 → in force; every Court of Appeal limit reversed or displaced. s.194 → "limited by a court" (*Okuta*).
 
@@ -717,7 +718,7 @@ For the front end (step 7): the UI can start now against mock JSON shaped like t
 - **Parliament's changes aren't events yet.** The Acts carry over 1,000 amendment notes ("[Act No. 7 of 2007, Sch.]"). Turning them into `amended_by_statute` / `repealed_by_statute` events belongs with step 6 or 7.
 - **286 PDF-only judgments have no text** (1.7%). The Archive may hold some of their PDFs; fetching them is about 300 requests. None are in the answer key.
 - **Coverage:** the Archive holds about 10% of Kenya's judgments, KICA has 2 of 13 versions, and 254 listed judgment pages were missing.
-- **Employment Act IDs changed in 2022,** so its sections can't be linked across that revision. It isn't a focus Act.
+- **Employment Act IDs changed in 2022:** mentions are linked by decision date (§4.6); the API merges the two IDs of a renumbered section (§7c, status resolver rule 6).
 - **Unchecked appeals:** *EG*, *Alai* and *Andama*. *Okuta* and *Andare*: no appeals found (absence unverified).
 
 ### Housekeeping

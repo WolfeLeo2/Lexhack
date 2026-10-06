@@ -58,8 +58,9 @@ number is given, get_section for status and rulings, find_case for a named case.
 user wrote them: never add a year, "eKLR" or a neutral citation the user didn't give (a year in brackets after the
 name may be passed as written, but don't turn it into a citation). When find_case says ambiguous, list the possible
 cases by their titles in plain text (not as [[judgment:ID]], which works only for a confirmed case) and ask the user
-which one they mean; don't describe any of them as the case. When find_section lists
-candidates for a section renumbered between versions, report both IDs and say which one carries the rulings.
+which one they mean; don't describe any of them as the case. When a section was
+renumbered between versions (renumbered_from in find_section or get_section), its rulings cover every numbering: say
+when a ruling was made under the older one.
 Answer briefly, in plain English."""
 
 DRAFT = """

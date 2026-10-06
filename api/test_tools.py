@@ -7,6 +7,7 @@ from . import main, tools
 fails = []
 S204 = "ke/act/cap-63/part_II__chp_XVIII__subpart_nn_1__sec_204"
 S194 = "ke/act/cap-63/part_II__chp_XVIII__sec_194"
+S45, S45_OLD = "ke/act/cap-226/part_VI__sec_45", "ke/act/cap-226/sec_45"
 
 
 def expect(name, got, want):
@@ -148,20 +149,36 @@ def test_find_section():
         out = tools.find_section(act, sec)["result"]
         expect(f"act named as {act!r}", (out["found"], (out.get("provision_id") or "").startswith(f"ke/act/{slug}/")),
                (True, True))
-    out = tools.find_section("Law of Succession Act", "43")
-    expect("duplicate number: ambiguous", (out["result"]["found"], out["result"]["ambiguous"],
-                                           len(out["result"]["candidates"])), (True, True, 2))
-    expect("duplicate number: all ids", sorted(out["ids"]["section"]),
-           sorted(c["provision_id"] for c in out["result"]["candidates"]))
+    # Law of Succession s.43 moved from Part V (to 2019) to Part VI (from 2021): versions don't overlap, a renumbering
+    out = tools.find_section("Law of Succession Act", "43")["result"]
+    expect("succession s.43: renumbered, current id", (out.get("ambiguous"), out.get("provision_id"),
+           [x["provision_id"] for x in out.get("renumbered_from", [])]),
+           (None, "ke/act/cap-160/part_VI__sec_43", ["ke/act/cap-160/part_V__sec_43"]))
     out = tools.find_section("Employment Act", "45")   # renumbered in 2022: rulings sit on the old ID
-    cands = {c["provision_id"]: c for c in out["result"].get("candidates", [])}
-    expect("employment act s.45: both ids", (out["result"].get("ambiguous"), sorted(out["ids"]["section"])),
-           (True, ["ke/act/cap-226/part_VI__sec_45", "ke/act/cap-226/sec_45"]))
-    expect("employment act s.45: old id carries the ruling",
-           cands.get("ke/act/cap-226/sec_45", {}).get("status", "").startswith("limited"), True)
-    expect("employment act s.45: version dates", all(c["versions"] for c in cands.values()), True)
-    expect("employment act: no ruling on either id, date picks one",
-           "ambiguous" in tools.find_section("Employment Act", "1")["result"], False)
+    expect("employment act s.45: current id with the old id's ruling",
+           (out["result"].get("ambiguous"), out["ids"]["section"], out["result"].get("status")),
+           (None, [S45], "limited by a court"))
+    expect("employment act s.45: old id and versions", [(x["provision_id"], bool(x["versions"]))
+                                                         for x in out["result"].get("renumbered_from", [])],
+           [(S45_OLD, True)])
+    expect("employment act s.1: current id", tools.find_section("Employment Act", "1")["result"].get("provision_id"),
+           "ke/act/cap-226/part_1__sec_1")
+    out = tools.get_section(S45)["result"]
+    expect("get_section s.45: ruling on the old numbering", ([(e["event_id"], e["provision_id"])
+           for e in out["summary_events"]], out["renumbered_from"]["provision_id"]), ([(925, S45_OLD)], S45_OLD))
+
+
+def test_renumbered_pages():
+    new, old = main.provision(S45), main.provision(S45_OLD)
+    expect("s.45 status merged", (new.status, old.status), ("limited by a court", "limited by a court"))
+    expect("s.45 Momanyi in summary", [e.event_id for e in new.summary_events], [925])
+    expect("s.45 links", (new.renumbered_from.provision_id, new.renumbered_to, old.renumbered_to.provision_id,
+                          old.renumbered_from), (S45_OLD, None, S45, None))
+    expect("s.45 citations cover both ids", main.citations(S45, 1).total, new.cited_by)
+    p = main.provision(S194)
+    expect("no renumbering: unchanged", (p.renumbered_from, p.renumbered_to, p.status), (None, None, "limited by a court"))
+    s45 = [x.provision_id for x in main.act_provisions("ke/act/cap-226") if x.number == "45"]
+    expect("acts list: s.45 once, current id", s45, [S45])
     for sec in ("", "two hundred and four"):
         expect(f"no number {sec!r}", tools.find_section("Penal Code", sec)["result"]["reason"], "no_section_number")
 
@@ -175,7 +192,8 @@ def test_call():
 
 def main_():
     with main.POOL:   # opens the pool and closes it on exit
-        for t in (test_declarations, test_get_section, test_find_section, test_search_and_cases, test_call):
+        for t in (test_declarations, test_get_section, test_find_section, test_renumbered_pages, test_search_and_cases,
+                  test_call):
             t()
     for f in fails:
         print("FAIL", *f)

@@ -62,7 +62,7 @@ Details of the Internet Archive pilot are in `crawler/REPORT.md`.
 
 ## What the pilot found (facts to build on)
 
-- Statutes carry **stable section IDs (eIds) that don't change between versions**. Exception: the Employment Act's IDs changed at its 2022-12-31 revision (`sec_45` → `part_VI__sec_45`); the focus Acts are stable. Examples:
+- Statutes carry **stable section IDs (eIds) that don't change between versions**. Exception: the Employment Act's IDs changed at its 2022-12-31 revision (`sec_45` → `part_VI__sec_45`; also Law of Succession s.43); the focus Acts are stable. The API treats same Act + same number + non-overlapping versions as one renumbered section (`api/status.py` `renumbering`: status, rulings and counts merged, `renumbered_from`/`_to` on the section page; README §7c). Examples:
   - KICA s.29 → `part_III__sec_29`
   - Penal Code s.194 → `part_II__chp_XVIII__sec_194`
   - Penal Code s.204 → `part_II__chp_XVIII__subpart_nn_1__sec_204`
@@ -246,14 +246,14 @@ Done:
 
 Next (priority order, 2026-09-28):
 1. **Filing checker 2c:** quotes away from their citation. (2b upload done 2026-09-29: `api/extract.py`, `POST /api/extract`, drop zone on `/check`; PDF (layout mode) / DOCX / text, scans read by Tesseract OCR up to 30 pages and labelled as such, 4 MB on the web because of Vercel.) Matching follow-ups from the benchmarks: institutional parties (county governments, KRA, tax commissioners) and "estate"/"deceased" as weak words, court words in context, anonymised titles; tune on dev + test v1, re-measure on a fresh sample.
-1a. **Research agent:** a draft benchmark (planted bad drafts, like the grader's); the Employment Act renumbering on the section page (ss.45, 85, 91, 92: the rulings sit on the pre-2022 IDs, so `part_VI__sec_45` shows none); answer streaming word by word.
+1a. **Research agent:** a draft benchmark (planted bad drafts, like the grader's); answer streaming word by word.
 2. **Later-appeal pass** over the 117 checked rulings with the `event-reviewer` agent (web search works): *EG*, *Alai*, *Andama*, *CORD*, *Mbuti* first.
 3. **Benchmark the amendment parser** with an agent sample; real commencement dates instead of year-only.
 4. **Coverage:** agents hunt landmark rulings we don't hold (fetch Wayback copies), then classify → verify → review → apply; add the most-cited missing Acts.
 5. Search synonyms ("criminal defamation" → s.194), section text by version + diff, judgment pages, a public API.
 6. A scheduled pipeline (Archive → citations → classify → verify → review apply → dedupe → issue labels).
 
-Known gaps: `/api/chat` and `/ask` need deploying (and `CHAT_PROXY_SECRET` set on Railway and Vercel); *PAK* [2022] KEHC 262 read-down of Penal Code ss.158/160 is missing; 181 judgments are duplicate copies (Kenya Law published them twice), marked `judgments.duplicate_of` by `pipeline/dedupe_judgments.py` and skipped by the API; 163 judgments have no text (of 286 PDF-only, 123 got text from Archive source files on 2026-09-29: `pipeline/fetch_sources.py`; the rest aren't archived or are blank placeholders); Archive coverage is ~10% of judgments; the Employment Act's eIds changed in 2022; appeals of *EG*, *Alai* and *Andama* are unchecked. To do: confirm the live Kenya Law pages still lack court notes.
+Known gaps: `/api/chat` and `/ask` need deploying (and `CHAT_PROXY_SECRET` set on Railway and Vercel); *PAK* [2022] KEHC 262 read-down of Penal Code ss.158/160 is missing; 181 judgments are duplicate copies (Kenya Law published them twice), marked `judgments.duplicate_of` by `pipeline/dedupe_judgments.py` and skipped by the API; 163 judgments have no text (of 286 PDF-only, 123 got text from Archive source files on 2026-09-29: `pipeline/fetch_sources.py`; the rest aren't archived or are blank placeholders); Archive coverage is ~10% of judgments; appeals of *EG*, *Alai* and *Andama* are unchecked. To do: confirm the live Kenya Law pages still lack court notes.
 
 Blind spots to keep in mind (details in README §9):
 - **One shared Neon branch:** both teammates write to `production`, and pipeline re-runs are destructive. Agree who runs them, or use Neon branches.

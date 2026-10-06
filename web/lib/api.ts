@@ -74,6 +74,13 @@ export interface CourtEvent {
   verified_by: string | null // 'human:…' or 'agent:…'
   state: 'in effect' | 'reversed on appeal' | 'displaced by a later ruling'
   superseded_by: number | null
+  provision_id: string | null // the ID the ruling was recorded on: an older numbering if the section was renumbered
+}
+
+/** The section under another ID in earlier / later versions (Kenya Law renumbered it). */
+export interface Numbering {
+  provision_id: string
+  versions: string[] // version dates, oldest first
 }
 
 export interface ProvisionStatus extends Counts {
@@ -81,6 +88,8 @@ export interface ProvisionStatus extends Counts {
   status: string
   summary_events: CourtEvent[]
   history: CourtEvent[]
+  renumbered_from: Numbering | null // status, rulings and counts cover every numbering
+  renumbered_to: Numbering | null
   disclaimer: string
 }
 
