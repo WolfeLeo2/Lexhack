@@ -27,6 +27,10 @@ def test_declarations():
 
 def test_get_section():
     out = tools.get_section(S204)
+    shown = out["result"]["summary_events"] + out["result"]["history"]
+    expect("no raw verified_by tag reaches the model", any("verified_by" in e for e in shown), False)
+    expect("checked_by in words", {e["checked_by"] for e in shown} <= {"checked by a person", "checked by an AI reviewer",
+                                                                     "from Kenya Law's reviser's note", "unverified"}, True)
     from .status import provision_status
     with main.db() as conn:
         want = provision_status(conn, S204)["status"]

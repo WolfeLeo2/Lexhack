@@ -28,11 +28,21 @@ def ids(section=(), event=(), judgment=()):
             "judgment": [str(x) for x in judgment]}
 
 
+LABELS = [("human:", "checked by a person"), ("agent:", "checked by an AI reviewer"),
+          ("source:", "from Kenya Law's reviser's note")]
+
+
+def checked_by(verified_by):
+    """How a ruling was checked, in words; the model never sees the raw verified_by tag, so it can't repeat it."""
+    return next((label for prefix, label in LABELS if (verified_by or "").startswith(prefix)), "unverified")
+
+
 def event_view(e):
     """An event as the model reads it: the court's words capped, how it was checked."""
     return {k: e[k] for k in ("event_id", "event_type", "scope", "subsection", "effective_date", "court", "title",
-                              "neutral_citation", "source_paragraph", "verified", "verified_by", "state", "provision_id",
-                              "superseded_by")} | {"operative_quote": e["operative_quote"][:MAX_QUOTE],
+                              "neutral_citation", "source_paragraph", "verified", "state", "provision_id",
+                              "superseded_by")} | {"checked_by": checked_by(e["verified_by"]),
+                                                    "operative_quote": e["operative_quote"][:MAX_QUOTE],
                                                     "scope_text": (e["scope_text"] or "")[:MAX_QUOTE] or None}
 
 
@@ -230,8 +240,8 @@ def find_case(citation: str):
         # a confirmed title wins over the unconfirmed candidates, which stay in cases for transparency
         titles = [] if judgments else title_search(conn, citation)
         ruled = [j["judgment_id"] for j in judgments + titles if j.get("confirmed", True)]   # citation findings: always
-        events = [dict(zip(("event_id", "provision_id", "event_type", "judgment_id", "verified_by", "act_title",
-                            "section_number", "heading"), r))
+        events = [dict(zip(("event_id", "provision_id", "event_type", "judgment_id", "checked_by", "act_title",
+                            "section_number", "heading"), (*r[:4], checked_by(r[4]), *r[5:])))
                   for r in conn.execute("""SELECT e.event_id, e.provision_id, e.event_type, e.judgment_id, e.verified_by,
                                                   a.title, p.number, p.heading
                                            FROM citation_events e JOIN provisions p USING (provision_id)

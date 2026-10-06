@@ -27,8 +27,6 @@ ACT = re.compile(r"\[\[act:\s*([^\]]+?)\s*\]\]")   # not a reference kind; namin
 BRACKETS = re.compile(r"\[\[(?:(?!\[\[)[^\n])*?\]\]")   # anything in [[...]]: a REF, a grouped [[event:1], [judgment:x]], or junk
 GROUP = re.compile(r"\]\s*,?\s*\[")   # between the references of a grouped one
 LEFTOVER = re.compile(r"\[\[\S*|\S*\]\]")   # an unclosed or stray bracket pair: never shown
-LABELS = [("human:", "checked by a person"), ("agent:", "checked by an AI reviewer"),
-          ("source:", "from Kenya Law's reviser's note")]
 
 SYSTEM = """You are Hakiki's research assistant for Kenyan statute law. Hakiki is a citator: it records whether a
 section is in force, amended, repealed, or limited or struck down by a court, with the court's own words.
@@ -48,8 +46,8 @@ Rules:
    act_not_recognised means the name didn't match the held Acts it lists: if the user's Act is one of those titles
    under another name, retry with that title; say the Act is not in Hakiki's collection only if it clearly isn't one
    of them. Hakiki holds about 10% of judgments, so never say a case does not exist or is fake.
-5. Say whether each ruling was checked by a person (verified_by 'human:...') or by an AI reviewer ('agent:...'); verified_by
-   'source:...' means the event was transcribed from Kenya Law's reviser's notes. Never present an unverified lead as
+5. Say how each ruling was checked, in the words of its checked_by field ("checked by a person", "checked by an AI
+   reviewer", "from Kenya Law's reviser's note", "unverified"). Never present an unverified lead as
    the status. Describe a ruling's state as its state field says: "displaced by a later ruling" means a later court
    took a different view (say displaced or overtaken, never reversed); only "reversed on appeal" means reversed.
 6. Report what the sources say. Never advise on the user's own case or tell them what to do; suggest they consult an
@@ -309,7 +307,7 @@ def render_parts(answer, seen, conn):
             st = state.get(v, "in effect")
             return {"kind": "ruling", "event_id": int(v), "quote": quote, "case": title, "citation": cite,
                     "court": court, "paragraph": para,
-                    "checked_by": next((label for prefix, label in LABELS if (by or "").startswith(prefix)), "unverified"),
+                    "checked_by": tools.checked_by(by),
                     "state": None if st == "in effect" else st, "url": url}
         if (k, v) in ok and k == "section" and v in sec:
             act, number, heading = sec[v]
