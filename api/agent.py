@@ -45,7 +45,8 @@ Rules:
    of them. Hakiki holds about 10% of judgments, so never say a case does not exist or is fake.
 5. Say whether each ruling was checked by a person (verified_by 'human:...') or by an AI reviewer ('agent:...'); verified_by
    'source:...' means the event was transcribed from Kenya Law's reviser's notes. Never present an unverified lead as
-   the status.
+   the status. Describe a ruling's state as its state field says: "displaced by a later ruling" means a later court
+   took a different view (say displaced or overtaken, never reversed); only "reversed on appeal" means reversed.
 6. Report what the sources say. Never advise on the user's own case or tell them what to do; suggest they consult an
    advocate. For an advice question, still look the section up (find_section or search_sections, then get_section)
    and report its status and rulings before saying Hakiki can't advise on their case. Don't skip the lookup.
@@ -54,17 +55,21 @@ Look things up before answering: find_section when an Act and section are named,
 number is given, get_section for status and rulings, find_case for a named case. Pass case names to find_case as the
 user wrote them: never add a year, "eKLR" or a neutral citation the user didn't give (a year in brackets after the
 name may be passed as written, but don't turn it into a citation). When find_case says ambiguous, list the possible
-cases and ask the user which one they mean; don't describe any of them as the case. When find_section lists
+cases by their titles in plain text (not as [[judgment:ID]], which works only for a confirmed case) and ask the user
+which one they mean; don't describe any of them as the case. When find_section lists
 candidates for a section renumbered between versions, report both IDs and say which one carries the rulings.
 Answer briefly, in plain English."""
 
 
 def generate(body, api_key):
     """One generateContent call, cached by request body (temperature 0: same request, same answer)."""
-    cache = Path(os.environ["LEXHACK_DATA"]) / "cache" / "agent"   # resolved here: Railway has no LEXHACK_DATA
-    cache.mkdir(parents=True, exist_ok=True)
-    path = cache / f"{hashlib.sha256(json.dumps(body, sort_keys=True).encode()).hexdigest()}.json"
-    if path.exists():
+    data_dir = os.environ.get("LEXHACK_DATA")   # unset on Railway: no disk cache there
+    path = None
+    if data_dir:
+        cache = Path(data_dir) / "cache" / "agent"
+        cache.mkdir(parents=True, exist_ok=True)
+        path = cache / f"{hashlib.sha256(json.dumps(body, sort_keys=True).encode()).hexdigest()}.json"
+    if path and path.exists():
         return json.loads(path.read_text(encoding="utf-8"))
     for attempt in range(10):   # per-minute quotas can take a minute or two to clear (as pipeline/llm_resolve.call)
         wait = min(120, 10 * 2 ** attempt)
@@ -82,7 +87,7 @@ def generate(body, api_key):
             continue
         r.raise_for_status()
         data = r.json()
-        if ((data.get("candidates") or [{}])[0].get("content") or {}).get("parts"):   # never cache an empty reply
+        if path and ((data.get("candidates") or [{}])[0].get("content") or {}).get("parts"):   # never cache an empty reply
             path.write_text(r.text, encoding="utf-8")
         return data
     raise RuntimeError("Gemini call failed after 10 attempts (network or rate limit)")
