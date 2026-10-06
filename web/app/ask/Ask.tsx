@@ -14,6 +14,8 @@ interface Turn {
   mode: Mode
   steps: Step[]
   answer: Answer | null
+  /** The answer as it streams in (delta events), one entry per chunk; cleared by reset and by the answer. */
+  live: string[]
   error: string | null
   pending: boolean
 }
@@ -67,7 +69,7 @@ export function Ask() {
       .filter((t) => t.answer)
       .slice(-6)
       .map((t) => ({ question: t.question, answer: t.answer!.text.slice(0, 4000) }))
-    setTurns([...prior, { question, mode, steps: [], answer: null, error: null, pending: true }])
+    setTurns([...prior, { question, mode, steps: [], answer: null, live: [], error: null, pending: true }])
     setQ('')
     const patch = (f: (t: Turn) => Partial<Turn>) => setTurns((ts) => ts.map((t, k) => (k === i ? { ...t, ...f(t) } : t)))
     const ctrl = new AbortController()
@@ -86,9 +88,11 @@ export function Ask() {
       let answered = false
       const handle = (e: ChatEvent) => {
         if (e.type === 'step') patch((t) => ({ steps: [...t.steps, { tool: e.tool, label: e.label }] }))
+        else if (e.type === 'delta') patch((t) => ({ live: [...t.live, e.text] }))
+        else if (e.type === 'reset') patch(() => ({ live: [] }))
         else if (e.type === 'answer') {
           answered = true
-          patch(() => ({ answer: { text: e.text, parts: e.parts, removed: e.removed, check: e.check, label: e.label } }))
+          patch(() => ({ live: [], answer: { text: e.text, parts: e.parts, removed: e.removed, check: e.check, label: e.label } }))
         } else if (e.type === 'error') throw new Error(e.message)
       }
       const reader = res.body.pipeThrough(new TextDecoderStream()).getReader()
@@ -206,7 +210,8 @@ function TurnView({ t, onRetry }: { t: Turn; onRetry?: () => void }) {
     <article>
       <p className="statute ml-auto w-fit max-w-[60ch] rounded-md bg-panel px-4 py-2.5 text-lg">{t.question}</p>
       <div aria-live="polite" className="mt-5">
-        {(t.pending || t.steps.length > 0) && <Steps steps={t.steps} pending={t.pending && !t.answer} />}
+        {(t.pending || t.steps.length > 0) && <Steps steps={t.steps} pending={t.pending && !t.answer && !t.live.length} />}
+        {!t.answer && !t.error && t.live.length > 0 && <Writing chunks={t.live} draft={t.mode === 'draft'} />}
         {t.answer && t.answer.label !== undefined ? (
           <Draft a={t.answer} />
         ) : (
@@ -331,6 +336,26 @@ function Draft({ a }: { a: Answer }) {
           </ul>
         )}
       </section>
+    </div>
+  )
+}
+
+/** The answer as the model writes it: plain text, each chunk fading in. The rendered answer replaces it, so screen
+ * readers hear only that (this block is hidden from them). */
+function Writing({ chunks, draft }: { chunks: string[]; draft: boolean }) {
+  return (
+    <div className="mt-5 max-w-[68ch]">
+      <p className="step-now flex items-center gap-2.5 text-[0.95rem]">
+        <PenLine className="h-4 w-4 shrink-0 text-seal" aria-hidden />
+        {draft ? 'Writing the draft…' : 'Writing…'}
+      </p>
+      <p className={`mt-3 whitespace-pre-wrap text-ink-2 ${draft ? 'statute' : ''}`} aria-hidden>
+        {chunks.map((c, k) => (
+          <span key={k} className="delta-in">
+            {c.replace(/\*\*/g, '')}
+          </span>
+        ))}
+      </p>
     </div>
   )
 }

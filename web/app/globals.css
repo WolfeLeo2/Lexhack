@@ -296,6 +296,12 @@ a:focus-visible > .spine {
 .answer-in {
   animation: step-in 0.45s both cubic-bezier(0.22, 1, 0.36, 1);
 }
+.delta-in {
+  animation: delta-in 0.4s both ease-out;
+}
+@keyframes delta-in {
+  from { opacity: 0; }
+}
 .ask-chip {
   animation: step-in 0.4s both cubic-bezier(0.22, 1, 0.36, 1);
   animation-delay: calc(0.3s + var(--i) * 0.07s);
@@ -326,7 +332,7 @@ a:focus-visible > .spine {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ask-bubble, .step-in, .step-now svg, .answer-in, .ask-chip, .draft-paper { animation: none; }
+  .ask-bubble, .step-in, .step-now svg, .answer-in, .delta-in, .ask-chip, .draft-paper { animation: none; }
   .ask-chip, .ask-send, .ask-mode { transition: none; }
   .pinned-note { animation: none; transform: rotate(-1.2deg); }
   .spine { transition: none; }

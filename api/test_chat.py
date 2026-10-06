@@ -4,6 +4,7 @@
 """
 import json
 import os
+import tempfile
 import time
 from collections import deque
 
@@ -89,14 +90,15 @@ def test_draft(c):
                                  part(text=first), part(text=revised)], bodies)
     ev = lines(c.post("/api/chat", json={"question": "Draft a paragraph on s.204", "mode": "draft"}))
     expect("draft order", [(e["type"], e.get("tool")) for e in ev],
-           [("step", "find_section"), ("step", "check"), ("step", "revise"), ("answer", None), ("done", None)])
+           [("step", "find_section"), ("step", "check"), ("step", "revise"), ("reset", None), ("answer", None),
+            ("done", None)])
     expect("check label", ev[1]["label"], "Checking the draft's citations")
     expect("draft system prompt", agent.DRAFT.strip() in bodies[0]["systemInstruction"]["parts"][0]["text"], True)
     sent = next(c["parts"][0]["text"] for c in bodies[-1]["contents"]   # the body's list grows after the call
                 if c["role"] == "user" and "citation check" in c["parts"][0].get("text", ""))
     expect("revise turn lists the section's ruling", f"[[event:{ids[0]}]]" in sent, True)
     expect("revise turn lists the fake case", "[2031] eKLR" in sent, True)
-    ans = ev[3]
+    ans = ev[4]
     expect("revised draft used", any(p["kind"] == "ruling" and p["event_id"] == ids[0] for p in ans["parts"]), True)
     expect("clean after revision", [f for f in ans["check"] if f["flagged"]], [])
     expect("passing items listed", [(f["kind"], f["result"], f["flagged"]) for f in ans["check"]],
@@ -158,8 +160,20 @@ def test_draft_checks(c):
                                   part(text=clean), part(text=clean + " Zyxwq v Qopqlr could not be confirmed.")],
                               question="Draft on s.204 citing Zyxwq v Qopqlr", bodies=bodies)
     expect("dropped case: revised", steps, ["get_section", "find_case", "check", "revise"])
-    expect("dropped case reported", flagged(ans), [("case", "not_confirmed")])
+    expect("dropped case: the revision says so, not flagged again", flagged(ans), [])
     expect("dropped case in the revise turn", "You named Zyxwq v Qopqlr" in json.dumps(bodies[-1]["contents"]), True)
+
+    # the first draft already says the named case couldn't be confirmed: no revision for it
+    steps, ans = draft_answer(c, [get, part(functionCall={"name": "find_case", "args": {"citation": "Zyxwq v Qopqlr"}}),
+                                  part(text=clean + " Zyxwq v Qopqlr is not in Hakiki's collection and could not be "
+                                                    "confirmed.")], question="Draft on s.204 citing Zyxwq v Qopqlr")
+    expect("stated unconfirmed: no revision", steps, ["get_section", "find_case", "check"])
+    expect("stated unconfirmed: not flagged", flagged(ans), [])
+    # ... but a statement about some other case doesn't count
+    steps, ans = draft_answer(c, [get, part(functionCall={"name": "find_case", "args": {"citation": "Zyxwq v Qopqlr"}}),
+                                  part(text=clean + " Another case could not be confirmed."), part(text=clean)],
+                              question="Draft on s.204 citing Zyxwq v Qopqlr")
+    expect("other case unconfirmed: revised", steps, ["get_section", "find_case", "check", "revise"])
 
     # past the revision deadline: first draft returned with its items and a note
     agent.REVISE_AFTER, real = -1, agent.REVISE_AFTER
@@ -178,6 +192,99 @@ def test_draft_checks(c):
     expect("invented in revision: removed", ans["removed"], 1)
     expect("references_removed item", flagged(ans), [("note", "references_removed")])
     expect("flagged first", [f["flagged"] for f in ans["check"]], sorted((f["flagged"] for f in ans["check"]), reverse=True))
+
+
+class FakeSSE:
+    """A streamGenerateContent response: one SSE chunk per part."""
+    status_code, text = 200, ""
+
+    def __init__(self, parts):
+        self.parts = parts
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        pass
+
+    def raise_for_status(self):
+        pass
+
+    def iter_lines(self):
+        for p in self.parts:
+            yield b""
+            yield b"data: " + json.dumps({"candidates": [{"content": {"role": "model", "parts": [p]}}]}).encode()
+
+
+def fake_post(rounds, streamed):
+    """agent.post stand-in: each call answers with the next round's parts; records whether it streamed."""
+    it = iter(rounds)
+
+    def post(body, api_key, stream=False):
+        streamed.append(stream)
+        return FakeSSE(next(it))
+    return post
+
+
+def test_streaming(c, real):
+    """The real generate() over a fake SSE stream: deltas, reference stripping, resets, the cache."""
+    with main.db() as conn:
+        summary = provision_status(conn, S204)["summary_events"]
+    limit = next(e["event_id"] for e in summary if e["event_type"] == "declared_unconstitutional")
+    other = next(e["event_id"] for e in summary if e["event_type"] == "interpreted")
+    call = lambda name, **args: {"functionCall": {"name": name, "args": args}}
+    agent.generate, real_post, data = real, agent.post, os.environ.get("LEXHACK_DATA")
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            os.environ["LEXHACK_DATA"] = tmp   # a fresh agent cache
+            streamed = []
+            agent.post = fake_post([[call("find_section", act="Penal Code", section="204")],
+                                    [call("get_section", provision_id=S204)],
+                                    [{"text": "s.204 [[sec"}, {"text": f"tion:{S204}]] is limited by [[ev"},
+                                     {"text": f"ent:{limit}], [event:999"}, {"text": "999]]. Done [["}]], streamed)
+            ev = lines(c.post("/api/chat", json={"question": "Stream s.204"}))
+            types = [e["type"] for e in ev]
+            deltas = [e["text"] for e in ev if e["type"] == "delta"]
+            expect("stream: streamed calls", streamed, [True] * 3)
+            expect("stream: order", types, ["step", "step"] + ["delta"] * len(deltas) + ["answer", "done"])
+            expect("stream: deltas", "".join(deltas), "s.204  is limited by . Done ")
+            expect("stream: no raw reference in a delta", any("[[" in d or "]]" in d or "ke/act" in d or "999" in d
+                                                              for d in deltas), False)
+            ans = ev[-2]
+            expect("stream: answer authoritative", [p["kind"] for p in ans["parts"]],
+                   ["text", "section", "text", "ruling", "text", "removed", "text"])
+
+            # text streamed in a round that then calls a tool: reset before the step
+            agent.post = fake_post([[{"text": "Let me check. "}, call("list_acts")], [{"text": "Fine."}]], [])
+            ev = lines(c.post("/api/chat", json={"question": "Stream acts"}))
+            expect("tool round: reset", [(e["type"], e.get("text")) for e in ev][:4],
+                   [("delta", "Let me check. "), ("reset", None), ("step", None), ("delta", "Fine.")])
+
+            # cache hit: the answer as one delta, no request
+            agent.post = fake_post([[{"text": "one "}, {"text": "two"}]], [])
+            first = [e["text"] for e in lines(c.post("/api/chat", json={"question": "Cached"})) if e["type"] == "delta"]
+            agent.post = fake_post([], streamed := [])
+            again = [e["text"] for e in lines(c.post("/api/chat", json={"question": "Cached"})) if e["type"] == "delta"]
+            expect("cache: first streamed", first, ["one ", "two"])
+            expect("cache hit: one delta, no request", (again, streamed), (["one two"], []))
+
+            # draft: the first draft streams, then reset, then the revision
+            agent.post = fake_post([[call("get_section", provision_id=S204)],
+                                    [{"text": f"First draft [[section:{S204}]] see [[event:{other}]]."}],
+                                    [{"text": "Revised "}, {"text": f"[[section:{S204}]] limited by [[event:{limit}]]."}]],
+                                   [])
+            ev = [(e["type"], e.get("tool") or (e["text"] if e["type"] == "delta" else None)) for e in
+                  lines(c.post("/api/chat", json={"question": "Draft stream", "mode": "draft"}))]
+            expect("draft: reset before the revision", ev,
+                   [("step", "get_section"), ("delta", "First draft  see ."), ("step", "check"), ("step", "revise"),
+                    ("reset", None), ("delta", "Revised "), ("delta", " limited by ."), ("answer", None),
+                    ("done", None)])
+    finally:
+        agent.post = real_post
+        if data is None:
+            os.environ.pop("LEXHACK_DATA", None)
+        else:
+            os.environ["LEXHACK_DATA"] = data
 
 
 def test_limits(c):
@@ -261,6 +368,7 @@ def run():
             agent.REVISE_AFTER = 10**6   # a slow Neon connection must not skip the revision these tests expect
             test_draft(c)
             test_draft_checks(c)
+            test_streaming(c, real)
             test_limits(c)
             test_error(c)
             test_proxy_key(c)

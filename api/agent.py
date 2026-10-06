@@ -21,9 +21,12 @@ from .status import RULES, load_events_many, statuses, with_leads
 
 MODEL, MAX_ROUNDS = "gemini-3.5-flash-lite", 8
 URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+STREAM_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:streamGenerateContent?alt=sse"
 REF = re.compile(r"\[\[(section|event|judgment):([^\]\s]+)\]\]")
 ACT = re.compile(r"\[\[act:\s*([^\]]+?)\s*\]\]")   # not a reference kind; naming a held Act is allowed (render_parts)
-BRACKETS = re.compile(r"\[\[[^\]]*\]\]")   # anything in [[...]]: a REF, or a malformed one like [[event:1, 2]]
+BRACKETS = re.compile(r"\[\[(?:(?!\[\[)[^\n])*?\]\]")   # anything in [[...]]: a REF, a grouped [[event:1], [judgment:x]], or junk
+GROUP = re.compile(r"\]\s*,?\s*\[")   # between the references of a grouped one
+LEFTOVER = re.compile(r"\[\[\S*|\S*\]\]")   # an unclosed or stray bracket pair: never shown
 LABELS = [("human:", "checked by a person"), ("agent:", "checked by an AI reviewer"),
           ("source:", "from Kenya Law's reviser's note")]
 
@@ -87,8 +90,40 @@ QUOTED = re.compile(r'["“]([^"“”]+)["”]')
 REVISE_AFTER = 35   # seconds into the chat run: later than this, skip the revision (the chat's deadline is 55)
 
 
-def generate(body, api_key, attempts=10):
-    """One generateContent call, cached by request body (temperature 0: same request, same answer)."""
+def answer_text(data):
+    """A reply's answer text (thoughts left out); '' when it calls a tool."""
+    parts = ((data.get("candidates") or [{}])[0].get("content") or {}).get("parts") or []
+    return "" if any("functionCall" in p for p in parts) else "".join(
+        p.get("text", "") for p in parts if not p.get("thought"))
+
+
+def post(body, api_key, stream=False):
+    return requests.post((STREAM_URL if stream else URL).format(model=MODEL), json=body,
+                         headers={"x-goog-api-key": api_key}, timeout=180, stream=stream)
+
+
+def read_stream(r, on_text):
+    """SSE chunks -> one generateContent-shaped reply. Parts are kept as received (thought signatures go back
+    unchanged); text goes to on_text as it arrives, until a function call shows up."""
+    parts, cand, feedback, call = [], {}, None, False
+    for line in r.iter_lines():
+        if not line.startswith(b"data:"):
+            continue
+        chunk = json.loads(line[5:])
+        feedback = chunk.get("promptFeedback") or feedback
+        cand = (chunk.get("candidates") or [{}])[0]
+        for p in (cand.get("content") or {}).get("parts") or []:
+            parts.append(p)
+            call = call or "functionCall" in p
+            if not call and p.get("text") and not p.get("thought"):
+                on_text(p["text"])
+    data = {"candidates": [{**cand, "content": {"role": "model", "parts": parts}}]}
+    return {**data, "promptFeedback": feedback} if feedback else data
+
+
+def generate(body, api_key, attempts=10, on_text=None):
+    """One Gemini call, cached by request body (temperature 0: same request, same answer). on_text: stream the reply
+    and pass its answer text on as it arrives (a cache hit passes it on whole); retried only before any text went."""
     data_dir = os.environ.get("LEXHACK_DATA")   # unset on Railway: no disk cache there
     path = None
     if data_dir:
@@ -96,27 +131,37 @@ def generate(body, api_key, attempts=10):
         cache.mkdir(parents=True, exist_ok=True)
         path = cache / f"{hashlib.sha256(json.dumps(body, sort_keys=True).encode()).hexdigest()}.json"
     if path and path.exists():
-        return json.loads(path.read_text(encoding="utf-8"))
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if on_text and (t := answer_text(data)):
+            on_text(t)
+        return data
+    sent = []
+
+    def forward(t):
+        sent.append(t)
+        on_text(t)
     for attempt in range(attempts):   # per-minute quotas can take a minute or two to clear (as pipeline/llm_resolve.call)
         wait = min(120, 10 * 2 ** attempt)
         try:
-            r = requests.post(URL.format(model=MODEL), json=body, headers={"x-goog-api-key": api_key}, timeout=180)
-        except (requests.ConnectionError, requests.Timeout) as e:
+            with post(body, api_key, stream=bool(on_text)) as r:
+                if r.status_code == 429 and "PerDay" in r.text:
+                    raise RuntimeError(f"Gemini daily quota exhausted for {MODEL}; answers so far are cached")
+                if r.status_code == 429 or r.status_code >= 500:
+                    print(f"  HTTP {r.status_code}; retrying in {wait}s", file=sys.stderr, flush=True)
+                    if attempt + 1 < attempts:
+                        time.sleep(wait)
+                    continue
+                r.raise_for_status()
+                data = read_stream(r, forward) if on_text else r.json()
+        except (requests.ConnectionError, requests.Timeout, requests.exceptions.ChunkedEncodingError) as e:
+            if sent:   # the reader has part of this reply: a retry would repeat it
+                raise
             print(f"  network error ({type(e).__name__}); retrying in {wait}s", file=sys.stderr, flush=True)
             if attempt + 1 < attempts:
                 time.sleep(wait)
             continue
-        if r.status_code == 429 and "PerDay" in r.text:
-            raise RuntimeError(f"Gemini daily quota exhausted for {MODEL}; answers so far are cached")
-        if r.status_code == 429 or r.status_code >= 500:
-            print(f"  HTTP {r.status_code}; retrying in {wait}s", file=sys.stderr, flush=True)
-            if attempt + 1 < attempts:
-                time.sleep(wait)
-            continue
-        r.raise_for_status()
-        data = r.json()
         if path and ((data.get("candidates") or [{}])[0].get("content") or {}).get("parts"):   # never cache an empty reply
-            path.write_text(r.text, encoding="utf-8")
+            path.write_text(json.dumps(data), encoding="utf-8")
         return data
     raise RuntimeError(f"Gemini call failed after {attempts} attempts (network or rate limit)")
 
@@ -144,8 +189,9 @@ def step_label(name, args):
             "revise": lambda: "Fixing what the check found"}.get(name, lambda: "Looking things up")()
 
 
-def run(question, history=(), api_key=None, on_step=None, attempts=10, system=SYSTEM):
-    """attempts: Gemini tries per call (the chat passes fewer: it has a deadline)."""
+def run(question, history=(), api_key=None, on_step=None, attempts=10, system=SYSTEM, on_text=None, on_reset=None):
+    """attempts: Gemini tries per call (the chat passes fewer: it has a deadline). on_text: the answer's raw text as the
+    model writes it; on_reset: forget the text sent so far (a round that streamed text turned out to call a tool)."""
     api_key = api_key or os.environ["GEMINI_API_KEY"]
     contents = [*history, {"role": "user", "parts": [{"text": question}]}]
     steps, seen = [], {"section": set(), "event": set(), "judgment": set()}
@@ -154,7 +200,12 @@ def run(question, history=(), api_key=None, on_step=None, attempts=10, system=SY
                 "tools": [{"functionDeclarations": tools.DECLARATIONS}], "generationConfig": {"temperature": 0}}
         if rnd == MAX_ROUNDS:   # out of rounds: answer with what you have
             body["toolConfig"] = {"functionCallingConfig": {"mode": "NONE"}}
-        resp = generate(body, api_key, attempts=attempts)
+        sent = []
+
+        def forward(t):
+            sent.append(t)
+            on_text(t)
+        resp = generate(body, api_key, attempts=attempts, on_text=forward if on_text else None)
         cand = (resp.get("candidates") or [{}])[0]
         content = cand.get("content")
         if not content or not content.get("parts"):
@@ -163,9 +214,10 @@ def run(question, history=(), api_key=None, on_step=None, attempts=10, system=SY
         contents.append(content)   # unchanged: Gemini 3.x thought signatures must come back as sent
         calls = [p["functionCall"] for p in content["parts"] if "functionCall" in p]
         if not calls:
-            answer = "".join(p.get("text", "") for p in content["parts"] if not p.get("thought"))
-            return {"answer": answer.strip(), "steps": steps, "seen": {k: sorted(v) for k, v in seen.items()},
+            return {"answer": answer_text(resp).strip(), "steps": steps, "seen": {k: sorted(v) for k, v in seen.items()},
                     "contents": contents}
+        if sent and on_reset:
+            on_reset()
         replies = []
         for c in calls:
             args = c.get("args") or {}
@@ -202,8 +254,27 @@ def is_invented(k, v, ok, acts):
     return (k, v) not in ok and not (k == "act" and v.lower() in acts)
 
 
+def pieces(token):
+    """'[[event:1], [judgment:x]]' (the model grouped them) -> ['[[event:1]]', '[[judgment:x]]']; a single one as is."""
+    return [f"[[{x}]]" for x in GROUP.split(token[2:-2])]
+
+
 def refs(answer):
-    return [ref(t) for t in BRACKETS.findall(answer)]
+    return [ref(t) for m in BRACKETS.findall(answer) for t in pieces(m)]
+
+
+class RefStrip:
+    """Streamed text with [[...]] references taken out, holding back one split across chunks: no raw ID is shown."""
+    def __init__(self):
+        self.buf = ""
+
+    def feed(self, delta):
+        head, nl, tail = BRACKETS.sub("", self.buf + delta).rpartition("\n")
+        text = LEFTOVER.sub("", head) + nl + tail   # a [[ before a line break can't close any more
+        i = text.find("[[")
+        i = len(text) - text.endswith("[") if i < 0 else i
+        self.buf = text[i:]
+        return text[:i]
 
 
 def render_parts(answer, seen, conn):
@@ -249,14 +320,19 @@ def render_parts(answer, seen, conn):
             return {"kind": "case", "judgment_id": v, "title": title, "citation": cite, "url": url}
         return {"kind": "removed"}
 
+    def text(t):
+        if t := LEFTOVER.sub("", t):
+            parts.append({"kind": "text", "text": t})
+
     parts, at = [], 0
     for m in BRACKETS.finditer(answer):
-        if m.start() > at:
-            parts.append({"kind": "text", "text": answer[at:m.start()]})
-        parts.append(part(m.group()))
+        text(answer[at:m.start()])
+        for k, t in enumerate(pieces(m.group())):
+            if k:
+                parts.append({"kind": "text", "text": " "})
+            parts.append(part(t))
         at = m.end()
-    if at < len(answer):
-        parts.append({"kind": "text", "text": answer[at:]})
+    text(answer[at:])
     return parts, sum(p["kind"] == "removed" for p in parts)
 
 
@@ -300,8 +376,22 @@ def named_in(name, question):
     return bool(n) and (n in q or (len(first) >= 3 and first in q))
 
 
+UNCONFIRMED = re.compile(r"(could ?n[o'’]t|cannot|can['’]t|unable to|did not|was not able to)\s+(be\s+)?confirm|"
+                         r"not (been )?confirmed|not in hakiki['’]s collection", re.I)
+
+
+def says_unconfirmed(name, text, near=200):
+    """The draft already says, near the case's name (or its first party), that it couldn't be confirmed."""
+    t, n = text.lower(), name.lower().strip()
+    first = re.split(r"\s+v\.?\s+", n)[0].strip()
+    return any(UNCONFIRMED.search(t[max(0, m.start() - near):m.end() + near])
+               for w in {n, first} if len(w) >= 3 for m in re.finditer(re.escape(w), t))
+
+
 def dropped_cases(parts, question, steps):
-    """find_case lookups for a case the user named that confirmed no single case, and that the draft doesn't cite."""
+    """find_case lookups for a case the user named that confirmed no single case, and that the draft neither cites nor
+    already says couldn't be confirmed (a revision would change nothing)."""
+    text = "".join(p["text"] for p in parts if p["kind"] == "text")
     in_draft = {p["judgment_id"] for p in parts if p["kind"] == "case"} | {p["case"] for p in parts if p["kind"] == "ruling"}
     out = []
     for s in steps:
@@ -313,7 +403,7 @@ def dropped_cases(parts, question, steps):
                      {t["judgment_id"] for t in titles if t["confirmed"]})
         cands = ({x for c in cases if c["judgment"] for x in (c["judgment"]["judgment_id"], c["judgment"].get("title"))} |
                  {x for t in titles for x in (t["judgment_id"], t["title"])})
-        if len(confirmed) != 1 and not in_draft & cands:
+        if len(confirmed) != 1 and not in_draft & cands and not says_unconfirmed(name, text):
             out.append(item(name, "case", "not_confirmed",
                             f"You named {name}. Hakiki could not confirm it, so the draft does not cite it.", True))
     return out
@@ -398,13 +488,13 @@ def revise_message(flags):
             "\nFix these or state them plainly in the draft. Reply with the full revised draft only.")
 
 
-def draft(question, history=(), api_key=None, on_step=None, attempts=10, started=None):
+def draft(question, history=(), api_key=None, on_step=None, attempts=10, started=None, on_text=None, on_reset=None):
     """Draft mode: research and write, check the rendered draft with the filing checker, one revision turn if anything
     the model can fix is flagged, then a second check. started: the run's time.monotonic() start; past REVISE_AFTER
     seconds the revision is skipped. -> {parts, removed, check} (check: every judged item, flagged first)."""
     started = time.monotonic() if started is None else started
     step = on_step or (lambda name, args: None)
-    out = run(question, history, api_key, on_step, attempts, system=SYSTEM + DRAFT)
+    out = run(question, history, api_key, on_step, attempts, system=SYSTEM + DRAFT, on_text=on_text, on_reset=on_reset)
     seen, steps = {k: set(v) for k, v in out["seen"].items()}, out["steps"]
     step("check", {})
     with main.db() as conn:
@@ -416,9 +506,12 @@ def draft(question, history=(), api_key=None, on_step=None, attempts=10, started
                           "first draft with what the check found", True))
     elif fix:
         step("revise", {})
+        if on_reset:   # the first draft's streamed text gives way to the revision's
+            on_reset()
         for f in fix:   # the check told the model these IDs, so they count as returned to it
             seen["event"].update(str(i) for i in f["cite"])
-        out = run(revise_message(fix), out["contents"], api_key, on_step, attempts, system=SYSTEM + DRAFT)
+        out = run(revise_message(fix), out["contents"], api_key, on_step, attempts, system=SYSTEM + DRAFT,
+                  on_text=on_text, on_reset=on_reset)
         for k, v in out["seen"].items():
             seen[k].update(v)
         steps = steps + out["steps"]

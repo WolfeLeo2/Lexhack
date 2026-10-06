@@ -52,6 +52,27 @@ def test_render():
     expect("citation not repeated after a title carrying it", jout.count(j[2]), j[1].count(j[2]))
 
 
+def test_grouped():
+    """The model sometimes groups references: [[event:1], [judgment:x]]. Each is rendered on its own; none leaks."""
+    with main.db() as conn:
+        x, y = [str(r[0]) for r in conn.execute("SELECT event_id FROM citation_events WHERE provision_id = %s AND "
+                                                "verified ORDER BY event_id LIMIT 2", (S204,))]
+        j = conn.execute("SELECT judgment_id FROM judgments WHERE has_full_text LIMIT 1").fetchone()[0]
+        expect("grouped refs", agent.refs(f"[[event:{x}], [judgment:{j}]] [[event:{x}],[event:{y}]]"),
+               [("event", x), ("judgment", j), ("event", x), ("event", y)])
+        parts, removed = agent.render_parts(f"See [[event:{x}], [event:{y}]].", {"event": [x, y]}, conn)
+        expect("grouped: both rulings", [p.get("event_id") for p in parts if p["kind"] == "ruling"], [int(x), int(y)])
+        expect("grouped: none removed", removed, 0)
+        parts, removed = agent.render_parts(f"See [[event:{x}], [event:999999]].", {"event": [x]}, conn)
+        expect("grouped, one unseen: removed and counted", ([p["kind"] for p in parts if p["kind"] != "text"], removed),
+               (["ruling", "removed"], 1))
+        outs = [agent.render(t, {"event": [x, y], "judgment": [j]}, conn)[0] for t in (
+            f"[[event:{x}], [judgment:{j}]]", "a [[event:1 unclosed", "stray ke/judgment/x]] b", "[[]] [[event:1, 2]]",
+            f"[[event:{x}], [section:nope]] and [[judgment:{j}]]")]
+    expect("no [[ or ]] in any rendered output", [o for o in outs if "[[" in o or "]]" in o], [])
+    expect("unclosed reference dropped", outs[1], "a  unclosed")
+
+
 def fake_model(replies, bodies=None):
     """generate() stand-in: returns the queued replies in order; records each request body in bodies."""
     it = iter(replies)
@@ -113,6 +134,7 @@ def test_live():
 def run():
     with main.POOL:
         test_render()
+        test_grouped()
         test_loop()
         test_prompt()
         if "--live" in sys.argv:

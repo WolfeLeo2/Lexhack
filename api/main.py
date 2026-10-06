@@ -459,8 +459,10 @@ class Stopped(Exception):
 
 @app.post("/api/chat")
 def chat(req: ChatRequest, request: Request):
-    """The research agent (api/agent.py), streamed as NDJSON: step events as tools run, then the answer (references
-    filled in from the database) and done; or one error event. Over-long input is a 422 (Pydantic), not a 413."""
+    """The research agent (api/agent.py), streamed as NDJSON: step events as tools run, delta events with the answer's
+    text as it is written (references taken out; reset = discard the deltas so far), then the answer (references
+    filled in from the database, authoritative) and done; or one error event. Over-long input is a 422 (Pydantic),
+    not a 413."""
     now = time.monotonic()
     if not allow(chat_key(request), now, _chat_hits, CHAT_RATE):
         raise HTTPException(429, f"rate limit: {CHAT_RATE} questions a minute")
@@ -473,14 +475,28 @@ def chat(req: ChatRequest, request: Request):
             raise Stopped
         events.put({"type": "step", "tool": name, "label": agent.step_label(name, args)})
 
+    strip = [agent.RefStrip()]
+
+    def text(delta):
+        if stop.is_set():
+            raise Stopped
+        if t := strip[0].feed(delta):
+            events.put({"type": "delta", "text": t})
+
+    def reset():
+        strip[0] = agent.RefStrip()
+        events.put({"type": "reset"})
+
     def work():
         try:
             history = agent.history_from_turns([t.model_dump() for t in req.history])
             if req.mode == "draft":
-                d = agent.draft(req.question, history, on_step=step, attempts=2, started=now)
+                d = agent.draft(req.question, history, on_step=step, attempts=2, started=now, on_text=text,
+                                on_reset=reset)
                 parts, removed, extra = d["parts"], d["removed"], {"check": d["check"], "label": agent.DRAFT_LABEL}
             else:
-                out = agent.run(req.question, history, on_step=step, attempts=2)   # few Gemini retries: a deadline
+                out = agent.run(req.question, history, on_step=step, attempts=2,   # few Gemini retries: a deadline
+                                on_text=text, on_reset=reset)
                 with db() as conn:
                     parts, removed = agent.render_parts(out["answer"], out["seen"], conn)
                 extra = {}
@@ -508,7 +524,7 @@ def chat(req: ChatRequest, request: Request):
                 if e is None:
                     return
                 yield json.dumps(e) + "\n"
-        finally:   # closed early (client gone) or past the deadline: stop the agent at its next tool call
+        finally:   # closed early (client gone) or past the deadline: stop the agent at its next tool call or text
             stop.set()
 
     threading.Thread(target=work, daemon=True).start()

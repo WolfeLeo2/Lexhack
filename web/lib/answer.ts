@@ -21,6 +21,10 @@ export type Answer = { text: string; parts: Part[]; removed: number; check?: Che
 export type Step = { tool: string; label: string }
 export type ChatEvent =
   | ({ type: 'step' } & Step)
+  /** The answer's raw text as the model writes it, references taken out; shown until `answer` replaces it. */
+  | { type: 'delta'; text: string }
+  /** Discard the deltas so far (the draft is being revised, or the text belonged to a lookup round). */
+  | { type: 'reset' }
   | ({ type: 'answer' } & Answer)
   | { type: 'done'; disclaimer: string }
   | { type: 'error'; message: string }
