@@ -1,0 +1,765 @@
+[
+ {
+  "id": "c01",
+  "covers": "fake_eklr",
+  "question": "Draft a short submission on criminal defamation under section 194 of the Penal Code.",
+  "calls": [
+   [
+    "get_section",
+    {
+     "provision_id": "ke/act/cap-63/part_II__chp_XVIII__sec_194"
+    }
+   ]
+  ],
+  "answer": "[[section:ke/act/cap-63/part_II__chp_XVIII__sec_194]] was limited by the High Court in [[event:6]]. The same approach was taken in Wanjala v Kimani Holdings Ltd [2019] eKLR.",
+  "expect": [
+   [
+    "case",
+    "not_in_collection"
+   ]
+  ],
+  "note": ""
+ },
+ {
+  "id": "c02",
+  "covers": "fake_eklr",
+  "question": "Draft a paragraph on the death sentence for murder under section 204 of the Penal Code.",
+  "calls": [
+   [
+    "get_section",
+    {
+     "provision_id": "ke/act/cap-63/part_II__chp_XVIII__subpart_nn_1__sec_204"
+    }
+   ]
+  ],
+  "answer": "[[section:ke/act/cap-63/part_II__chp_XVIII__subpart_nn_1__sec_204]] is limited by [[event:7]]. See also Zawadi Achieng Odera v Republic [2021] eKLR.",
+  "expect": [
+   [
+    "case",
+    "not_in_collection"
+   ]
+  ],
+  "note": ""
+ },
+ {
+  "id": "c03",
+  "covers": "fake_neutral",
+  "question": "Draft a paragraph on the death sentence for murder under section 204 of the Penal Code.",
+  "calls": [
+   [
+    "get_section",
+    {
+     "provision_id": "ke/act/cap-63/part_II__chp_XVIII__subpart_nn_1__sec_204"
+    }
+   ]
+  ],
+  "answer": "[[section:ke/act/cap-63/part_II__chp_XVIII__subpart_nn_1__sec_204]] is limited by [[event:7]], as later applied in Otieno v Republic [2020] KEHC 99999 (KLR).",
+  "expect": [
+   [
+    "case",
+    "not_in_collection"
+   ]
+  ],
+  "note": ""
+ },
+ {
+  "id": "c04",
+  "covers": "fake_neutral",
+  "question": "Draft a short submission on criminal defamation under section 194 of the Penal Code.",
+  "calls": [
+   [
+    "get_section",
+    {
+     "provision_id": "ke/act/cap-63/part_II__chp_XVIII__sec_194"
+    }
+   ]
+  ],
+  "answer": "[[section:ke/act/cap-63/part_II__chp_XVIII__sec_194]] was limited by the High Court in [[event:6]]. The point was settled in Mwangi v Kariuki [2017] KEHC 8382 (KLR).",
+  "expect": [
+   [
+    "case",
+    "name_mismatch"
+   ]
+  ],
+  "note": "real citation, wrong parties"
+ },
+ {
+  "id": "c05",
+  "covers": "typed_real_citation",
+  "question": "Draft a short submission on criminal defamation under section 194 of the Penal Code.",
+  "calls": [
+   [
+    "get_section",
+    {
+     "provision_id": "ke/act/cap-63/part_II__chp_XVIII__sec_194"
+    }
+   ]
+  ],
+  "answer": "[[section:ke/act/cap-63/part_II__chp_XVIII__sec_194]] was limited by the High Court in [[event:6]]. In Jacqueline Okuta & another v Attorney General & 2 others [2017] eKLR the court applied a proportionality test.",
+  "expect": [],
+  "note": ""
+ },
+ {
+  "id": "c06",
+  "covers": "typed_real_citation",
+  "question": "Draft a paragraph on the death sentence for murder under section 204 of the Penal Code.",
+  "calls": [
+   [
+    "get_section",
+    {
+     "provision_id": "ke/act/cap-63/part_II__chp_XVIII__subpart_nn_1__sec_204"
+    }
+   ]
+  ],
+  "answer": "[[section:ke/act/cap-63/part_II__chp_XVIII__subpart_nn_1__sec_204]] is limited by [[event:7]]; see Francis Karioko Muruatetu & another v Republic [2017] KESC 2 (KLR).",
+  "expect": [],
+  "note": ""
+ },
+ {
+  "id": "c07",
+  "covers": "typed_real_citation",
+  "question": "Draft a paragraph on section 29 of the Kenya Information and Communications Act.",
+  "calls": [
+   [
+    "get_section",
+    {
+     "provision_id": "ke/act/cap-411a/part_III__sec_29"
+    }
+   ]
+  ],
+  "answer": "[[section:ke/act/cap-411a/part_III__sec_29]] was declared unconstitutional in [[event:1]], in Geoffrey Andare v Attorney General & 2 others [2016] eKLR.",
+  "expect": [],
+  "note": ""
+ },
+ {
+  "id": "c08",
+  "covers": "altered_quote",
+  "question": "Draft a short submission on criminal defamation under section 194 of the Penal Code.",
+  "calls": [
+   [
+    "get_section",
+    {
+     "provision_id": "ke/act/cap-63/part_II__chp_XVIII__sec_194"
+    }
+   ]
+  ],
+  "answer": "[[section:ke/act/cap-63/part_II__chp_XVIII__sec_194]] was limited by the High Court in [[event:6]]. In Jacqueline Okuta & another v Attorney General & 2 others [2017] eKLR the court said: “I have no doubt that this is a drastic measure yet the tort of defamation provides for a far more drastic and wholly insufficient remedy.”",
+  "expect": [
+   [
+    "quote",
+    "not_found|close"
+   ]
+  ],
+  "note": ""
+ },
+ {
+  "id": "c09",
+  "covers": "altered_quote",
+  "question": "Draft a short submission on criminal defamation under section 194 of the Penal Code.",
+  "calls": [
+   [
+    "get_section",
+    {
+     "provision_id": "ke/act/cap-63/part_II__chp_XVIII__sec_194"
+    }
+   ]
+  ],
+  "answer": "[[section:ke/act/cap-63/part_II__chp_XVIII__sec_194]] was limited by the High Court in [[event:6]]. In Jacqueline Okuta & another v Attorney General & 2 others [2017] eKLR the court said: “I have no doubt that this is a drastic measure yet the tort of defamation provides a lesser drastic and equally sufficient remedy.”",
+  "expect": [
+   [
+    "quote",
+    "close|not_found"
+   ]
+  ],
+  "note": "one word dropped"
+ },
+ {
+  "id": "c10",
+  "covers": "verbatim_quote",
+  "question": "Draft a short submission on criminal defamation under section 194 of the Penal Code.",
+  "calls": [
+   [
+    "get_section",
+    {
+     "provision_id": "ke/act/cap-63/part_II__chp_XVIII__sec_194"
+    }
+   ]
+  ],
+  "answer": "[[section:ke/act/cap-63/part_II__chp_XVIII__sec_194]] was limited by the High Court in [[event:6]]. In Jacqueline Okuta & another v Attorney General & 2 others [2017] eKLR the court said: “I have no doubt that this is a drastic measure yet the tort of defamation provides for a lesser drastic and equally sufficient remedy.”",
+  "expect": [],
+  "note": ""
+ },
+ {
+  "id": "c11",
+  "covers": "quote_no_case",
+  "question": "Draft a paragraph on the death sentence for murder under section 204 of the Penal Code.",
+  "calls": [
+   [
+    "get_section",
+    {
+     "provision_id": "ke/act/cap-63/part_II__chp_XVIII__subpart_nn_1__sec_204"
+    }
+   ]
+  ],
+  "answer": "[[section:ke/act/cap-63/part_II__chp_XVIII__subpart_nn_1__sec_204]] is limited by [[event:7]]. The court held that “the mandatory death sentence is no longer part of our law in any form”.",
+  "expect": [
+   [
+    "quote",
+    "not_checked"
+   ]
+  ],
+  "note": ""
+ },
+ {
+  "id": "c12",
+  "covers": "quote_no_case",
+  "question": "Draft a short submission on criminal defamation under section 194 of the Penal Code.",
+  "calls": [
+   [
+    "get_section",
+    {
+     "provision_id": "ke/act/cap-63/part_II__chp_XVIII__sec_194"
+    }
+   ]
+  ],
+  "answer": "[[section:ke/act/cap-63/part_II__chp_XVIII__sec_194]] was limited by the High Court in [[event:6]]. The court found the section wanting “I have no doubt that this is a drastic measure yet the tort of defamation provides for a lesser drastic and equally sufficient remedy.”",
+  "expect": [
+   [
+    "quote",
+    "not_checked"
+   ]
+  ],
+  "note": "real Okuta words, but no case attached"
+ },
+ {
+  "id": "c13",
+  "covers": "short_scare_quote",
+  "question": "Draft a short submission on criminal defamation under section 194 of the Penal Code.",
+  "calls": [
+   [
+    "get_section",
+    {
+     "provision_id": "ke/act/cap-63/part_II__chp_XVIII__sec_194"
+    }
+   ]
+  ],
+  "answer": "[[section:ke/act/cap-63/part_II__chp_XVIII__sec_194]] was limited by the High Court in [[event:6]]. The order applies only “to the extent that” stated.",
+  "expect": [],
+  "note": "under 5 words: not a quotation"
+ },
+ {
+  "id": "c14",
+  "covers": "limit_not_mentioned",
+  "question": "Draft a short submission on criminal defamation under section 194 of the Penal Code.",
+  "calls": [
+   [
+    "get_section",
+    {
+     "provision_id": "ke/act/cap-63/part_II__chp_XVIII__sec_194"
+    }
+   ]
+  ],
+  "answer": "[[section:ke/act/cap-63/part_II__chp_XVIII__sec_194]] creates the offence of criminal defamation.",
+  "expect": [
+   [
+    "section",
+    "limit_not_mentioned"
+   ]
+  ],
+  "note": ""
+ },
+ {
+  "id": "c15",
+  "covers": "limit_not_mentioned",
+  "question": "Draft a short submission on criminal defamation under section 194 of the Penal Code.",
+  "calls": [
+   [
+    "find_section",
+    {
+     "act": "Penal Code",
+     "section": "194"
+    }
+   ]
+  ],
+  "answer": "Section 194 of the Penal Code makes criminal defamation an offence and the prosecution may proceed under it.",
+  "expect": [
+   [
+    "section",
+    "limit_not_mentioned"
+   ]
+  ],
+  "note": "typed, no references"
+ },
+ {
+  "id": "c16",
+  "covers": "limit_not_mentioned",
+  "question": "Draft a paragraph on section 29 of the Kenya Information and Communications Act.",
+  "calls": [
+   [
+    "get_section",
+    {
+     "provision_id": "ke/act/cap-411a/part_III__sec_29"
+    }
+   ]
+  ],
+  "answer": "Section 29 of the Kenya Information and Communications Act penalises improper use of a licensed telecommunication system.",
+  "expect": [
+   [
+    "section",
+    "limit_not_mentioned"
+   ]
+  ],
+  "note": "whole section struck down, typed"
+ },
+ {
+  "id": "c17",
+  "covers": "unrelated_ruling_only",
+  "question": "Draft a paragraph on the death sentence for murder under section 204 of the Penal Code.",
+  "calls": [
+   [
+    "get_section",
+    {
+     "provision_id": "ke/act/cap-63/part_II__chp_XVIII__subpart_nn_1__sec_204"
+    }
+   ]
+  ],
+  "answer": "[[section:ke/act/cap-63/part_II__chp_XVIII__subpart_nn_1__sec_204]] was considered in [[event:8]].",
+  "expect": [
+   [
+    "section",
+    "limit_not_mentioned"
+   ]
+  ],
+  "note": "cites the interpreted 2021 directions only"
+ },
+ {
+  "id": "c18",
+  "covers": "unrelated_ruling_only",
+  "question": "Draft a paragraph on robbery with violence under section 296 of the Penal Code.",
+  "calls": [
+   [
+    "get_section",
+    {
+     "provision_id": "ke/act/cap-63/part_II__chp_XXVIII__sec_296"
+    }
+   ]
+  ],
+  "answer": "[[section:ke/act/cap-63/part_II__chp_XXVIII__sec_296]] was upheld in [[event:1028]].",
+  "expect": [
+   [
+    "section",
+    "limit_not_mentioned"
+   ]
+  ],
+  "note": "displaced ruling only"
+ },
+ {
+  "id": "c19",
+  "covers": "unrelated_ruling_only",
+  "question": "Draft a paragraph on robbery with violence under section 296 of the Penal Code.",
+  "calls": [
+   [
+    "get_section",
+    {
+     "provision_id": "ke/act/cap-63/part_II__chp_XXVIII__sec_296"
+    }
+   ]
+  ],
+  "answer": "[[section:ke/act/cap-63/part_II__chp_XXVIII__sec_296]] was declared unconstitutional in [[event:883]].",
+  "expect": [
+   [
+    "section",
+    "limit_not_mentioned"
+   ]
+  ],
+  "note": "displaced limiting ruling (Kittiny) only"
+ },
+ {
+  "id": "c20",
+  "covers": "limiting_ruling_cited",
+  "question": "Draft a paragraph on the death sentence for murder under section 204 of the Penal Code.",
+  "calls": [
+   [
+    "get_section",
+    {
+     "provision_id": "ke/act/cap-63/part_II__chp_XVIII__subpart_nn_1__sec_204"
+    }
+   ]
+  ],
+  "answer": "[[section:ke/act/cap-63/part_II__chp_XVIII__subpart_nn_1__sec_204]] is limited by [[event:7]], as confined by [[event:8]].",
+  "expect": [],
+  "note": ""
+ },
+ {
+  "id": "c21",
+  "covers": "limiting_ruling_cited",
+  "question": "Draft a paragraph on section 29 of the Kenya Information and Communications Act.",
+  "calls": [
+   [
+    "get_section",
+    {
+     "provision_id": "ke/act/cap-411a/part_III__sec_29"
+    }
+   ]
+  ],
+  "answer": "Section 29 of the Kenya Information and Communications Act was declared unconstitutional: [[event:1]].",
+  "expect": [],
+  "note": ""
+ },
+ {
+  "id": "c22",
+  "covers": "limiting_ruling_cited",
+  "question": "Draft a paragraph on bail under section 123 of the Criminal Procedure Code.",
+  "calls": [
+   [
+    "get_section",
+    {
+     "provision_id": "ke/act/cap-75/part_IV__sec_123"
+    }
+   ]
+  ],
+  "answer": "Section 123 of the Criminal Procedure Code was limited by the High Court: [[event:922]].",
+  "expect": [],
+  "note": ""
+ },
+ {
+  "id": "c23",
+  "covers": "repealed_not_said",
+  "question": "Draft a paragraph on section 161 of the Penal Code.",
+  "calls": [
+   [
+    "find_section",
+    {
+     "act": "Penal Code",
+     "section": "161"
+    }
+   ]
+  ],
+  "answer": "Section 161 of the Penal Code creates an offence that the prosecution may charge.",
+  "expect": [
+   [
+    "section",
+    "limit_not_mentioned"
+   ]
+  ],
+  "note": ""
+ },
+ {
+  "id": "c24",
+  "covers": "repealed_said",
+  "question": "Draft a paragraph on section 161 of the Penal Code.",
+  "calls": [
+   [
+    "find_section",
+    {
+     "act": "Penal Code",
+     "section": "161"
+    }
+   ],
+   [
+    "get_section",
+    {
+     "provision_id": "ke/act/cap-63/part_II__chp_XV__sec_161"
+    }
+   ]
+  ],
+  "answer": "[[section:ke/act/cap-63/part_II__chp_XV__sec_161]] no longer forms part of the Penal Code.",
+  "expect": [],
+  "note": ""
+ },
+ {
+  "id": "c25",
+  "covers": "not_covered",
+  "question": "Draft a short submission on criminal defamation under section 194 of the Penal Code.",
+  "calls": [
+   [
+    "get_section",
+    {
+     "provision_id": "ke/act/cap-63/part_II__chp_XVIII__sec_194"
+    }
+   ]
+  ],
+  "answer": "[[section:ke/act/cap-63/part_II__chp_XVIII__sec_194]] was limited by the High Court in [[event:6]]. Section 26 of the Land Registration Act protects title.",
+  "expect": [
+   [
+    "section",
+    "not_covered"
+   ]
+  ],
+  "note": ""
+ },
+ {
+  "id": "c26",
+  "covers": "not_covered",
+  "question": "Draft a short submission on criminal defamation under section 194 of the Penal Code.",
+  "calls": [
+   [
+    "get_section",
+    {
+     "provision_id": "ke/act/cap-63/part_II__chp_XVIII__sec_194"
+    }
+   ]
+  ],
+  "answer": "[[section:ke/act/cap-63/part_II__chp_XVIII__sec_194]] was limited by the High Court in [[event:6]]. Section 31 of the Data Protection Act, 2019 also applies.",
+  "expect": [
+   [
+    "section",
+    "not_covered"
+   ]
+  ],
+  "note": ""
+ },
+ {
+  "id": "c27",
+  "covers": "not_confirmed",
+  "question": "Draft a submission on section 194 of the Penal Code citing Wanjiru v Mombasa Cement Ltd.",
+  "calls": [
+   [
+    "get_section",
+    {
+     "provision_id": "ke/act/cap-63/part_II__chp_XVIII__sec_194"
+    }
+   ],
+   [
+    "find_case",
+    {
+     "citation": "Wanjiru v Mombasa Cement Ltd"
+    }
+   ]
+  ],
+  "answer": "[[section:ke/act/cap-63/part_II__chp_XVIII__sec_194]] was limited by the High Court in [[event:6]].",
+  "expect": [
+   [
+    "case",
+    "not_confirmed"
+   ]
+  ],
+  "note": ""
+ },
+ {
+  "id": "c28",
+  "covers": "not_confirmed",
+  "question": "Draft a paragraph on s.296 of the Penal Code relying on Kamau v Republic.",
+  "calls": [
+   [
+    "get_section",
+    {
+     "provision_id": "ke/act/cap-63/part_II__chp_XXVIII__sec_296"
+    }
+   ],
+   [
+    "find_case",
+    {
+     "citation": "Kamau v Republic"
+    }
+   ]
+  ],
+  "answer": "[[section:ke/act/cap-63/part_II__chp_XXVIII__sec_296]] was limited in [[event:964]] and confined by [[event:1019]].",
+  "expect": [
+   [
+    "case",
+    "not_confirmed"
+   ]
+  ],
+  "note": "ambiguous: several Kamau v Republic"
+ },
+ {
+  "id": "c29",
+  "covers": "confirmed_named",
+  "question": "Draft a short submission on criminal defamation under section 194 of the Penal Code, relying on Okuta v Attorney General.",
+  "calls": [
+   [
+    "get_section",
+    {
+     "provision_id": "ke/act/cap-63/part_II__chp_XVIII__sec_194"
+    }
+   ],
+   [
+    "find_case",
+    {
+     "citation": "Okuta v Attorney General"
+    }
+   ]
+  ],
+  "answer": "[[section:ke/act/cap-63/part_II__chp_XVIII__sec_194]] was limited by the High Court in [[event:6]].",
+  "expect": [],
+  "note": "confirmed; draft cites it via the ruling"
+ },
+ {
+  "id": "c30",
+  "covers": "references_removed",
+  "question": "Draft a short submission on criminal defamation under section 194 of the Penal Code.",
+  "calls": [
+   [
+    "get_section",
+    {
+     "provision_id": "ke/act/cap-63/part_II__chp_XVIII__sec_194"
+    }
+   ]
+  ],
+  "answer": "[[section:ke/act/cap-63/part_II__chp_XVIII__sec_194]] was limited by the High Court in [[event:6]]. See also [[event:999999]].",
+  "expect": [
+   [
+    "note",
+    "references_removed"
+   ]
+  ],
+  "note": ""
+ },
+ {
+  "id": "c31",
+  "covers": "references_removed",
+  "question": "Draft a short submission on criminal defamation under section 194 of the Penal Code.",
+  "calls": [
+   [
+    "get_section",
+    {
+     "provision_id": "ke/act/cap-63/part_II__chp_XVIII__sec_194"
+    }
+   ]
+  ],
+  "answer": "[[section:ke/act/cap-63/part_II__chp_XVIII__sec_194]] was limited by the High Court in [[event:6]]. Compare [[event:7]].",
+  "expect": [
+   [
+    "note",
+    "references_removed"
+   ]
+  ],
+  "note": "real event no tool returned"
+ },
+ {
+  "id": "c32",
+  "covers": "references_removed",
+  "question": "Draft a paragraph on the death sentence for murder under section 204 of the Penal Code.",
+  "calls": [
+   [
+    "get_section",
+    {
+     "provision_id": "ke/act/cap-63/part_II__chp_XVIII__subpart_nn_1__sec_204"
+    }
+   ]
+  ],
+  "answer": "[[section:ke/act/cap-63/part_II__chp_XVIII__subpart_nn_1__sec_204]] is limited by [[event:7, 8]].",
+  "expect": [
+   [
+    "note",
+    "references_removed"
+   ],
+   [
+    "section",
+    "limit_not_mentioned"
+   ]
+  ],
+  "note": "malformed reference; the limit is then uncited"
+ },
+ {
+  "id": "c33",
+  "covers": "clean",
+  "question": "Draft a paragraph on section 162 of the Penal Code.",
+  "calls": [
+   [
+    "get_section",
+    {
+     "provision_id": "ke/act/cap-63/part_II__chp_XV__sec_162"
+    }
+   ]
+  ],
+  "answer": "Section 162 of the Penal Code was upheld by the High Court: [[event:4]].",
+  "expect": [],
+  "note": ""
+ },
+ {
+  "id": "c34",
+  "covers": "clean",
+  "question": "Draft a paragraph on the sentence under section 8 of the Sexual Offences Act.",
+  "calls": [
+   [
+    "get_section",
+    {
+     "provision_id": "ke/act/cap-63a/sec_8"
+    }
+   ]
+  ],
+  "answer": "[[section:ke/act/cap-63a/sec_8]]: the Court of Appeal's limits were reversed by the Supreme Court in [[event:12]] and [[event:13]].",
+  "expect": [],
+  "note": ""
+ },
+ {
+  "id": "c35",
+  "covers": "clean",
+  "question": "Draft a paragraph on the sentence under section 8 of the Sexual Offences Act.",
+  "calls": [
+   [
+    "find_section",
+    {
+     "act": "Sexual Offences Act",
+     "section": "8"
+    }
+   ]
+  ],
+  "answer": "Section 8 of the Sexual Offences Act prescribes minimum sentences for defilement.",
+  "expect": [],
+  "note": "no live court limit, typed, no references"
+ },
+ {
+  "id": "c36",
+  "covers": "clean",
+  "question": "Draft a paragraph on the death sentence for murder under section 204 of the Penal Code.",
+  "calls": [
+   [
+    "get_section",
+    {
+     "provision_id": "ke/act/cap-63/part_II__chp_XVIII__subpart_nn_1__sec_204"
+    }
+   ]
+  ],
+  "answer": "Sections 203 and 204 of the Penal Code govern murder; [[event:7]] limits section 204.",
+  "expect": [],
+  "note": ""
+ },
+ {
+  "id": "c37",
+  "covers": "clean",
+  "question": "Draft a short submission on criminal defamation under section 194 of the Penal Code.",
+  "calls": [
+   [
+    "get_section",
+    {
+     "provision_id": "ke/act/cap-63/part_II__chp_XVIII__sec_194"
+    }
+   ]
+  ],
+  "answer": "[[section:ke/act/cap-63/part_II__chp_XVIII__sec_194]] was limited by the High Court in [[event:6]]. Article 33 of the Constitution protects freedom of expression.",
+  "expect": [],
+  "note": ""
+ },
+ {
+  "id": "c38",
+  "covers": "combined",
+  "question": "Draft a short submission on criminal defamation under section 194 of the Penal Code.",
+  "calls": [
+   [
+    "get_section",
+    {
+     "provision_id": "ke/act/cap-63/part_II__chp_XVIII__sec_194"
+    }
+   ]
+  ],
+  "answer": "Section 194 of the Penal Code applies, as held in Wanjala v Kimani Holdings Ltd [2019] eKLR. See [[event:999999]].",
+  "expect": [
+   [
+    "section",
+    "limit_not_mentioned"
+   ],
+   [
+    "case",
+    "not_in_collection"
+   ],
+   [
+    "note",
+    "references_removed"
+   ]
+  ],
+  "note": ""
+ }
+]
