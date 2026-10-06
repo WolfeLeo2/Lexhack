@@ -1,5 +1,5 @@
 'use client'
-import { ArrowUp, BookOpen, Check, CircleAlert, ClipboardCheck, Copy, FileSearch, Gavel, Library, type LucideIcon, PenLine, RotateCcw, ScrollText, Search, Sparkles } from 'lucide-react'
+import { ArrowUp, BookOpen, Check, CircleAlert, ClipboardCheck, Copy, FileSearch, Gavel, Library, type LucideIcon, PenLine, Plus, RotateCcw, ScrollText, Search, Sparkles } from 'lucide-react'
 import Link from 'next/link'
 import { Fragment, type ReactNode, useEffect, useRef, useState } from 'react'
 import { CourtWords } from '@/components/court'
@@ -18,6 +18,28 @@ interface Turn {
   live: string[]
   error: string | null
   pending: boolean
+}
+
+interface ChatSession {
+  id: string
+  title: string
+  mode: Mode
+  createdAt: number
+  updatedAt: number
+  turns: Turn[]
+}
+
+function timeAgo(ms: number): string {
+  const diffSec = Math.max(0, Math.floor((Date.now() - ms) / 1000))
+  if (diffSec < 60) return 'Just now'
+  const diffMin = Math.floor(diffSec / 60)
+  if (diffMin < 60) return `${diffMin}m ago`
+  const diffHours = Math.floor(diffMin / 60)
+  if (diffHours < 24) return `${diffHours}h ago`
+  const diffDays = Math.floor(diffHours / 24)
+  if (diffDays === 1) return 'Yesterday'
+  if (diffDays < 7) return `${diffDays}d ago`
+  return new Date(ms).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 
 const EXAMPLES = [
@@ -45,12 +67,79 @@ const ICONS: Record<string, LucideIcon> = {
 }
 
 export function Ask() {
-  const [turns, setTurns] = useState<Turn[]>([])
+  const [sessions, setSessions] = useState<ChatSession[]>([])
+  const [activeId, setActiveId] = useState<string | null>(null)
+  const [showHistory, setShowHistory] = useState(false)
+  const [hydrated, setHydrated] = useState(false)
   const [q, setQ] = useState('')
   const [mode, setMode] = useState<Mode>('answer')
   const last = useRef<HTMLLIElement>(null)
   const inflight = useRef<AbortController | null>(null)
+
+  const activeSession = sessions.find((s) => s.id === activeId) ?? null
+  const turns = activeSession ? activeSession.turns : []
   const pending = turns.some((t) => t.pending)
+
+  // Restore sessions from localStorage on client mount
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('hakiki:ask:sessions')
+      const savedActiveId = localStorage.getItem('hakiki:ask:active_id')
+      if (raw) {
+        const parsed = JSON.parse(raw) as ChatSession[]
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const clean = parsed.map((s) => ({
+            ...s,
+            turns: (s.turns || []).map((t) => ({ ...t, pending: false, live: [] })),
+          }))
+          setSessions(clean)
+          if (savedActiveId && clean.some((s) => s.id === savedActiveId)) {
+            setActiveId(savedActiveId)
+          }
+        }
+      }
+    } catch {}
+    setHydrated(true)
+  }, [])
+
+  // Sync sessions & activeId to localStorage
+  useEffect(() => {
+    if (!hydrated) return
+    try {
+      if (sessions.length === 0) {
+        localStorage.removeItem('hakiki:ask:sessions')
+        localStorage.removeItem('hakiki:ask:active_id')
+      } else {
+        const toStore = sessions.slice(0, 25).map((s) => ({
+          ...s,
+          turns: s.turns.map((t) => ({ ...t, pending: false, live: [] })),
+        }))
+        localStorage.setItem('hakiki:ask:sessions', JSON.stringify(toStore))
+        if (activeId) {
+          localStorage.setItem('hakiki:ask:active_id', activeId)
+        } else {
+          localStorage.removeItem('hakiki:ask:active_id')
+        }
+      }
+    } catch {}
+  }, [sessions, activeId, hydrated])
+
+  // Sync activeSession's mode
+  useEffect(() => {
+    if (activeSession) {
+      setMode(activeSession.mode)
+    }
+  }, [activeId])
+
+  // Close history drawer on Escape key
+  useEffect(() => {
+    if (!showHistory) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setShowHistory(false)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [showHistory])
 
   // Leaving the page drops the stream, so the API stops the agent rather than answering no one.
   useEffect(() => () => inflight.current?.abort(), [])
@@ -61,24 +150,99 @@ export function Ask() {
     last.current?.scrollIntoView({ behavior: still ? 'auto' : 'smooth', block: 'start' })
   }, [turns.length])
 
-  async function ask(question: string, prior: Turn[], mode: Mode) {
+  function startNewChat() {
+    inflight.current?.abort()
+    setActiveId(null)
+    setQ('')
+    setShowHistory(false)
+  }
+
+  function switchSession(id: string) {
+    if (id === activeId) {
+      setShowHistory(false)
+      return
+    }
+    inflight.current?.abort()
+    setActiveId(id)
+    setShowHistory(false)
+    setQ('')
+  }
+
+  function deleteSession(id: string, e?: React.MouseEvent) {
+    e?.stopPropagation()
+    if (activeId === id) {
+      inflight.current?.abort()
+      setActiveId(null)
+    }
+    setSessions((prev) => prev.filter((s) => s.id !== id))
+  }
+
+  function clearAllSessions() {
+    inflight.current?.abort()
+    setActiveId(null)
+    setSessions([])
+    setShowHistory(false)
+  }
+
+  async function ask(question: string, prior: Turn[], m: Mode) {
     question = question.trim().slice(0, MAX_Q)
     if (!question || pending) return
+
+    let currentSessionId = activeId
+    if (!currentSessionId) {
+      currentSessionId = crypto.randomUUID()
+      const newSession: ChatSession = {
+        id: currentSessionId,
+        title: question.length > 55 ? question.slice(0, 52) + '…' : question,
+        mode: m,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        turns: [],
+      }
+      setSessions((prev) => [newSession, ...prev])
+      setActiveId(currentSessionId)
+    }
+
     const i = prior.length
     const history = prior
       .filter((t) => t.answer)
       .slice(-6)
       .map((t) => ({ question: t.question, answer: t.answer!.text.slice(0, 4000) }))
-    setTurns([...prior, { question, mode, steps: [], answer: null, live: [], error: null, pending: true }])
+
+    const newTurn: Turn = { question, mode: m, steps: [], answer: null, live: [], error: null, pending: true }
+
+    setSessions((prev) =>
+      prev.map((s) => {
+        if (s.id !== currentSessionId) return s
+        return {
+          ...s,
+          updatedAt: Date.now(),
+          turns: [...s.turns, newTurn],
+        }
+      })
+    )
     setQ('')
-    const patch = (f: (t: Turn) => Partial<Turn>) => setTurns((ts) => ts.map((t, k) => (k === i ? { ...t, ...f(t) } : t)))
+
+    const patch = (f: (t: Turn) => Partial<Turn>) => {
+      setSessions((prev) =>
+        prev.map((s) => {
+          if (s.id !== currentSessionId) return s
+          return {
+            ...s,
+            updatedAt: Date.now(),
+            turns: s.turns.map((t, k) => (k === i ? { ...t, ...f(t) } : t)),
+          }
+        })
+      )
+    }
+
     const ctrl = new AbortController()
     inflight.current = ctrl
     try {
       const res = await fetch('/ask/api', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question, history, mode }),
+        body: JSON.stringify({ question, history, mode: m }),
         signal: ctrl.signal,
       })
       if (!res.ok || !res.body) {
@@ -108,12 +272,12 @@ export function Ask() {
         }
         if (buf.trim()) handle(JSON.parse(buf))
       } finally {
-        reader.cancel().catch(() => {}) // an error event or bad line stops reading: release the stream
+        reader.cancel().catch(() => {})
       }
       if (!answered) throw new Error('The answer was cut off. Try again in a moment.')
       patch(() => ({ pending: false }))
     } catch (err) {
-      if (ctrl.signal.aborted) return // the page is gone
+      if (ctrl.signal.aborted) return
       const message = err instanceof TypeError || err instanceof SyntaxError ? 'The connection dropped. Try again in a moment.' : (err as Error).message
       patch(() => ({ pending: false, error: message }))
     }
@@ -124,6 +288,49 @@ export function Ask() {
 
   return (
     <div className="pb-8">
+      {/* Active Inquiry Header */}
+      {turns.length > 0 && (
+        <header className="mb-8 border-b border-rule pb-5">
+          <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-3">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-ink-2">
+                <span className="rounded-sm border border-rule px-1.5 py-px font-sans">
+                  {activeSession?.mode === 'draft' ? 'Draft submission' : 'Legal inquiry'}
+                </span>
+                <span className="text-rule">&middot;</span>
+                <span>{turns.length} {turns.length === 1 ? 'question' : 'questions'}</span>
+                <span className="text-rule">&middot;</span>
+                <span>Updated {timeAgo(activeSession?.updatedAt ?? Date.now())}</span>
+              </div>
+              <h2 className="statute mt-2.5 text-2xl sm:text-3xl font-medium tracking-tight text-ink line-clamp-2" title={activeSession?.title}>
+                {activeSession?.title}
+              </h2>
+            </div>
+
+            <div className="flex items-center gap-2 sm:gap-3 shrink-0 pt-1 text-sm">
+              <button
+                type="button"
+                onClick={startNewChat}
+                className="inline-flex items-center gap-1.5 rounded-sm border border-rule bg-paper px-3 py-1.5 text-sm text-ink hover:border-ink hover:text-ink transition-colors"
+              >
+                <Plus className="h-3.5 w-3.5" aria-hidden />
+                <span>New inquiry</span>
+              </button>
+              {sessions.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => setShowHistory(true)}
+                  className="inline-flex items-center gap-1.5 rounded-sm border border-rule bg-panel px-3 py-1.5 text-sm text-ink-2 hover:border-ink hover:text-ink transition-colors"
+                >
+                  <ScrollText className="h-3.5 w-3.5" aria-hidden />
+                  <span>Register ({sessions.length})</span>
+                </button>
+              )}
+            </div>
+          </div>
+        </header>
+      )}
+
       {turns.length > 0 && (
         <ol className="mt-4 space-y-12" aria-label="Conversation">
           {turns.map((t, i) => (
@@ -145,7 +352,9 @@ export function Ask() {
           <label htmlFor="ask-q" className="statute block text-xl font-medium">
             {mode === 'draft' ? 'What should Hakiki draft?' : turns.length ? 'Ask a follow-up' : 'Your question'}
           </label>
-          <ModeToggle mode={mode} onChange={setMode} />
+          <div className="flex items-center gap-2">
+            <ModeToggle mode={mode} onChange={setMode} />
+          </div>
         </div>
         <div className="mt-3 flex items-end gap-3 rounded-md border border-rule bg-paper p-2 focus-within:border-ink-2">
           <textarea
@@ -198,6 +407,186 @@ export function Ask() {
               </li>
             ))}
           </ul>
+        </div>
+      )}
+
+      {/* Previous inquiries ledger shown when starting fresh */}
+      {turns.length === 0 && sessions.length > 0 && (
+        <section className="mt-14 border-t border-rule pt-8" aria-labelledby="inquiries-h">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <div>
+              <h2 id="inquiries-h" className="statute text-2xl font-medium tracking-[-0.01em]">
+                Previous inquiries
+              </h2>
+              <p className="mt-1 text-sm text-ink-2">
+                Saved in your browser’s local records. Open any inquiry to resume.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={clearAllSessions}
+              className="text-xs text-ink-2/60 hover:text-seal transition-colors"
+            >
+              Clear register ({sessions.length})
+            </button>
+          </div>
+
+          <ol className="mt-6 divide-y divide-rule border-y border-rule">
+            {sessions.map((s) => (
+              <li key={s.id} className="group">
+                <div
+                  onClick={() => switchSession(s.id)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      switchSession(s.id)
+                    }
+                  }}
+                  className="grid grid-cols-[minmax(0,1fr)] items-baseline gap-x-6 gap-y-2 py-4 hover:bg-panel/60 sm:grid-cols-[minmax(0,1fr)_auto] cursor-pointer transition-colors"
+                >
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                      <span className="statute text-xl text-ink group-hover:text-gazette transition-colors line-clamp-1">
+                        {s.title}
+                      </span>
+                      <span className="rounded-sm border border-rule px-1.5 py-px text-xs text-ink-2 shrink-0">
+                        {s.mode === 'draft' ? 'Draft' : 'Inquiry'}
+                      </span>
+                    </div>
+                    <p className="mt-1.5 text-sm text-ink-2">
+                      <span>{s.turns.length} {s.turns.length === 1 ? 'question' : 'questions'}</span>
+                      <span className="mx-2 text-rule">&middot;</span>
+                      <span>Updated {timeAgo(s.updatedAt)}</span>
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-4 text-sm sm:justify-end">
+                    <span className="text-gazette group-hover:underline underline-offset-4 text-[0.95rem]">
+                      Open &rarr;
+                    </span>
+                    <button
+                      type="button"
+                      onClick={(e) => deleteSession(s.id, e)}
+                      className="text-xs text-ink-2/40 hover:text-seal transition-colors py-1 px-1.5"
+                      title="Remove this inquiry"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </section>
+      )}
+
+      {/* Inquiry Register Drawer */}
+      {showHistory && (
+        <div className="fixed inset-0 z-50 flex justify-end" role="dialog" aria-modal="true" aria-label="Inquiry register">
+          <div
+            className="fixed inset-0 bg-ink/30 transition-opacity"
+            onClick={() => setShowHistory(false)}
+          />
+          <aside className="paper-grain relative z-10 w-full max-w-lg border-l border-rule bg-paper p-6 sm:p-8 flex flex-col h-full overflow-hidden shadow-[-8px_0_24px_-12px_rgba(24,33,43,0.35)]">
+            <div className="flex items-start justify-between border-b border-rule pb-4 mb-5">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="statute text-2xl font-medium tracking-tight text-ink">Inquiry register</h2>
+                  <span className="rounded-sm border border-rule px-1.5 py-px text-xs text-ink-2">
+                    {sessions.length}
+                  </span>
+                </div>
+                <p className="text-xs text-ink-2 mt-1">
+                  Saved inquiries in this browser
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowHistory(false)}
+                className="rounded-sm border border-rule px-2 py-1 text-xs text-ink-2 hover:border-ink hover:text-ink transition-colors"
+                aria-label="Close register"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="mb-4">
+              <button
+                type="button"
+                onClick={startNewChat}
+                className="w-full inline-flex items-center justify-center gap-2 rounded-sm border border-rule bg-panel hover:border-ink hover:text-ink px-4 py-2.5 text-sm font-medium transition-colors"
+              >
+                <Plus className="h-4 w-4" />
+                <span>Start a new inquiry</span>
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto divide-y divide-rule border-y border-rule pr-1 -mr-1">
+              {sessions.length === 0 ? (
+                <p className="text-center text-sm text-ink-2 py-12">No inquiries recorded yet.</p>
+              ) : (
+                sessions.map((s) => {
+                  const isActive = s.id === activeId
+                  return (
+                    <div
+                      key={s.id}
+                      onClick={() => switchSession(s.id)}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault()
+                          switchSession(s.id)
+                        }
+                      }}
+                      className={`group cursor-pointer py-3.5 px-3 transition-colors flex items-start justify-between gap-3 text-left ${
+                        isActive
+                          ? 'border-l-2 border-seal bg-panel/75'
+                          : 'hover:bg-panel/40'
+                      }`}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="statute font-medium text-lg text-ink truncate group-hover:text-gazette transition-colors">
+                          {s.title}
+                        </p>
+                        <p className="text-xs text-ink-2 mt-1">
+                          <span className="capitalize">{s.mode === 'draft' ? 'Draft' : 'Inquiry'}</span>
+                          <span className="mx-1.5 text-rule">&middot;</span>
+                          <span>{s.turns.length} {s.turns.length === 1 ? 'question' : 'questions'}</span>
+                          <span className="mx-1.5 text-rule">&middot;</span>
+                          <span>{timeAgo(s.updatedAt)}</span>
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={(e) => deleteSession(s.id, e)}
+                        aria-label={`Remove inquiry ${s.title}`}
+                        title="Remove inquiry"
+                        className="text-xs text-ink-2/30 hover:text-seal opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity py-1 px-1.5"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  )
+                })
+              )}
+            </div>
+
+            {sessions.length > 0 && (
+              <div className="border-t border-rule pt-4 mt-4 flex items-center justify-between text-xs text-ink-2">
+                <span>{sessions.length} saved {sessions.length === 1 ? 'inquiry' : 'inquiries'}</span>
+                <button
+                  type="button"
+                  onClick={clearAllSessions}
+                  className="hover:text-seal transition-colors"
+                >
+                  Clear all
+                </button>
+              </div>
+            )}
+          </aside>
         </div>
       )}
     </div>
