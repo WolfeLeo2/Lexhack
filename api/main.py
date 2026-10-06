@@ -1,6 +1,11 @@
-"""LexHack API. The response models below ARE the contract the web UI builds against (also served at /docs).
+"""LexHack API. The response models below ARE the contract the web UI builds against.
 
-  uv run uvicorn api.main:app --reload            # http://127.0.0.1:8000/docs
+API documentation:
+  - Scalar: http://127.0.0.1:8000/scalar
+  - Swagger UI: http://127.0.0.1:8000/docs
+  - ReDoc: http://127.0.0.1:8000/redoc
+
+  uv run uvicorn api.main:app --reload
 
 Every answer reports what the sources say, with the court's verbatim words and a link. Never legal advice, never a
 bare yes/no.
@@ -19,8 +24,9 @@ from typing import Literal
 
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
+from scalar_fastapi import get_scalar_api_reference
 
 import crawler.config  # noqa: F401  (loads .env)
 
@@ -47,9 +53,35 @@ async def lifespan(app):
         POOL.close()
 
 
-app = FastAPI(title="LexHack citator API", version="0.1", lifespan=lifespan)
+API_DESCRIPTION = """Hakiki Citator API.
+
+Checks whether sections of Kenyan statutes are still good law: in force, amended, repealed,
+or limited or struck down by court rulings, with the courts' verbatim words and judgment links.
+
+- **Scalar Reference**: `/scalar`
+- **Swagger UI**: `/docs`
+- **ReDoc**: `/redoc`
+- **MCP Endpoint**: `/mcp` (Model Context Protocol for AI clients)
+
+Every answer reports what published sources say. It is not legal advice.
+"""
+
+app = FastAPI(
+    title="Hakiki Citator API",
+    description=API_DESCRIPTION,
+    version="0.1",
+    lifespan=lifespan,
+)
 app.add_middleware(CORSMiddleware, allow_origins=os.environ.get("CORS_ORIGINS", "http://localhost:3000").split(","),
                    allow_methods=["GET"], allow_headers=["*"])
+
+
+@app.get("/scalar", include_in_schema=False)
+def scalar_html():
+    return get_scalar_api_reference(
+        openapi_url=app.openapi_url,
+        title=f"{app.title} - Scalar",
+    )
 
 RATE, WINDOW = 60, 60.0   # /mcp requests per client IP per minute
 _hits = {}
@@ -58,6 +90,7 @@ CHAT_GLOBAL_RATE = 30     # /api/chat questions per minute from everyone (key "*
 _chat_hits = {}
 CHAT_SLOTS = threading.BoundedSemaphore(4)   # agent runs at once
 CHAT_DEADLINE = 55        # seconds; the web proxy's maxDuration is 60
+START_TIME = time.time()
 
 
 def allow(key, now, hits=_hits, rate=RATE, window=WINDOW):
@@ -100,6 +133,424 @@ async def limit_mcp(request, call_next):
 def db():
     with POOL.connection() as conn:
         yield conn
+
+
+def check_db():
+    try:
+        with db() as conn:
+            conn.execute("SELECT 1").fetchone()
+        return True, None
+    except Exception as e:
+        return False, str(e)
+
+
+LANDING_TEMPLATE = """<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>__SERVICE__</title>
+  <style>
+    :root {
+      --paper: #f1f3ee;
+      --panel: #ffffff;
+      --panel-hover: #fcfdfa;
+      --ink: #18212b;
+      --ink-muted: #4d5a66;
+      --rule: #c9d0c6;
+      --gazette: #1e5b47;
+      --gazette-bg: #e8f3ee;
+      --seal: #8e2c48;
+      --seal-bg: #fdf0f3;
+      --note: #fbf7e4;
+      --note-border: #e5dcb2;
+      --font-serif: "Newsreader", Georgia, Cambria, serif;
+      --font-sans: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --paper: #141a20;
+        --panel: #1c242c;
+        --panel-hover: #222c36;
+        --ink: #e7eae4;
+        --ink-muted: #a6b0b8;
+        --rule: #33404a;
+        --gazette: #7fcaa9;
+        --gazette-bg: #1a332a;
+        --seal: #ea8ca7;
+        --seal-bg: #351c24;
+        --note: #262416;
+        --note-border: #4a4428;
+      }
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: var(--paper);
+      color: var(--ink);
+      font-family: var(--font-sans);
+      font-size: 16px;
+      line-height: 1.6;
+      padding: 48px 20px 80px;
+      min-height: 100vh;
+      background-image: radial-gradient(rgba(24, 33, 43, 0.05) 1px, transparent 1px);
+      background-size: 4px 4px;
+    }
+    .container {
+      max-width: 960px;
+      margin: 0 auto;
+    }
+    header {
+      margin-bottom: 28px;
+      padding-bottom: 24px;
+      border-bottom: 1px solid var(--rule);
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .seal-svg {
+      width: 44px;
+      height: 44px;
+      color: var(--seal);
+      flex-shrink: 0;
+    }
+    h1 {
+      font-family: var(--font-serif);
+      font-size: 2.1rem;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      line-height: 1.1;
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .version-tag {
+      font-family: var(--font-sans);
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: var(--gazette);
+      background: var(--gazette-bg);
+      padding: 3px 10px;
+      border-radius: 999px;
+    }
+    .subtitle {
+      color: var(--ink-muted);
+      font-size: 1.05rem;
+      margin-top: 6px;
+    }
+    .disclaimer-banner {
+      background: var(--note);
+      border: 1px solid var(--note-border);
+      border-left: 4px solid var(--seal);
+      padding: 14px 18px;
+      border-radius: 6px;
+      margin-bottom: 36px;
+      font-size: 0.95rem;
+      color: var(--ink);
+    }
+    .disclaimer-banner strong {
+      color: var(--seal);
+    }
+    .section-title {
+      font-family: var(--font-serif);
+      font-size: 1.35rem;
+      margin: 32px 0 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      letter-spacing: -0.01em;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 18px;
+    }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--rule);
+      border-radius: 8px;
+      padding: 22px;
+      text-decoration: none;
+      color: inherit;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    .card:hover {
+      transform: translateY(-2px);
+      border-color: var(--gazette);
+      background: var(--panel-hover);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    }
+    .card-badge {
+      display: inline-block;
+      align-self: flex-start;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 2px 8px;
+      border-radius: 4px;
+      margin-bottom: 12px;
+    }
+    .badge-gazette { background: var(--gazette-bg); color: var(--gazette); }
+    .badge-rule { background: var(--paper); color: var(--ink-muted); border: 1px solid var(--rule); }
+    .badge-seal { background: var(--seal-bg); color: var(--seal); }
+    .card-title {
+      font-family: var(--font-serif);
+      font-size: 1.25rem;
+      margin-bottom: 8px;
+      font-weight: 600;
+    }
+    .card-desc {
+      color: var(--ink-muted);
+      font-size: 0.92rem;
+      line-height: 1.5;
+      margin-bottom: 16px;
+      flex-grow: 1;
+    }
+    .card-link {
+      font-size: 0.9rem;
+      font-weight: 500;
+      color: var(--gazette);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .code-box {
+      background: var(--panel);
+      border: 1px solid var(--rule);
+      border-radius: 8px;
+      padding: 20px;
+      margin-top: 16px;
+    }
+    .code-box pre {
+      font-family: var(--font-mono);
+      font-size: 0.88rem;
+      color: var(--ink);
+      overflow-x: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+      line-height: 1.6;
+    }
+    .code-comment {
+      color: var(--ink-muted);
+    }
+    .footer {
+      border-top: 1px solid var(--rule);
+      margin-top: 48px;
+      padding-top: 24px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 16px;
+      font-size: 0.88rem;
+      color: var(--ink-muted);
+    }
+    .footer a {
+      color: var(--gazette);
+      text-decoration: none;
+    }
+    .footer a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="brand">
+        <svg viewBox="0 0 40 40" class="seal-svg" aria-hidden="true" fill="none" stroke="currentColor">
+          <circle cx="20" cy="20" r="17.5" stroke-width="1.6" stroke-dasharray="96 3 100" />
+          <circle cx="20" cy="20" r="14" stroke-width="0.8" stroke-dasharray="1.2 1.6" />
+          <text x="20" y="27.5" text-anchor="middle" font-size="21" fill="currentColor" stroke="none" font-family="'Newsreader', Georgia, serif">§</text>
+        </svg>
+        <div>
+          <h1>__SERVICE__ <span class="version-tag">v__VERSION__</span></h1>
+          <p class="subtitle">Kenyan statute citator & judicial validity engine</p>
+        </div>
+      </div>
+    </header>
+
+    <div class="disclaimer-banner">
+      <strong>Notice:</strong> __DISCLAIMER__
+    </div>
+
+    <h2 class="section-title">API Documentation</h2>
+    <div class="grid">
+      <a href="/scalar" class="card">
+        <div>
+          <span class="card-badge badge-gazette">Recommended</span>
+          <div class="card-title">Scalar Reference</div>
+          <div class="card-desc">Modern interactive API documentation with live test requests, dark mode, and multi-language code snippets (curl, Python, JS).</div>
+        </div>
+        <div class="card-link">Explore Scalar &rarr;</div>
+      </a>
+      <a href="/docs" class="card">
+        <div>
+          <span class="card-badge badge-rule">Interactive</span>
+          <div class="card-title">Swagger UI</div>
+          <div class="card-desc">Standard interactive OpenAPI documentation with direct browser-based endpoint testing and schema explorer.</div>
+        </div>
+        <div class="card-link">Open Swagger UI &rarr;</div>
+      </a>
+      <a href="/redoc" class="card">
+        <div>
+          <span class="card-badge badge-rule">Reference</span>
+          <div class="card-title">ReDoc</div>
+          <div class="card-desc">Clean, publication-grade three-column API reference focused on readable request/response schemas and models.</div>
+        </div>
+        <div class="card-link">Read ReDoc &rarr;</div>
+      </a>
+      <a href="/openapi.json" class="card">
+        <div>
+          <span class="card-badge badge-rule">Specification</span>
+          <div class="card-title">OpenAPI JSON</div>
+          <div class="card-desc">Machine-readable OpenAPI 3.1 specification for Postman, Insomnia, code generation, and automated testing.</div>
+        </div>
+        <div class="card-link">View openapi.json &rarr;</div>
+      </a>
+    </div>
+
+    <h2 class="section-title">Health & Agents</h2>
+    <div class="grid">
+      <a href="/health" class="card">
+        <div>
+          <span class="card-badge badge-gazette">Monitor</span>
+          <div class="card-title">Health Check (/health)</div>
+          <div class="card-desc">Consolidated health status probe for uptime monitors and Railway deployment healthchecks.</div>
+        </div>
+        <div class="card-link">Check Health &rarr;</div>
+      </a>
+      <a href="/readyz" class="card">
+        <div>
+          <span class="card-badge badge-gazette">Probe</span>
+          <div class="card-title">Readiness (/readyz)</div>
+          <div class="card-desc">Verifies live PostgreSQL database connection pool and query readiness (SELECT 1).</div>
+        </div>
+        <div class="card-link">Test Readiness &rarr;</div>
+      </a>
+      <a href="/livez" class="card">
+        <div>
+          <span class="card-badge badge-rule">Probe</span>
+          <div class="card-title">Liveness (/livez)</div>
+          <div class="card-desc">Lightweight process probe reporting process uptime and event loop health.</div>
+        </div>
+        <div class="card-link">Test Liveness &rarr;</div>
+      </a>
+      <a href="/mcp" class="card">
+        <div>
+          <span class="card-badge badge-seal">AI Protocol</span>
+          <div class="card-title">MCP Server (/mcp)</div>
+          <div class="card-desc">Model Context Protocol endpoint for Claude Desktop, Cursor, and automated AI agents to query statute validity.</div>
+        </div>
+        <div class="card-link">Inspect MCP &rarr;</div>
+      </a>
+    </div>
+
+    <h2 class="section-title">Developer Quickstart</h2>
+    <div class="code-box">
+      <pre><span class="code-comment"># 1. Search provisions by legal topic or keyword</span>
+curl -s "http://127.0.0.1:8000/api/search?q=criminal+defamation"
+
+<span class="code-comment"># 2. Get status and court rulings for Penal Code s.194</span>
+curl -s "http://127.0.0.1:8000/api/provisions/ke/act/cap-63/part_II__chp_XVIII__sec_194"
+
+<span class="code-comment"># 3. Check citation validity in a legal filing</span>
+curl -s -X POST "http://127.0.0.1:8000/api/check" \\
+  -H "Content-Type: application/json" \\
+  -d '{"text": "Section 204 of the Penal Code makes death mandatory."}'</pre>
+    </div>
+
+    <footer class="footer">
+      <div>Hakiki &middot; Built for LexHack 2026</div>
+      <div>Data from Kenya Law via Internet Archive &middot; Quotations verbatim</div>
+    </footer>
+  </div>
+</body>
+</html>"""
+
+
+def render_landing_html(service: str, version: str) -> str:
+    return (
+        LANDING_TEMPLATE.replace("__SERVICE__", service)
+        .replace("__VERSION__", version)
+        .replace("__DISCLAIMER__", DISCLAIMER)
+    )
+
+
+@app.get("/", tags=["Info"])
+def root_info(request: Request, format: str | None = None):
+    """Service overview and developer portal. Returns a Hakiki-themed HTML UI for browsers, or JSON for API clients."""
+    accept = request.headers.get("accept", "").lower()
+    wants_json = format == "json" or ("application/json" in accept and "text/html" not in accept)
+    payload = {
+        "service": "Hakiki Citator API",
+        "version": app.version,
+        "description": "API for verifying status and court rulings on Kenyan statutory provisions.",
+        "docs": {
+            "scalar": "/scalar",
+            "swagger": "/docs",
+            "redoc": "/redoc",
+            "openapi": "/openapi.json",
+        },
+        "health": "/health",
+        "livez": "/livez",
+        "readyz": "/readyz",
+    }
+    if wants_json:
+        return JSONResponse(payload)
+    return HTMLResponse(render_landing_html(app.title, app.version))
+
+
+@app.get("/livez", tags=["Health"])
+def livez():
+    """Liveness probe. Returns 200 immediately if the server process is alive."""
+    return {"status": "ok", "uptime_seconds": int(time.time() - START_TIME)}
+
+
+@app.get("/readyz", tags=["Health"])
+def readyz():
+    """Readiness probe. Verifies database connectivity."""
+    ok, err = check_db()
+    if not ok:
+        return JSONResponse(
+            {"status": "error", "db": "disconnected", "error": err},
+            status_code=503,
+        )
+    return {"status": "ok", "db": "connected"}
+
+
+@app.get("/health", tags=["Health"])
+def health():
+    """Consolidated health check for monitors (e.g. Railway, uptime checkers)."""
+    ok, err = check_db()
+    if not ok:
+        return JSONResponse(
+            {"status": "degraded", "db": "disconnected", "error": err},
+            status_code=503,
+        )
+    return {"status": "ok", "db": "connected", "uptime_seconds": int(time.time() - START_TIME)}
+
+
+@app.get("/api/version", tags=["Info"])
+def api_version():
+    """App version and environment info."""
+    return {
+        "service": "Hakiki Citator API",
+        "version": app.version,
+        "commit": os.environ.get("RAILWAY_GIT_COMMIT_SHA", os.environ.get("GIT_COMMIT", "dev")),
+        "environment": os.environ.get("ENVIRONMENT", "development" if os.environ.get("DEBUG") else "production"),
+    }
 
 
 class Act(BaseModel):
