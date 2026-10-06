@@ -93,7 +93,27 @@ def generate(body, api_key):
     raise RuntimeError("Gemini call failed after 10 attempts (network or rate limit)")
 
 
-def run(question, history=(), api_key=None):
+def history_from_turns(turns):
+    """[{question, answer}] (earlier turns, answers as rendered) -> Gemini contents."""
+    return [c for t in turns for c in ({"role": "user", "parts": [{"text": t["question"]}]},
+                                       {"role": "model", "parts": [{"text": t["answer"]}]})]
+
+
+def step_label(name, args):
+    """What a tool call is doing, in plain English, for the chat's progress line."""
+    def arg(k):
+        s = str(args.get(k) or "")
+        return s if len(s) <= 80 else s[:80] + "…"
+    return {"find_section": lambda: f"Looking up {arg('act')} s.{arg('section')}",
+            "search_sections": lambda: f"Searching sections for “{arg('query')}”",
+            "get_section": lambda: "Reading the section and its rulings",
+            "find_case": lambda: f"Looking for the case “{arg('citation')}”",
+            "citing_judgments": lambda: "Finding judgments that cite it",
+            "list_acts": lambda: "Checking which Acts Hakiki holds",
+            "check_text": lambda: "Checking the citations in the text"}.get(name, lambda: "Looking things up")()
+
+
+def run(question, history=(), api_key=None, on_step=None):
     api_key = api_key or os.environ["GEMINI_API_KEY"]
     contents = [*history, {"role": "user", "parts": [{"text": question}]}]
     steps, seen = [], {"section": set(), "event": set(), "judgment": set()}
@@ -117,6 +137,8 @@ def run(question, history=(), api_key=None):
         replies = []
         for c in calls:
             args = c.get("args") or {}
+            if on_step:
+                on_step(c["name"], args)
             try:
                 out = tools.call(c["name"], args)
                 for k, v in out["ids"].items():
@@ -140,8 +162,9 @@ def refs(answer):
     return [ref(t) for t in BRACKETS.findall(answer)]
 
 
-def render(answer, seen, conn):
-    """-> (answer with references replaced by database text, number of references no tool returned)."""
+def render_parts(answer, seen, conn):
+    """-> (the answer as Parts: text, and each reference filled in from the database; number of references no tool
+    returned). The /api/chat contract's Part shapes; render() joins them into plain text."""
     ok = {(k, v) for k, vs in seen.items() for v in vs}
     good = [(k, v) for k, v in refs(answer) if (k, v) in ok]
     ev = {str(r[0]): r[1:] for r in conn.execute(
@@ -160,29 +183,56 @@ def render(answer, seen, conn):
     jud = {r[0]: r[1:] for r in conn.execute(
         "SELECT judgment_id, title, neutral_citation, source_url FROM judgments WHERE judgment_id = ANY(%s)",
         ([v for k, v in good if k == "judgment"],))}
-    invented = 0
 
-    def sub(m):
-        nonlocal invented
-        k, v = ref(m.group())
+    def part(text):
+        k, v = ref(text)
         if (k, v) in ok and k == "event" and v in ev:
             quote, para, by, title, cite, court, url, _ = ev[v]
-            who = next((label for prefix, label in LABELS if (by or "").startswith(prefix)), "unverified")
-            if state.get(v, "in effect") != "in effect":
-                who += f"; {state[v]}"
-            src = ", ".join(x for x in (title or "Parliament (Kenya Law reviser's note)", cite, court,
-                                        para and f"para {para}") if x)
-            return f'"{quote}" ({src}; {who}){f" <{url}>" if url else ""}'
+            st = state.get(v, "in effect")
+            return {"kind": "ruling", "event_id": int(v), "quote": quote, "case": title, "citation": cite,
+                    "court": court, "paragraph": para,
+                    "checked_by": next((label for prefix, label in LABELS if (by or "").startswith(prefix)), "unverified"),
+                    "state": None if st == "in effect" else st, "url": url}
         if (k, v) in ok and k == "section" and v in sec:
             act, number, heading = sec[v]
-            return f"{act} s.{number}{f' ({heading})' if heading else ''} [status: {status[v]}]"
+            return {"kind": "section", "provision_id": v, "act": act, "number": number, "heading": heading,
+                    "status": status[v]}
         if (k, v) in ok and k == "judgment" and v in jud:
             title, cite, url = jud[v]
-            return f"{title}{f' {cite}' if cite else ''}{f' <{url}>' if url else ''}"
-        invented += 1
-        return "[unverified reference removed]"
+            return {"kind": "case", "judgment_id": v, "title": title, "citation": cite, "url": url}
+        return {"kind": "removed"}
 
-    return BRACKETS.sub(sub, answer), invented
+    parts, at = [], 0
+    for m in BRACKETS.finditer(answer):
+        if m.start() > at:
+            parts.append({"kind": "text", "text": answer[at:m.start()]})
+        parts.append(part(m.group()))
+        at = m.end()
+    if at < len(answer):
+        parts.append({"kind": "text", "text": answer[at:]})
+    return parts, sum(p["kind"] == "removed" for p in parts)
+
+
+def part_text(p):
+    """One Part as plain text (the agent's CLI, the eval and the chat's `text`)."""
+    if p["kind"] == "ruling":
+        src = ", ".join(x for x in (p["case"] or "Parliament (Kenya Law reviser's note)", p["citation"], p["court"],
+                                    p["paragraph"] and f"para {p['paragraph']}") if x)
+        who = p["checked_by"] + (f"; {p['state']}" if p["state"] else "")
+        return f'"{p["quote"]}" ({src}; {who}){f" <{p['url']}>" if p["url"] else ""}'
+    if p["kind"] == "section":
+        return f"{p['act']} s.{p['number']}{f' ({p['heading']})' if p['heading'] else ''} [status: {p['status']}]"
+    if p["kind"] == "case":
+        return f"{p['title']}{f' {p['citation']}' if p['citation'] else ''}{f' <{p['url']}>' if p['url'] else ''}"
+    if p["kind"] == "removed":
+        return "[unverified reference removed]"
+    return p["text"]
+
+
+def render(answer, seen, conn):
+    """-> (answer with references replaced by database text, number of references no tool returned)."""
+    parts, removed = render_parts(answer, seen, conn)
+    return "".join(map(part_text, parts)), removed
 
 
 if __name__ == "__main__":

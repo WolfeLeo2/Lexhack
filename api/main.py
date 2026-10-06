@@ -6,21 +6,25 @@ Every answer reports what the sources say, with the court's verbatim words and a
 bare yes/no.
 """
 import functools
+import json
+import logging
 import os
+import queue
+import threading
 import time
 from collections import deque
 from contextlib import asynccontextmanager, contextmanager
 
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from fastapi.responses import JSONResponse, StreamingResponse
+from pydantic import BaseModel, Field
 
 import crawler.config  # noqa: F401  (loads .env)
 
 from psycopg_pool import ConnectionPool
 
-from . import extract, filing
+from . import agent, extract, filing
 from .status import provision_status, statuses
 from . import mcp_server
 
@@ -47,15 +51,17 @@ app.add_middleware(CORSMiddleware, allow_origins=os.environ.get("CORS_ORIGINS", 
 
 RATE, WINDOW = 60, 60.0   # /mcp requests per client IP per minute
 _hits = {}
+CHAT_RATE = 10            # /api/chat questions per client IP per minute (each costs Gemini calls)
+_chat_hits = {}
 
 
-def allow(key, now, hits=_hits):
+def allow(key, now, hits=_hits, rate=RATE, window=WINDOW):
     """Sliding window. ponytail: in memory, one Railway instance; Redis if it ever runs several. Keys are never
     dropped: fine at our traffic, prune idle keys if memory ever grows."""
     q = hits.setdefault(key, deque())
-    while q and now - q[0] > WINDOW:
+    while q and now - q[0] > window:
         q.popleft()
-    if len(q) >= RATE:
+    if len(q) >= rate:
         return False
     q.append(now)
     return True
@@ -393,6 +399,51 @@ async def extract_file(request: Request):
         return ExtractResult(**extract.read(await request.body(), request.headers.get("x-filename", "")))
     except extract.ExtractError as e:
         raise HTTPException(e.status, str(e))
+
+
+class Turn(BaseModel):
+    question: str = Field(max_length=2000)
+    answer: str = Field(max_length=4000)   # the plain answer text Hakiki returned
+
+
+class ChatRequest(BaseModel):
+    question: str = Field(min_length=1, max_length=2000)
+    history: list[Turn] = Field(default=[], max_length=6)
+
+
+CHAT_ERROR = "Hakiki couldn't finish that answer. Please try again in a minute."
+
+
+@app.post("/api/chat")
+def chat(req: ChatRequest, request: Request):
+    """The research agent (api/agent.py), streamed as NDJSON: step events as tools run, then the answer (references
+    filled in from the database) and done; or one error event. Over-long input is a 422 (Pydantic), not a 413."""
+    ip = client_key(request.headers.get("x-forwarded-for"), request.client.host if request.client else "")
+    if not allow(ip, time.monotonic(), _chat_hits, CHAT_RATE):
+        raise HTTPException(429, f"rate limit: {CHAT_RATE} questions a minute")
+    events = queue.Queue()
+
+    def work():
+        try:
+            out = agent.run(req.question, agent.history_from_turns([t.model_dump() for t in req.history]),
+                            on_step=lambda name, args: events.put(
+                                {"type": "step", "tool": name, "label": agent.step_label(name, args)}))
+            with db() as conn:
+                parts, removed = agent.render_parts(out["answer"], out["seen"], conn)
+            events.put({"type": "answer", "text": "".join(map(agent.part_text, parts)), "parts": parts,
+                        "removed": removed})
+            events.put({"type": "done", "disclaimer": DISCLAIMER})
+        except Exception:
+            logging.exception("chat failed")   # the real error stays in the server log
+            events.put({"type": "error", "message": CHAT_ERROR})
+        events.put(None)
+
+    def stream():   # a sync generator: Starlette iterates it in a worker thread, so the blocking get is fine
+        while (e := events.get()) is not None:
+            yield json.dumps(e) + "\n"
+
+    threading.Thread(target=work, daemon=True).start()
+    return StreamingResponse(stream(), media_type="application/x-ndjson")
 
 
 app.mount("/", mcp_server.http_app)   # serves /mcp; mounted last so every /api route above matches first
