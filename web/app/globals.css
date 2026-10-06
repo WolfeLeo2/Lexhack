@@ -305,6 +305,16 @@ a:focus-visible > .spine {
   transform: translateY(-2px);
   border-color: var(--color-ink-2);
 }
+.ask-mode {
+  transition: background-color 0.2s, color 0.2s, box-shadow 0.2s;
+}
+/* A draft lands on the desk like a sheet of paper: a slight lift and settle. */
+.draft-paper {
+  animation: paper-in 0.55s both cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes paper-in {
+  from { opacity: 0; transform: translateY(12px) rotate(-0.6deg); }
+}
 .ask-send {
   transition: transform 0.15s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.2s;
 }
@@ -316,8 +326,8 @@ a:focus-visible > .spine {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ask-bubble, .step-in, .step-now svg, .answer-in, .ask-chip { animation: none; }
-  .ask-chip, .ask-send { transition: none; }
+  .ask-bubble, .step-in, .step-now svg, .answer-in, .ask-chip, .draft-paper { animation: none; }
+  .ask-chip, .ask-send, .ask-mode { transition: none; }
   .pinned-note { animation: none; transform: rotate(-1.2deg); }
   .spine { transition: none; }
   .theme-icon, .stamp, .lineage-node, .lineage-edge, .lineage-edge-dashed { animation: none; stroke-dashoffset: 0; }

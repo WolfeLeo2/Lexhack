@@ -16,7 +16,7 @@ from pathlib import Path
 
 import requests
 
-from . import main, tools
+from . import filing, main, tools
 from .status import RULES, load_events_many, statuses, with_leads
 
 MODEL, MAX_ROUNDS = "gemini-3.5-flash-lite", 8
@@ -61,6 +61,25 @@ cases by their titles in plain text (not as [[judgment:ID]], which works only fo
 which one they mean; don't describe any of them as the case. When find_section lists
 candidates for a section renumbered between versions, report both IDs and say which one carries the rulings.
 Answer briefly, in plain English."""
+
+DRAFT = """
+
+Draft mode: the user wants a short draft (for example a submission paragraph) for an advocate to review. All six
+rules above still apply.
+- Research first with the tools, then write only the draft: plain, formal, short prose an advocate could adapt, with
+  the references inline. No preamble, no notes to the user.
+- Cite cases only as [[judgment:ID]] or [[event:ID]]. Never type a case name with a citation, an eKLR or neutral
+  citation, or quoted words yourself: Hakiki fills them in from the database.
+- When a section you cite has court rulings, cite them ([[event:ID]]) so the draft says what the court did.
+- The draft is for an advocate's review. Don't advise the user on their own case or tell them what to do."""
+DRAFT_LABEL = "Draft for an advocate's review. Hakiki reports what sources say; this is not legal advice."
+PLAIN_STATUS = {"in force; no recorded court rulings", "in force"}
+CASE_NOTES = {"not_in_collection": "Not in Hakiki's collection — check before relying on it",
+              "possible_match": "Fits more than one case in Hakiki's collection, so Hakiki can't say which",
+              "name_mismatch": "The citation belongs to a different case in Hakiki's collection"}
+QUOTE_NOTES = {"close": "Close to the judgment, but not word for word",
+               "not_found": "The quoted words are not in the judgment",
+               "not_checked": "Not checked: Hakiki doesn't hold the cited judgment's text"}
 
 
 def generate(body, api_key, attempts=10):
@@ -115,16 +134,18 @@ def step_label(name, args):
             "find_case": lambda: f"Looking for the case “{arg('citation')}”",
             "citing_judgments": lambda: "Finding judgments that cite it",
             "list_acts": lambda: "Checking which Acts Hakiki holds",
-            "check_text": lambda: "Checking the citations in the text"}.get(name, lambda: "Looking things up")()
+            "check_text": lambda: "Checking the citations in the text",
+            "check": lambda: "Checking the draft's citations",
+            "revise": lambda: "Fixing what the check found"}.get(name, lambda: "Looking things up")()
 
 
-def run(question, history=(), api_key=None, on_step=None, attempts=10):
+def run(question, history=(), api_key=None, on_step=None, attempts=10, system=SYSTEM):
     """attempts: Gemini tries per call (the chat passes fewer: it has a deadline)."""
     api_key = api_key or os.environ["GEMINI_API_KEY"]
     contents = [*history, {"role": "user", "parts": [{"text": question}]}]
     steps, seen = [], {"section": set(), "event": set(), "judgment": set()}
     for rnd in range(MAX_ROUNDS + 1):
-        body = {"systemInstruction": {"parts": [{"text": SYSTEM}]}, "contents": contents,
+        body = {"systemInstruction": {"parts": [{"text": system}]}, "contents": contents,
                 "tools": [{"functionDeclarations": tools.DECLARATIONS}], "generationConfig": {"temperature": 0}}
         if rnd == MAX_ROUNDS:   # out of rounds: answer with what you have
             body["toolConfig"] = {"functionCallingConfig": {"mode": "NONE"}}
@@ -261,6 +282,72 @@ def render(answer, seen, conn):
     """-> (answer with references replaced by database text, number of references no tool returned)."""
     parts, removed = render_parts(answer, seen, conn)
     return "".join(map(part_text, parts)), removed
+
+
+def draft_check(conn, parts):
+    """The rendered draft through the filing checker. -> flags [{raw_text, kind, result, note, cite}] (cite: event IDs
+    the model should reference for a section). Only what the model wrote is judged: a case or section inside a
+    reference Hakiki rendered from the database is not, nor a quote that is a ruling's own words."""
+    spans, at = [], 0
+    for p in parts:
+        n = len(part_text(p))
+        spans.append((at, at + n, p["kind"]))
+        at += n
+    text = "".join(map(part_text, parts))
+    kind_at = lambda i: next((k for s, e, k in spans if s <= i < e), "text")
+    rulings = [p for p in parts if p["kind"] == "ruling"]
+    cited = {p["event_id"] for p in rulings}
+    flags, sections = [], set()
+    for f in filing.check(conn, text)["findings"]:
+        where = kind_at(f["char_start"])
+        if f["kind"] == "case":
+            c = f["case"]
+            if where == "text" and c["result"] != "found":
+                flags.append({"raw_text": f["raw_text"], "kind": "case", "result": c["result"],
+                              "note": CASE_NOTES.get(c["result"], c["result"])})
+            flags += [{"raw_text": q["quote"], "kind": "quote", "result": q["result"],
+                       "note": QUOTE_NOTES.get(q["result"], q["result"])}
+                      for q in f["quotes"] if q["result"] != "verbatim" and not any(q["quote"] in r["quote"] for r in rulings)]
+        elif where != "ruling" and (prov := f["section"]["provision"]) and prov["provision_id"] not in sections:
+            s = f["section"]
+            sections.add(prov["provision_id"])
+            ids = [e["event_id"] for e in s["summary_events"]]
+            if ids and s["status"] not in PLAIN_STATUS and not cited & set(ids):
+                flags.append({"raw_text": f["raw_text"], "kind": "section", "result": "limit_not_mentioned",
+                              "note": f"Hakiki records this section as “{s['status']}”; the draft cites none of the "
+                                      "rulings behind that", "cite": ids})
+    return flags
+
+
+def revise_message(flags):
+    lines = [f"- {f['raw_text'][:200]}: {f['note']}" + (" (cite " + " ".join(f"[[event:{i}]]" for i in f["cite"]) + ")"
+                                                         if f.get("cite") else "") for f in flags]
+    return ("Hakiki's citation check found these problems in your draft:\n" + "\n".join(lines) +
+            "\nFix these or state them plainly in the draft. Reply with the full revised draft only.")
+
+
+def draft(question, history=(), api_key=None, on_step=None, attempts=10):
+    """Draft mode: research and write, check the rendered draft with the filing checker, one revision turn if anything
+    is flagged, then a second check. -> {parts, removed, check} (check: what is still flagged)."""
+    step = on_step or (lambda name, args: None)
+    out = run(question, history, api_key, on_step, attempts, system=SYSTEM + DRAFT)
+    seen = {k: set(v) for k, v in out["seen"].items()}
+    step("check", {})
+    with main.db() as conn:
+        parts, removed = render_parts(out["answer"], seen, conn)
+        flags = draft_check(conn, parts)
+    if flags:
+        step("revise", {})
+        for f in flags:   # the check told the model these IDs, so they count as returned to it
+            seen["event"].update(str(i) for i in f.get("cite", ()))
+        out = run(revise_message(flags), out["contents"], api_key, on_step, attempts, system=SYSTEM + DRAFT)
+        for k, v in out["seen"].items():
+            seen[k].update(v)
+        with main.db() as conn:
+            parts, removed = render_parts(out["answer"], seen, conn)
+            flags = draft_check(conn, parts)
+    return {"parts": parts, "removed": removed,
+            "check": [{k: f[k] for k in ("raw_text", "kind", "result", "note")} for f in flags]}
 
 
 if __name__ == "__main__":

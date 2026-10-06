@@ -1,14 +1,17 @@
 'use client'
-import { ArrowUp, BookOpen, FileSearch, Gavel, Library, type LucideIcon, RotateCcw, ScrollText, Search, Sparkles } from 'lucide-react'
+import { ArrowUp, BookOpen, Check, ClipboardCheck, Copy, FileSearch, Gavel, Library, type LucideIcon, PenLine, RotateCcw, ScrollText, Search, Sparkles } from 'lucide-react'
 import Link from 'next/link'
 import { Fragment, type ReactNode, useEffect, useRef, useState } from 'react'
 import { CourtWords } from '@/components/court'
 import { cap, courtActed, sectionHref, shortCase } from '@/lib/format'
-import { type Answer, type CaseRef, type ChatEvent, type Inline, isBlank, type Part, type Ruling as RulingPart, type SectionRef, type Step, toLines } from '@/lib/answer'
+import { type Answer, type CaseRef, type CheckFlag, type ChatEvent, type Inline, isBlank, type Part, type Ruling as RulingPart, type SectionRef, type Step, toLines } from '@/lib/answer'
 import { cleanUrl, locator } from '@/lib/text'
+
+type Mode = 'answer' | 'draft'
 
 interface Turn {
   question: string
+  mode: Mode
   steps: Step[]
   answer: Answer | null
   error: string | null
@@ -21,6 +24,11 @@ const EXAMPLES = [
   'What did the court decide in Okuta?',
   'Has Sexual Offences Act s.8 been changed by the courts?',
 ]
+const DRAFT_EXAMPLES = [
+  'Draft a submission paragraph on whether s.204 of the Penal Code still requires the death sentence',
+  'Draft a short paragraph on the status of criminal defamation under s.194 of the Penal Code',
+  'Draft a paragraph on whether the minimum sentences in Sexual Offences Act s.8 bind the court',
+]
 const MAX_Q = 2000
 const ICONS: Record<string, LucideIcon> = {
   find_section: BookOpen,
@@ -30,11 +38,14 @@ const ICONS: Record<string, LucideIcon> = {
   citing_judgments: Library,
   list_acts: Library,
   check_text: FileSearch,
+  check: ClipboardCheck,
+  revise: PenLine,
 }
 
 export function Ask() {
   const [turns, setTurns] = useState<Turn[]>([])
   const [q, setQ] = useState('')
+  const [mode, setMode] = useState<Mode>('answer')
   const last = useRef<HTMLLIElement>(null)
   const inflight = useRef<AbortController | null>(null)
   const pending = turns.some((t) => t.pending)
@@ -48,7 +59,7 @@ export function Ask() {
     last.current?.scrollIntoView({ behavior: still ? 'auto' : 'smooth', block: 'start' })
   }, [turns.length])
 
-  async function ask(question: string, prior: Turn[]) {
+  async function ask(question: string, prior: Turn[], mode: Mode) {
     question = question.trim().slice(0, MAX_Q)
     if (!question || pending) return
     const i = prior.length
@@ -56,7 +67,7 @@ export function Ask() {
       .filter((t) => t.answer)
       .slice(-6)
       .map((t) => ({ question: t.question, answer: t.answer!.text.slice(0, 4000) }))
-    setTurns([...prior, { question, steps: [], answer: null, error: null, pending: true }])
+    setTurns([...prior, { question, mode, steps: [], answer: null, error: null, pending: true }])
     setQ('')
     const patch = (f: (t: Turn) => Partial<Turn>) => setTurns((ts) => ts.map((t, k) => (k === i ? { ...t, ...f(t) } : t)))
     const ctrl = new AbortController()
@@ -65,7 +76,7 @@ export function Ask() {
       const res = await fetch('/ask/api', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question, history }),
+        body: JSON.stringify({ question, history, mode }),
         signal: ctrl.signal,
       })
       if (!res.ok || !res.body) {
@@ -77,7 +88,7 @@ export function Ask() {
         if (e.type === 'step') patch((t) => ({ steps: [...t.steps, { tool: e.tool, label: e.label }] }))
         else if (e.type === 'answer') {
           answered = true
-          patch(() => ({ answer: { text: e.text, parts: e.parts, removed: e.removed } }))
+          patch(() => ({ answer: { text: e.text, parts: e.parts, removed: e.removed, check: e.check, label: e.label } }))
         } else if (e.type === 'error') throw new Error(e.message)
       }
       const reader = res.body.pipeThrough(new TextDecoderStream()).getReader()
@@ -104,7 +115,8 @@ export function Ask() {
     }
   }
 
-  const retry = (i: number) => ask(turns[i].question, turns.slice(0, i))
+  const retry = (i: number) => ask(turns[i].question, turns.slice(0, i), turns[i].mode)
+  const examples = mode === 'draft' ? DRAFT_EXAMPLES : EXAMPLES
 
   return (
     <div className="pb-8">
@@ -122,12 +134,15 @@ export function Ask() {
         className="mt-10"
         onSubmit={(e) => {
           e.preventDefault()
-          ask(q, turns)
+          ask(q, turns, mode)
         }}
       >
-        <label htmlFor="ask-q" className="statute block text-xl font-medium">
-          {turns.length ? 'Ask a follow-up' : 'Your question'}
-        </label>
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <label htmlFor="ask-q" className="statute block text-xl font-medium">
+            {mode === 'draft' ? 'What should Hakiki draft?' : turns.length ? 'Ask a follow-up' : 'Your question'}
+          </label>
+          <ModeToggle mode={mode} onChange={setMode} />
+        </div>
         <div className="mt-3 flex items-end gap-3 rounded-md border border-rule bg-paper p-2 focus-within:border-ink-2">
           <textarea
             id="ask-q"
@@ -136,12 +151,12 @@ export function Ask() {
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
                 e.preventDefault()
-                ask(q, turns)
+                ask(q, turns, mode)
               }
             }}
             maxLength={MAX_Q}
             rows={2}
-            placeholder="Is this section still good law? What did the court decide in…?"
+            placeholder={mode === 'draft' ? 'Draft a submission paragraph on…' : 'Is this section still good law? What did the court decide in…?'}
             aria-describedby="ask-hint"
             className="min-h-[3.5rem] w-full resize-y bg-transparent px-2 py-1.5 outline-none placeholder:text-ink-2/70"
           />
@@ -149,26 +164,28 @@ export function Ask() {
             type="submit"
             disabled={pending || !q.trim()}
             className="ask-send grid h-10 w-10 shrink-0 place-items-center rounded-full bg-ink text-paper disabled:opacity-35"
-            aria-label="Ask"
+            aria-label={mode === 'draft' ? 'Draft' : 'Ask'}
           >
             <ArrowUp className="h-5 w-5" aria-hidden />
           </button>
         </div>
         <p id="ask-hint" className="mt-2 text-sm text-ink-2">
-          Enter to ask, Shift+Enter for a new line.
+          {mode === 'draft'
+            ? 'Hakiki drafts a short passage, then checks every case, quote and section in it. Enter to send, Shift+Enter for a new line.'
+            : 'Enter to ask, Shift+Enter for a new line.'}
         </p>
         <p className="mt-1 text-sm text-ink-2">Hakiki reports what published sources say. It is not legal advice.</p>
       </form>
 
-      {turns.length === 0 && (
-        <div className="mt-6" role="group" aria-label="Example questions">
+      {(turns.length === 0 || (mode === 'draft' && !turns.some((t) => t.mode === 'draft'))) && (
+        <div className="mt-6" role="group" aria-label={mode === 'draft' ? 'Example drafting tasks' : 'Example questions'}>
           <p className="text-sm text-ink-2">Or try one of these:</p>
-          <ul className="mt-2 flex flex-wrap gap-2">
-            {EXAMPLES.map((ex, k) => (
+          <ul key={mode} className="mt-2 flex flex-wrap gap-2">
+            {examples.map((ex, k) => (
               <li key={ex}>
                 <button
                   type="button"
-                  onClick={() => ask(ex, turns)}
+                  onClick={() => ask(ex, turns, mode)}
                   className="ask-chip rounded-full border border-note-rule bg-note px-3.5 py-1.5 text-left text-[0.95rem]"
                   style={{ ['--i' as string]: k }}
                 >
@@ -190,10 +207,14 @@ function TurnView({ t, onRetry }: { t: Turn; onRetry?: () => void }) {
       <p className="statute ml-auto w-fit max-w-[60ch] rounded-md bg-panel px-4 py-2.5 text-lg">{t.question}</p>
       <div aria-live="polite" className="mt-5">
         {(t.pending || t.steps.length > 0) && <Steps steps={t.steps} pending={t.pending && !t.answer} />}
-        {t.answer && (
-          <div className="answer-in mt-5 max-w-[68ch] space-y-4">
-            <AnswerBody parts={t.answer.parts} />
-          </div>
+        {t.answer && t.answer.label !== undefined ? (
+          <Draft a={t.answer} />
+        ) : (
+          t.answer && (
+            <div className="answer-in mt-5 max-w-[68ch] space-y-4">
+              <AnswerBody parts={t.answer.parts} />
+            </div>
+          )
         )}
         {t.error && (
           <p className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-md border border-note-rule bg-note px-4 py-3" role="alert">
@@ -208,6 +229,93 @@ function TurnView({ t, onRetry }: { t: Turn; onRetry?: () => void }) {
         )}
       </div>
     </article>
+  )
+}
+
+/** Answer | Draft: a two-option radio group. */
+function ModeToggle({ mode, onChange }: { mode: Mode; onChange: (m: Mode) => void }) {
+  return (
+    <div role="radiogroup" aria-label="Mode" className="inline-flex rounded-full border border-rule bg-paper p-0.5 text-sm">
+      {(['answer', 'draft'] as const).map((m) => (
+        <button
+          key={m}
+          type="button"
+          role="radio"
+          aria-checked={mode === m}
+          onClick={() => onChange(m)}
+          className={`ask-mode rounded-full px-3.5 py-1 ${mode === m ? 'bg-ink text-paper' : 'text-ink-2 hover:text-ink'}`}
+        >
+          {m === 'answer' ? 'Answer' : 'Draft'}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+// What each check result means, in the /check page's words. No verdict colours: the note says what the check found.
+const CHECK_WORDS: Record<string, string> = {
+  found: 'Verified: in Hakiki’s collection',
+  verbatim: 'Quote matches the judgment, word for word',
+  not_in_collection: 'Not in Hakiki’s collection — check before relying on it',
+  possible_match: 'Could be more than one case in Hakiki’s collection — check which one is meant',
+  name_mismatch: 'The citation belongs to a different case in Hakiki’s collection',
+  close: 'The quote is close to the judgment, but not word for word',
+  not_found: 'The quoted words are not in the judgment',
+  not_checked: 'Quote not checked: we don’t hold this judgment’s text',
+  limit_not_mentioned: 'A court has ruled on this section — the draft doesn’t say so',
+}
+const KIND_WORDS: Record<CheckFlag['kind'], string> = { case: 'Case', quote: 'Quote', section: 'Section' }
+
+/** A draft: the label, the draft on a sheet of paper (copy = the plain text), then what Hakiki's check still flags. */
+function Draft({ a }: { a: Answer }) {
+  const [copied, setCopied] = useState(false)
+  useEffect(() => {
+    if (!copied) return
+    const id = setTimeout(() => setCopied(false), 2000)
+    return () => clearTimeout(id)
+  }, [copied])
+  const check = a.check ?? []
+  return (
+    <div className="answer-in mt-5 max-w-[72ch]">
+      <p className="text-sm text-ink-2">{a.label}</p>
+      <div className="draft-paper relative mt-3 rounded-sm bg-paper px-6 pt-5 pb-6 shadow-[0_14px_30px_-22px_rgba(24,33,43,0.7)] ring-1 ring-rule sm:px-8">
+        <button
+          type="button"
+          onClick={() => navigator.clipboard?.writeText(a.text).then(() => setCopied(true), () => {})}
+          className="link absolute top-3 right-3 inline-flex items-center gap-1.5 rounded-sm px-1.5 py-0.5 text-sm text-ink-2 hover:text-ink"
+        >
+          {copied ? <Check className="h-4 w-4" aria-hidden /> : <Copy className="h-4 w-4" aria-hidden />}
+          <span aria-live="polite">{copied ? 'Copied' : 'Copy text'}</span>
+        </button>
+        <div className="statute mt-4 space-y-4 text-[1.05rem] leading-relaxed">
+          <AnswerBody parts={a.parts} />
+        </div>
+      </div>
+      <section className="mt-6" aria-label="Checked by Hakiki">
+        <h3 className="statute flex items-center gap-2 text-lg font-medium">
+          <ClipboardCheck className="h-5 w-5 text-ink-2" aria-hidden />
+          Checked by Hakiki
+        </h3>
+        {check.length === 0 ? (
+          <p className="mt-2 text-ink-2">
+            Nothing flagged. Every case Hakiki could read in the draft is in its collection, every quote matches the judgment, and every section with court rulings cites them.
+          </p>
+        ) : (
+          <ul className="mt-2 space-y-3">
+            {check.map((f, k) => (
+              <li key={k} className="step-in border-l-2 border-rule pl-3" style={{ animationDelay: `${k * 0.06}s` }}>
+                <p>
+                  <span className="text-sm text-ink-2">{KIND_WORDS[f.kind] ?? f.kind}: </span>
+                  <span className="statute">{f.kind === 'quote' ? `“${f.raw_text}”` : f.raw_text}</span>
+                </p>
+                <p className="text-[0.95rem]">{CHECK_WORDS[f.result] ?? f.note}</p>
+                {f.kind === 'section' && CHECK_WORDS[f.result] && <p className="text-sm text-ink-2">{f.note}.</p>}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    </div>
   )
 }
 

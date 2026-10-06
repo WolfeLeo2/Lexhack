@@ -79,6 +79,43 @@ def test_stream(c):
     expect("done", ev[3]["disclaimer"], main.DISCLAIMER)
 
 
+def test_draft(c):
+    with main.db() as conn:
+        ids = [e["event_id"] for e in provision_status(conn, S204)["summary_events"]]
+    first = f"It is submitted that [[section:{S204}]] governs. See Wanjiru v Kamau [2031] eKLR."
+    revised = f"It is submitted that [[section:{S204}]] governs, as limited by [[event:{ids[0]}]]."
+    bodies = []
+    agent.generate = fake_model([part(functionCall={"name": "find_section", "args": {"act": "Penal Code", "section": "204"}}),
+                                 part(text=first), part(text=revised)], bodies)
+    ev = lines(c.post("/api/chat", json={"question": "Draft a paragraph on s.204", "mode": "draft"}))
+    expect("draft order", [(e["type"], e.get("tool")) for e in ev],
+           [("step", "find_section"), ("step", "check"), ("step", "revise"), ("answer", None), ("done", None)])
+    expect("check label", ev[1]["label"], "Checking the draft's citations")
+    expect("draft system prompt", agent.DRAFT.strip() in bodies[0]["systemInstruction"]["parts"][0]["text"], True)
+    sent = next(c["parts"][0]["text"] for c in bodies[-1]["contents"]   # the body's list grows after the call
+                if c["role"] == "user" and "citation check" in c["parts"][0].get("text", ""))
+    expect("revise turn lists the section's ruling", f"[[event:{ids[0]}]]" in sent, True)
+    expect("revise turn lists the fake case", "[2031] eKLR" in sent, True)
+    ans = ev[3]
+    expect("revised draft used", any(p["kind"] == "ruling" and p["event_id"] == ids[0] for p in ans["parts"]), True)
+    expect("clean after revision", ans["check"], [])
+    expect("draft label", ans["label"], agent.DRAFT_LABEL)
+
+    # the revision keeps the invented case: still reported
+    agent.generate = fake_model([part(text=first), part(text=revised + " See Wanjiru v Kamau [2031] eKLR.")])
+    ans = [e for e in lines(c.post("/api/chat", json={"question": "Draft", "mode": "draft"})) if e["type"] == "answer"][0]
+    expect("fake case reported", [(f["kind"], f["raw_text"], f["result"]) for f in ans["check"]],
+           [("case", "[2031] eKLR", "not_in_collection")])
+
+    # clean first time: no revise step, one model call
+    agent.generate = fake_model([part(text=revised)])
+    ev = lines(c.post("/api/chat", json={"question": "Draft", "mode": "draft"}))
+    expect("clean: no revise", [e.get("tool") for e in ev if e["type"] == "step"], ["check"])
+    agent.generate = fake_model([part(text="ok")])
+    expect("answer mode: no check", "check" in lines(c.post("/api/chat", json={"question": "q"}))[-2], False)
+    expect("bad mode 422", c.post("/api/chat", json={"question": "q", "mode": "essay"}).status_code, 422)
+
+
 def test_limits(c):
     expect("long question 422", c.post("/api/chat", json={"question": "x" * 2001}).status_code, 422)
     expect("empty question 422", c.post("/api/chat", json={"question": ""}).status_code, 422)
@@ -157,6 +194,7 @@ def run():
         with TestClient(main.app) as c:
             main._chat_hits.clear()
             test_stream(c)
+            test_draft(c)
             test_limits(c)
             test_error(c)
             test_proxy_key(c)

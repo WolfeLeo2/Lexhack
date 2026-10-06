@@ -15,6 +15,7 @@ import threading
 import time
 from collections import deque
 from contextlib import asynccontextmanager, contextmanager
+from typing import Literal
 
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -423,6 +424,7 @@ class Turn(BaseModel):
 class ChatRequest(BaseModel):
     question: str = Field(min_length=1, max_length=2000)
     history: list[Turn] = Field(default=[], max_length=6)
+    mode: Literal["answer", "draft"] = "answer"   # draft: a short draft, checked by the filing checker (agent.draft)
 
 
 CHAT_ERROR = "Hakiki couldn't finish that answer. Please try again in a minute."
@@ -452,12 +454,17 @@ def chat(req: ChatRequest, request: Request):
 
     def work():
         try:
-            out = agent.run(req.question, agent.history_from_turns([t.model_dump() for t in req.history]),
-                            on_step=step, attempts=2)   # few Gemini retries: the answer has a deadline
-            with db() as conn:
-                parts, removed = agent.render_parts(out["answer"], out["seen"], conn)
+            history = agent.history_from_turns([t.model_dump() for t in req.history])
+            if req.mode == "draft":
+                d = agent.draft(req.question, history, on_step=step, attempts=2)
+                parts, removed, extra = d["parts"], d["removed"], {"check": d["check"], "label": agent.DRAFT_LABEL}
+            else:
+                out = agent.run(req.question, history, on_step=step, attempts=2)   # few Gemini retries: a deadline
+                with db() as conn:
+                    parts, removed = agent.render_parts(out["answer"], out["seen"], conn)
+                extra = {}
             events.put({"type": "answer", "text": "".join(map(agent.part_text, parts)), "parts": parts,
-                        "removed": removed})
+                        "removed": removed, **extra})
             events.put({"type": "done", "disclaimer": DISCLAIMER})
         except Stopped:
             pass
