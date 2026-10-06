@@ -130,3 +130,36 @@ export function KindIcon({ kind, className = 'h-5 w-5' }: { kind: 'case' | 'sect
     </svg>
   )
 }
+
+/** A question put to the statute book: the bubble pops up, then the court's line is marked on the page as the
+ * answer (globals.css: .ask-bubble, .glass-mark). */
+export function QuestionToTheBook({ className = '' }: { className?: string }) {
+  const rules = [64, 80, 96, 112, 128, 144, 160, 176]
+  return (
+    <svg viewBox="0 0 320 240" className={className} aria-hidden fill="none">
+      <g transform="rotate(2 150 130)">
+        <path d="M96 30h132l26 26v168H96z" fill="var(--color-paper)" stroke="var(--color-ink-2)" strokeWidth="1.5" />
+        <path d="M228 30v26h26" stroke="var(--color-ink-2)" strokeWidth="1.5" />
+        <text x="116" y="54" className="statute" fontSize="16" fill="var(--color-ink-2)">
+          § 204
+        </text>
+        {rules.map((y, i) => (
+          <line key={y} x1="116" x2={i % 3 === 2 ? 196 : 234} y1={y + 10} y2={y + 10} stroke="var(--color-rule)" strokeWidth="3" strokeLinecap="round" />
+        ))}
+        <rect x="114" y="131.5" width="104" height="13" rx="2" fill="var(--hl)" className="glass-mark" style={{ ['--i' as string]: 1.4 }} />
+        <path d="M112 200 h60" stroke="var(--color-seal)" strokeWidth="2" strokeLinecap="round" pathLength={1} className="glass-squiggle" />
+      </g>
+      <g className="ask-bubble">
+        <path
+          d="M30 40h92a12 12 0 0 1 12 12v40a12 12 0 0 1-12 12H66l-18 18v-18H30a12 12 0 0 1-12-12V52a12 12 0 0 1 12-12z"
+          fill="var(--color-note)"
+          stroke="var(--color-note-rule)"
+          strokeWidth="1.5"
+        />
+        <text x="76" y="82" textAnchor="middle" className="statute" fontSize="26" fontStyle="italic" fill="var(--color-ink)">
+          still law?
+        </text>
+      </g>
+    </svg>
+  )
+}

@@ -62,6 +62,9 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
                 <span className="sm:hidden">Check</span>
                 <span className="hidden sm:inline">Check a filing</span>
               </Link>
+              <Link href="/ask" className="hover:text-ink">
+                Ask
+              </Link>
               <Link href="/about" className="hover:text-ink">
                 About
               </Link>

@@ -63,6 +63,9 @@ export default async function Home() {
             <Link href="/acts" className="link">
               Browse the Acts
             </Link>
+            <Link href="/ask" className="link">
+              Ask a question in plain words
+            </Link>
             <Link href="/about" className="link">
               How to use Hakiki
             </Link>

@@ -1,5 +1,6 @@
 // pnpm check — asserts on real texts from the database (Penal Code, Sexual Offences Act, judgment titles).
 import assert from 'node:assert/strict'
+import { isBlank, toLines } from './answer.ts'
 import { caseName, locator, splitAt, structure, tidySpaces, wordDiff } from './text.ts'
 
 assert.equal(tidySpaces('Act ( Cap. 245 ) and [Act No. 10 of 1969 , Sch.]'), 'Act (Cap. 245) and [Act No. 10 of 1969, Sch.]')
@@ -66,5 +67,21 @@ assert.deepEqual(
   wordDiff('invalid in its entirety', 'invalid to the extent').map((d) => d.op),
   ['same', 'del', 'del', 'del', 'add', 'add', 'add'],
 )
+
+// The chat answer's layout: inline references stay in their line; newlines, bullets and blank lines split it.
+const sec = { kind: 'section', provision_id: 'ke/act/cap-63/x', act: 'Penal Code', number: '204', heading: null, status: 'limited by a court' } as const
+const lines = toLines([
+  { kind: 'text', text: 'Yes: ' },
+  sec,
+  { kind: 'text', text: ' is **limited**.\n\n- first\n* second ' },
+  { kind: 'removed' },
+  { kind: 'ruling', event_id: 1, quote: 'q', case: null, citation: null, court: null, paragraph: null, checked_by: 'unverified', state: null, url: null },
+  sec,
+])
+assert.deepEqual(
+  lines.map((l) => ('ruling' in l ? 'R' : `${l.bullet ? '-' : ''}${l.items.map((x) => (typeof x === 'string' ? x : `<${x.kind}>`)).join('')}`)),
+  ['Yes: <section> is **limited**.', '', '-first', '-second <removed>', 'R', '<section>'],
+)
+assert.deepEqual(lines.map(isBlank), [false, true, false, false, false, false])
 
 console.log('text checks passed')

@@ -85,6 +85,12 @@ export default async function AboutPage() {
           status. Read the judgment before relying on one.
         </li>
         <li>
+          <strong className="font-medium">Or just ask.</strong> <Link href="/ask" className="link">Ask Hakiki</Link> answers
+          a question in plain words. An AI model looks the section or case up in Hakiki’s records and writes the answer;
+          the court’s words and each status come from the database, never from the model, and any reference it can’t
+          back with a lookup is removed.
+        </li>
+        <li>
           <strong className="font-medium">See how courts use it.</strong> At the bottom is every judgment we hold that cites
           the section, highest court first.
         </li>
