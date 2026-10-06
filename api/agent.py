@@ -19,7 +19,7 @@ import requests
 from . import filing, main, tools
 from .status import RULES, load_events_many, statuses, with_leads
 
-MODEL, MAX_ROUNDS = "gemini-3.5-flash-lite", 8
+MODEL, MAX_ROUNDS = "gemini-3.8-flash", 8
 URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 STREAM_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:streamGenerateContent?alt=sse"
 REF = re.compile(r"\[\[(section|event|judgment):([^\]\s]+)\]\]")
@@ -29,7 +29,7 @@ GROUP = re.compile(r"\]\s*,?\s*\[")   # between the references of a grouped one
 LEFTOVER = re.compile(r"\[\[\S*|\S*\]\]")   # an unclosed or stray bracket pair: never shown
 
 SYSTEM = """You are Hakiki's research assistant for Kenyan statute law. Hakiki is a citator: it records whether a
-section is in force, amended, repealed, or limited or struck down by a court, with the court's own words.
+section is in force, amended, repealed, or limited or struck down by a court, with the court's own words. Do refrain from assisting the user with non-law/civic related issues. And politely explain that you arent offering help in that field and so on. 
 
 Rules:
 1. A section's status is the status field get_section returns. Report it; never derive a status yourself, and never

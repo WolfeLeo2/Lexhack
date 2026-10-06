@@ -208,7 +208,16 @@ export function Ask() {
 function TurnView({ t, onRetry }: { t: Turn; onRetry?: () => void }) {
   return (
     <article>
-      <p className="statute ml-auto w-fit max-w-[60ch] rounded-md bg-panel px-4 py-2.5 text-lg">{t.question}</p>
+      <div className="relative ml-auto w-fit max-w-[60ch]">
+        <p className="statute rounded-md bg-panel px-4 py-2.5 text-lg">{t.question}</p>
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 16 14"
+          className="pointer-events-none absolute top-[calc(100%-1px)] right-6 h-3.5 w-4 text-panel"
+        >
+          <path d="M0 0h16v14z" fill="currentColor" />
+        </svg>
+      </div>
       <div aria-live="polite" className="mt-5">
         {(t.pending || t.steps.length > 0) && <Steps steps={t.steps} pending={t.pending && !t.answer && !t.live.length} />}
         {!t.answer && !t.error && t.live.length > 0 && <Writing chunks={t.live} draft={t.mode === 'draft'} />}
