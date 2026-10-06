@@ -11,7 +11,7 @@ export const EVENT_LABEL: Record<string, string> = {
   amended_by_statute: 'Amended by Parliament',
 }
 
-export const cap = (s: string) => s[0].toUpperCase() + s.slice(1)
+export const cap = (s: string) => (s ? s[0].toUpperCase() + s.slice(1) : s)
 
 export const year = (d: string | null) => (d ?? '').slice(0, 4)
 

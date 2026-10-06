@@ -1,7 +1,7 @@
 // pnpm check — asserts on real texts from the database (Penal Code, Sexual Offences Act, judgment titles).
 import assert from 'node:assert/strict'
 import { isBlank, toLines } from './answer.ts'
-import { caseName, locator, splitAt, structure, tidySpaces, wordDiff } from './text.ts'
+import { caseName, cleanUrl, locator, splitAt, structure, tidySpaces, wordDiff } from './text.ts'
 
 assert.equal(tidySpaces('Act ( Cap. 245 ) and [Act No. 10 of 1969 , Sch.]'), 'Act (Cap. 245) and [Act No. 10 of 1969, Sch.]')
 assert.equal(tidySpaces('Article 33 (2) (a)- (d ) of the Constitution .'), 'Article 33 (2) (a)- (d) of the Constitution.')
@@ -83,5 +83,8 @@ assert.deepEqual(
   ['Yes: <section> is **limited**.', '', '-first', '-second <removed>', 'R', '<section>'],
 )
 assert.deepEqual(lines.map(isBlank), [false, true, false, false, false, false])
+
+assert.equal(cleanUrl('javascript:alert(1)'), null)
+assert.equal(cleanUrl('https://new.kenyalaw.org/akn/x?utm_source=a'), 'https://new.kenyalaw.org/akn/x')
 
 console.log('text checks passed')

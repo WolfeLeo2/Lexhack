@@ -94,6 +94,7 @@ export function cleanUrl(u: string | null) {
   if (!u) return null
   try {
     const url = new URL(u)
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return null
     for (const k of [...url.searchParams.keys()]) if (k.startsWith('utm_')) url.searchParams.delete(k)
     return url.toString()
   } catch {

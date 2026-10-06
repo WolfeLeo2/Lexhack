@@ -36,7 +36,11 @@ export function Ask() {
   const [turns, setTurns] = useState<Turn[]>([])
   const [q, setQ] = useState('')
   const last = useRef<HTMLLIElement>(null)
+  const inflight = useRef<AbortController | null>(null)
   const pending = turns.some((t) => t.pending)
+
+  // Leaving the page drops the stream, so the API stops the agent rather than answering no one.
+  useEffect(() => () => inflight.current?.abort(), [])
 
   // A new question lands below the fold on a long conversation: bring it into view.
   useEffect(() => {
@@ -55,11 +59,14 @@ export function Ask() {
     setTurns([...prior, { question, steps: [], answer: null, error: null, pending: true }])
     setQ('')
     const patch = (f: (t: Turn) => Partial<Turn>) => setTurns((ts) => ts.map((t, k) => (k === i ? { ...t, ...f(t) } : t)))
+    const ctrl = new AbortController()
+    inflight.current = ctrl
     try {
       const res = await fetch('/ask/api', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ question, history }),
+        signal: ctrl.signal,
       })
       if (!res.ok || !res.body) {
         const body = await res.json().catch(() => null)
@@ -75,18 +82,23 @@ export function Ask() {
       }
       const reader = res.body.pipeThrough(new TextDecoderStream()).getReader()
       let buf = ''
-      for (;;) {
-        const { value, done } = await reader.read()
-        if (done) break
-        buf += value
-        const lines = buf.split('\n')
-        buf = lines.pop()!
-        for (const l of lines) if (l.trim()) handle(JSON.parse(l))
+      try {
+        for (;;) {
+          const { value, done } = await reader.read()
+          if (done) break
+          buf += value
+          const lines = buf.split('\n')
+          buf = lines.pop()!
+          for (const l of lines) if (l.trim()) handle(JSON.parse(l))
+        }
+        if (buf.trim()) handle(JSON.parse(buf))
+      } finally {
+        reader.cancel().catch(() => {}) // an error event or bad line stops reading: release the stream
       }
-      if (buf.trim()) handle(JSON.parse(buf))
       if (!answered) throw new Error('The answer was cut off. Try again in a moment.')
       patch(() => ({ pending: false }))
     } catch (err) {
+      if (ctrl.signal.aborted) return // the page is gone
       const message = err instanceof TypeError || err instanceof SyntaxError ? 'The connection dropped. Try again in a moment.' : (err as Error).message
       patch(() => ({ pending: false, error: message }))
     }
@@ -100,7 +112,7 @@ export function Ask() {
         <ol className="mt-4 space-y-12" aria-label="Conversation">
           {turns.map((t, i) => (
             <li key={i} ref={i === turns.length - 1 ? last : undefined} className="scroll-mt-24">
-              <TurnView t={t} onRetry={() => retry(i)} />
+              <TurnView t={t} onRetry={i === turns.length - 1 ? () => retry(i) : undefined} />
             </li>
           ))}
         </ol>
@@ -145,6 +157,7 @@ export function Ask() {
         <p id="ask-hint" className="mt-2 text-sm text-ink-2">
           Enter to ask, Shift+Enter for a new line.
         </p>
+        <p className="mt-1 text-sm text-ink-2">Hakiki reports what published sources say. It is not legal advice.</p>
       </form>
 
       {turns.length === 0 && (
@@ -170,7 +183,8 @@ export function Ask() {
   )
 }
 
-function TurnView({ t, onRetry }: { t: Turn; onRetry: () => void }) {
+/** onRetry only on the last turn: asking again replaces it, and an earlier one would drop the turns after it. */
+function TurnView({ t, onRetry }: { t: Turn; onRetry?: () => void }) {
   return (
     <article>
       <p className="statute ml-auto w-fit max-w-[60ch] rounded-md bg-panel px-4 py-2.5 text-lg">{t.question}</p>
@@ -184,10 +198,12 @@ function TurnView({ t, onRetry }: { t: Turn; onRetry: () => void }) {
         {t.error && (
           <p className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-md border border-note-rule bg-note px-4 py-3" role="alert">
             <span>{t.error}</span>
-            <button type="button" onClick={onRetry} className="link inline-flex items-center gap-1.5 text-gazette underline underline-offset-[3px]">
-              <RotateCcw className="h-4 w-4" aria-hidden />
-              Ask again
-            </button>
+            {onRetry && (
+              <button type="button" onClick={onRetry} className="link inline-flex items-center gap-1.5 text-gazette underline underline-offset-[3px]">
+                <RotateCcw className="h-4 w-4" aria-hidden />
+                Ask again
+              </button>
+            )}
           </p>
         )}
       </div>
