@@ -7,6 +7,8 @@ judging, following pipeline/review_brief.md: read the judgment, decide, and sear
   uv run python -m pipeline.review_events export --set leads       # every lead the API shows
   uv run python -m pipeline.review_events score                    # benchmark verdicts vs the blind consensus
   uv run python -m pipeline.review_events apply [--dry-run]        # write every saved verdict to citation_events
+  --reviewer TAG (export): stamp a round with the model that reviews it (its accepts carry that verified_by);
+  --dir NAME (export, score): a separate folder, e.g. a benchmark run with another model, never applied
 
 apply is idempotent and re-applies ALL saved verdicts (benchmark and leads), matched to live events by judgment,
 section, type and quote. Run it after every classify_events / verify_events re-run: classify recreates rejected leads.
@@ -114,8 +116,8 @@ def lead_cases(conn):
     return todo
 
 
-def export(which):
-    root = data_dir() / "review" / which
+def export(which, folder=None, reviewer=None):
+    root = data_dir() / "review" / (folder or which)
     (root / "text").mkdir(parents=True, exist_ok=True)
     (root / "verdicts").mkdir(exist_ok=True)
     with connect() as conn:
@@ -128,6 +130,8 @@ def export(which):
         if not path.exists():
             path.write_text(f"{j.get('title')}\n{j.get('url')}\n\n" + "\n".join(textwrap.wrap(text, 140)), encoding="utf-8")
         c.update(judgment_text=str(path), judgment_url=j.get("url"), quote_found=quote_found(text, c["operative_quote"]))
+        if reviewer:
+            c["reviewer"] = reviewer
         del c["raw_path"]
     # a new round never overwrites an earlier one: apply pairs every batch file with its verdicts file by case_id
     rnd = 1 + max([int(p.name.split("_r")[1].split("_")[0]) for p in root.glob("batch_r*_*.json")] or [1])
@@ -157,9 +161,10 @@ def apply(dry_run):
                 continue
             if v["decision"] == "reject":
                 conn.execute("UPDATE citation_events SET check_verdict = 'fail', check_reason = %s WHERE event_id = %s",
-                             (f"{REVIEWER}: {v['reason']}"[:1000], eid))
+                             (f"{c.get('reviewer', REVIEWER)}: {v['reason']}"[:1000], eid))
                 continue
-            new_quote, note = quote, f"{REVIEWER}: {v['reason']}"
+            who = c.get("reviewer", REVIEWER)   # each round says which model checked it
+            new_quote, note = quote, f"{who}: {v['reason']}"
             better = (v.get("better_quote") or "").strip()
             # the reviewer's better quote replaces ours only if code finds it verbatim in the judgment too
             if better and quote_found(json.loads((data_dir() / raw).read_text(encoding="utf-8"))["text"] or "", better):
@@ -168,15 +173,15 @@ def apply(dry_run):
             conn.execute("""UPDATE citation_events SET verified = true, verified_by = %s, operative_quote = %s,
                             source_paragraph = coalesce(nullif(%s, ''), source_paragraph),
                             notes = coalesce(notes || ' | ', '') || %s WHERE event_id = %s AND NOT verified""",
-                         (REVIEWER, new_quote, (v.get("paragraph") or "").strip(), note[:2000], eid))
+                         (who, new_quote, (v.get("paragraph") or "").strip(), note[:2000], eid))
         if not dry_run:
             conn.commit()
     print(f"{'would apply' if dry_run else 'applied'}: {n} (matched {sum(n[k] for k in ('accept', 'reject', 'unsure'))} "
           f"live events to saved verdicts)")
 
 
-def score():
-    root = data_dir() / "review" / "benchmark"
+def score(folder="benchmark"):
+    root = data_dir() / "review" / folder
     got = {v["case_id"]: v for f in sorted((root / "verdicts").glob("*.json")) for v in json.loads(f.read_text())}
     cases = [c for f in sorted(root.glob("batch_*.json")) for c in json.loads(f.read_text())]
     labels = {}
@@ -210,13 +215,16 @@ def score():
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest="cmd", required=True)
-    sub.add_parser("export").add_argument("--set", choices=["benchmark", "leads"], required=True)
-    sub.add_parser("score")
+    ex = sub.add_parser("export")
+    ex.add_argument("--set", choices=["benchmark", "leads"], required=True)
+    ex.add_argument("--dir")
+    ex.add_argument("--reviewer")
+    sub.add_parser("score").add_argument("--dir", default="benchmark")
     sub.add_parser("apply").add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
     if args.cmd == "export":
-        export(args.set)
+        export(args.set, args.dir, args.reviewer)
     elif args.cmd == "apply":
         apply(args.dry_run)
     else:
-        score()
+        score(args.dir)
