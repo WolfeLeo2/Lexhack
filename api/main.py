@@ -91,8 +91,11 @@ CHAT_GLOBAL_RATE = 30     # /api/chat questions per minute from everyone (key "*
 _chat_hits = {}
 CHAT_SLOTS = threading.BoundedSemaphore(4)   # agent runs at once
 EXPORT_RATE = 20          # /api/export files per client IP per minute
+EXPORT_GLOBAL_RATE = 30   # /api/export files per minute from everyone (key "*")
 _export_hits = {}
+EXPORT_SLOTS = threading.BoundedSemaphore(2)   # files built at once (a citation-heavy draft re-check takes seconds)
 MAX_EXPORT = 200_000      # bytes of request body
+MAX_EXPORT_PARTS, MAX_EXPORT_TEXT = 300, 30_000   # parts; characters of text across them
 CHAT_DEADLINE = 55        # seconds; the web proxy's maxDuration is 60
 START_TIME = time.time()
 
@@ -990,7 +993,7 @@ class ExportRequest(BaseModel):
     format: Literal["docx", "pdf"]
     question: str = Field(min_length=1, max_length=2000)
     mode: Literal["answer", "draft"] = "answer"
-    parts: list[dict] = Field(max_length=2000)   # the chat's Parts; rulings and sections are re-read from the DB
+    parts: list[dict] = Field(max_length=300)   # the chat's Parts; rulings and sections are re-read from the DB
     check: list[dict] | None = Field(None, max_length=500)
     label: str | None = None   # accepted for the client's convenience; the file's title is the server's
 
@@ -999,22 +1002,35 @@ class ExportRequest(BaseModel):
 async def export_file(request: Request):
     """An Ask Hakiki answer or draft as a Word (.docx) or PDF file (api/export.py). No model call: built from the
     parts sent, with every ruling's words, source and state and every section's status re-read from the database.
-    Body up to 200 KB; not stored."""
-    if not allow(chat_key(request), time.monotonic(), _export_hits, EXPORT_RATE):
+    Body up to 200 KB, 300 parts, 30,000 characters of text; not stored."""
+    now = time.monotonic()
+    if not allow(chat_key(request), now, _export_hits, EXPORT_RATE):
         raise HTTPException(429, f"rate limit: {EXPORT_RATE} files a minute")
+    if not allow("*", now, _export_hits, EXPORT_GLOBAL_RATE):
+        raise HTTPException(429, CHAT_BUSY)
+    too_big = HTTPException(413, "That answer is too large to export.")
     if int(request.headers.get("content-length") or 0) > MAX_EXPORT:
-        raise HTTPException(413, "That answer is too large to export.")
-    body = await request.body()
-    if len(body) > MAX_EXPORT:
-        raise HTTPException(413, "That answer is too large to export.")
+        raise too_big
+    body = bytearray()
+    async for chunk in request.stream():   # a chunked body has no Content-Length: stop reading past the cap
+        body += chunk
+        if len(body) > MAX_EXPORT:
+            raise too_big
     try:
-        req = ExportRequest.model_validate_json(body)
+        req = ExportRequest.model_validate_json(bytes(body))
     except ValueError as e:
         raise HTTPException(422, "That answer could not be read.") from e
+    if sum(len(str(p.get("text") or "")) for p in req.parts) > MAX_EXPORT_TEXT:
+        raise HTTPException(422, "That answer is too long to export.")
+    if not EXPORT_SLOTS.acquire(blocking=False):
+        raise HTTPException(429, CHAT_BUSY)
 
     def build():
-        with db() as conn:
-            return export.document(conn, req, DISCLAIMER)
+        try:
+            with db() as conn:
+                return export.document(conn, req, DISCLAIMER)
+        finally:
+            EXPORT_SLOTS.release()
     name, mime, data = await run_in_threadpool(build)
     return Response(data, media_type=mime, headers={"Content-Disposition": f'attachment; filename="{name}"',
                                                     "Cache-Control": "no-store"})

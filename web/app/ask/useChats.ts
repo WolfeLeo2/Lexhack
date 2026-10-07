@@ -42,7 +42,9 @@ export const newId = () => Date.now().toString(36) + Math.random().toString(36).
 function valid(c: unknown): Chat | null {
   const x = c as Chat
   if (!x || typeof x.id !== 'string' || typeof x.title !== 'string' || !Array.isArray(x.turns)) return null
-  const turns = x.turns.filter((t) => t && typeof t.question === 'string' && Array.isArray(t.steps))
+  const turns = x.turns.filter(
+    (t) => t && typeof t.question === 'string' && Array.isArray(t.steps) && (!t.answer || Array.isArray(t.answer.parts)),
+  )
   if (!turns.length) return null
   return {
     id: x.id,
@@ -75,7 +77,12 @@ function save(chats: Chat[]): Store {
       localStorage.removeItem(LEGACY)
       return list.length < chats.length ? 'trimmed' : 'saved'
     } catch {
-      if (list.length <= 1) return 'off'
+      if (list.length <= 1) {
+        try {
+          localStorage.removeItem(KEY) // nothing fits: don't let an older list come back on reload
+        } catch {}
+        return 'off'
+      }
       list = list.slice(0, -1)
     }
   }
@@ -126,6 +133,8 @@ export function useChats() {
   }, [])
 
   // Another tab saved: take its list (it is newer), keeping any chat this tab is still answering.
+  // ponytail: last writer wins; two tabs changing chats within one save of each other can lose one change. Merge by
+  // chat id and updatedAt if that ever bites.
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
       if (e.key !== KEY) return

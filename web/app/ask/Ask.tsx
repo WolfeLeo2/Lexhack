@@ -175,7 +175,10 @@ export function Ask() {
             </button>
             <button
               type="button"
-              onClick={() => setSheet(true)}
+              onClick={() => {
+                setRemoved(null) // a stale Undo would take focus from the sheet
+                setSheet(true)
+              }}
               aria-haspopup="dialog"
               className="inline-flex items-center gap-1.5 rounded-sm border border-rule bg-panel px-3 py-1.5 text-ink-2 transition-colors hover:border-ink hover:text-ink"
             >

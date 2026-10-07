@@ -24,6 +24,9 @@ const STORE_WORDS: Record<Store, string> = {
   off: 'This browser isn’t letting Hakiki keep chats (private browsing or storage turned off), so they’ll be gone when you leave the page.',
 }
 
+/** A title short enough for a label. */
+const clip = (t: string) => (t.length > 60 ? t.slice(0, 60).trimEnd() + '…' : t)
+
 export const plural = (n: number, one: string, many = one + 's') => `${n} ${n === 1 ? one : many}`
 
 interface ListProps {
@@ -39,17 +42,27 @@ interface ListProps {
 
 /** The chats, newest first, each with a Remove button beside it (not inside it); Undo after a removal. */
 export function ChatList({ chats, activeId, store, removed, onOpen, onRemove, onClearAll, onUndo }: ListProps) {
+  // After a removal, focus goes to Undo (the row it was on is gone). A tick later, so a sheet that closed because the
+  // open chat was removed has finished handing focus back first.
+  const undoRef = useRef<HTMLButtonElement>(null)
+  useEffect(() => {
+    if (!removed) return
+    const id = setTimeout(() => undoRef.current?.focus())
+    return () => clearTimeout(id)
+  }, [removed])
   return (
     <div>
-      {removed && (
-        <p role="status" className="step-in mb-3 flex flex-wrap items-center gap-x-3 rounded-md border border-note-rule bg-note px-3 py-2 text-sm">
-          <span className="min-w-0 truncate">{removed.length === 1 ? `Removed “${removed[0].title}”.` : `Removed ${plural(removed.length, 'chat')}.`}</span>
-          <button type="button" onClick={onUndo} className="link inline-flex items-center gap-1 text-gazette underline underline-offset-[3px]">
-            <Undo2 className="h-3.5 w-3.5" aria-hidden />
-            Undo
-          </button>
-        </p>
-      )}
+      <div role="status">
+        {removed && (
+          <p className="step-in mb-3 flex flex-wrap items-center gap-x-3 rounded-md border border-note-rule bg-note px-3 py-2 text-sm">
+            <span className="min-w-0 truncate">{removed.length === 1 ? `Removed “${clip(removed[0].title)}”.` : `Removed ${plural(removed.length, 'chat')}.`}</span>
+            <button ref={undoRef} type="button" onClick={onUndo} className="link inline-flex items-center gap-1 text-gazette underline underline-offset-[3px]">
+              <Undo2 className="h-3.5 w-3.5" aria-hidden />
+              Undo
+            </button>
+          </p>
+        )}
+      </div>
       {chats.length > 0 ? (
         <ol className="divide-y divide-rule border-y border-rule">
           {chats.map((c) => {
@@ -60,7 +73,7 @@ export function ChatList({ chats, activeId, store, removed, onOpen, onRemove, on
                 <button
                   type="button"
                   onClick={() => onOpen(c.id)}
-                  aria-current={active ? 'page' : undefined}
+                  aria-current={active ? 'true' : undefined}
                   className={`group min-w-0 flex-1 border-l-2 py-3 pr-2 pl-3 text-left transition-colors hover:bg-panel/60 ${active ? 'border-seal bg-panel/60' : 'border-transparent'}`}
                 >
                   <span className="statute line-clamp-2 text-lg leading-snug break-words text-ink transition-colors group-hover:text-gazette">{c.title}</span>
@@ -75,7 +88,7 @@ export function ChatList({ chats, activeId, store, removed, onOpen, onRemove, on
                 <button
                   type="button"
                   onClick={() => onRemove(c.id)}
-                  aria-label={`Remove “${c.title}”`}
+                  aria-label={`Remove “${clip(c.title)}”`}
                   title="Remove this chat"
                   className="mt-2.5 shrink-0 rounded-sm p-2 text-ink-2 transition-colors hover:bg-panel hover:text-ink"
                 >

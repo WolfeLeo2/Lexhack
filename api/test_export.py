@@ -9,7 +9,10 @@ import pypdf
 from docx import Document
 from fastapi.testclient import TestClient
 
-from . import main
+from collections import deque
+import time
+
+from . import export, main
 from .status import provision_status
 from .test_agent import S204
 
@@ -71,7 +74,7 @@ def run():
             expect(f"{fmt} title", "Draft for an advocate's review" in text, True)
             expect(f"{fmt} checked by Hakiki", "Checked by Hakiki" in text, True)
             expect(f"{fmt} forged check note gone", "forged" in text, False)
-            expect(f"{fmt} smuggled reference not filled", "Smuggled [ [event:1] ] here." in text, True)
+            expect(f"{fmt} smuggled reference not filled", "Smuggled [[event:1]] here." in text, True)
         r = c.post("/api/export", json={"format": "pdf", "question": "q", "mode": "answer",
                                         "parts": [{"kind": "text", "text": "x" * 210_000}]})
         expect("oversize 413", r.status_code, 413)
@@ -84,10 +87,58 @@ def run():
                  for _ in range(main.EXPORT_RATE + 1)]
         expect("rate limit", codes[-1], 429)
         main._export_hits.clear()
+        test_caps(c)
+        test_minors(c, ev["event_id"], words)
     for f in fails:
         print("FAIL", *f)
     print(f"{len(fails)} failures")
     raise SystemExit(bool(fails))
+
+
+def post(c, parts, question="q", mode="answer", check=None, fmt="docx"):
+    main._export_hits.clear()
+    return c.post("/api/export", json={"format": fmt, "question": question, "mode": mode, "parts": parts,
+                                       "check": check})
+
+
+def test_caps(c):
+    expect("301 parts 422", post(c, [{"kind": "text", "text": "x"}] * 301).status_code, 422)
+    expect("30k text 422", post(c, [{"kind": "text", "text": "x" * 30_001}]).status_code, 422)
+    held = [main.EXPORT_SLOTS.acquire(blocking=False) for _ in range(2)]
+    try:
+        expect("slots busy 429", post(c, [{"kind": "text", "text": "x"}]).status_code, 429)
+    finally:
+        for h in held:
+            if h:
+                main.EXPORT_SLOTS.release()
+    main._export_hits.clear()
+    main._export_hits["*"] = deque([time.monotonic()] * main.EXPORT_GLOBAL_RATE)
+    r = c.post("/api/export", json={"format": "docx", "question": "q", "parts": []})
+    expect("global rate 429", r.status_code, 429)
+    main._export_hits.clear()
+    expect("slot released after a file", post(c, [{"kind": "text", "text": "x"}]).status_code, 200)
+
+
+def test_minors(c, eid, words):
+    def flags(question, raw):
+        r = post(c, [{"kind": "text", "text": "A draft."}], question, "draft",
+                 [{"raw_text": raw, "kind": "case", "result": "not_confirmed", "note": "", "flagged": True}])
+        return "could not confirm" in docx_text(r.content)
+    expect("not_confirmed named in question kept", flags("Draft on Wanjiru v Republic", "Wanjiru v Republic"), True)
+    expect("not_confirmed not in question dropped", flags("Draft on s.204", "Wanjiru v Republic"), False)
+    expect("not_confirmed with newline dropped", flags("Draft on Wanjiru\nv R", "Wanjiru\nv R"), False)
+    expect("not_confirmed non-str dropped", flags("Draft on 5", 5), False)
+    split = docx_text(post(c, [{"kind": "text", "text": "[[event:"}, {"kind": "text", "text": f"{eid}]] end"}]).content)
+    expect("split reference not re-formed", flat(words) in flat(split), False)
+    expect("split reference shown as typed", f"[[event:{eid}]] end" in split, True)
+    trail = docx_text(post(c, [{"kind": "text", "text": "see ["}, {"kind": "ruling", "event_id": eid}]).content)
+    expect("trailing [ keeps the next ruling", flat(words) in flat(trail), True)
+    odd = docx_text(post(c, [{"kind": "ruling", "event_id": {"x": 1}}, {"kind": "section", "provision_id": "a b]]"},
+                             {"kind": "case", "judgment_id": True}]).content)
+    expect("odd ids removed", odd.count("[reference removed]"), 3)
+    expect("odd ids: no stray brackets", "[[" in odd or "]]" in odd, False)
+    expect("javascript link dropped", export.web("javascript:alert(1)"), None)
+    expect("https link kept", export.web("https://new.kenyalaw.org/x"), "https://new.kenyalaw.org/x")
 
 
 if __name__ == "__main__":

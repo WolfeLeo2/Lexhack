@@ -2,6 +2,8 @@
 // court quote and section status from its database; this only relays. Server to server, so no CORS.
 import { API_URL } from '@/lib/api'
 
+export const maxDuration = 60 // Vercel: re-checking a long draft takes a few seconds
+
 const MESSAGES: Record<number, string> = {
   413: 'That answer is too large to download. Copy the text instead.',
   422: 'That answer could not be turned into a file.',
@@ -18,7 +20,7 @@ export async function POST(req: Request) {
   }
   let upstream: Response
   try {
-    upstream = await fetch(`${API_URL}/api/export`, { method: 'POST', headers, body: await req.text(), cache: 'no-store' })
+    upstream = await fetch(`${API_URL}/api/export`, { method: 'POST', headers, body: await req.text(), cache: 'no-store', signal: req.signal })
   } catch {
     return Response.json({ error: 'Hakiki’s service is unreachable. Try again in a moment.' }, { status: 502 })
   }

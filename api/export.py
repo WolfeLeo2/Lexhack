@@ -33,21 +33,36 @@ def clean(s):
     return CONTROL.sub("", str(s or ""))
 
 
+HIDE = str.maketrans("[]", "\ue000\ue001")   # brackets in prose, hidden while references are filled in
+SHOW = str.maketrans("\ue000\ue001", "[]")
+SAFE_ID = re.compile(r"[^\[\]\s]+")
+
+
 def rebuild(conn, parts):
     """Client parts -> (parts filled in from the database, references that no longer resolve). A reference the
-    database doesn't hold becomes 'removed'; prose can't smuggle one in ([[ ]] in text is broken up)."""
+    database doesn't hold becomes 'removed'. Prose can't make one: its brackets are hidden while the references are
+    filled in (so text split across parts can't re-form [[event:1]], nor a trailing [ swallow the next ruling)."""
     seen, src = {"event": set(), "section": set(), "judgment": set()}, []
     for p in parts:
         k = p.get("kind")
         if k == "text":
-            src.append(clean(p.get("text")).replace("[[", "[ [").replace("]]", "] ]"))
+            src.append(clean(p.get("text")).replace("\ue000", "").replace("\ue001", "").translate(HIDE))
             continue
         kind, key = {"ruling": ("event", "event_id"), "section": ("section", "provision_id"),
                      "case": ("judgment", "judgment_id")}.get(k, ("removed", None))
-        v = str(p.get(key)) if key else "x"
+        v = p.get(key) if key else None
+        v = str(v) if isinstance(v, (str, int)) and not isinstance(v, bool) else ""
+        if not SAFE_ID.fullmatch(v):
+            kind, v = "removed", "x"
         seen.setdefault(kind, set()).add(v)
         src.append(f"[[{kind}:{v}]]")
-    return agent.render_parts("".join(src), seen, conn)
+    out, removed = agent.render_parts("".join(src), seen, conn)
+    return [dict(p, text=p["text"].translate(SHOW)) if p["kind"] == "text" else p for p in out], removed
+
+
+def web(url):
+    """Only http(s) links go into a file."""
+    return url if isinstance(url, str) and re.match(r"https?://", url) else None
 
 
 def checked(conn, parts, removed, question, client_check):
@@ -56,8 +71,10 @@ def checked(conn, parts, removed, question, client_check):
     flags, in the server's words."""
     items = agent.draft_check(conn, parts, question)
     for f in client_check or []:
-        if f.get("result") == "not_confirmed" and f.get("raw_text"):
-            name = clean(f["raw_text"])[:200]
+        raw = f.get("raw_text")
+        if (f.get("result") == "not_confirmed" and isinstance(raw, str) and raw.strip() and "\n" not in raw
+                and raw.strip().lower() in question.lower()):   # a case the user named, so it is in the question
+            name = clean(raw.strip())[:200]
             items.append(agent.item(name, "case", "not_confirmed",
                                     f"You named {name}. Hakiki could not confirm it, so the draft does not cite it.", True))
         elif f.get("result") == "revision_skipped":
@@ -180,7 +197,7 @@ def check_lines(check):
 
 def add_runs(par, rs):
     for text, style, url in rs:
-        if url:
+        if url := web(url):
             rid = par.part.relate_to(url, RELATIONSHIP_TYPE.HYPERLINK, is_external=True)
             link = OxmlElement("w:hyperlink")
             link.set(qn("r:id"), rid)
@@ -251,6 +268,7 @@ def to_pdf(d):
 
     def write(rs, size=11.5, h=6.2):
         for text, style, url in rs:
+            url = web(url)
             pdf.set_font("serif", {"b": "B", "i": "I"}.get(style, ""), size)
             pdf.set_text_color(*(GREEN if url else ink))
             pdf.write(h, text, link=url or "")
