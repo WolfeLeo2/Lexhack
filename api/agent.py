@@ -19,7 +19,7 @@ import requests
 from . import filing, main, tools
 from .status import RULES, load_events_many, statuses, with_leads
 
-MODEL, MAX_ROUNDS = "gemini-3.8-flash", 8
+MODEL, MAX_ROUNDS = "gemini-3.5-flash-lite", 8
 URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 STREAM_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:streamGenerateContent?alt=sse"
 REF = re.compile(r"\[\[(section|event|judgment):([^\]\s]+)\]\]")
