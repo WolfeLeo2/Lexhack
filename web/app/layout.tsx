@@ -87,7 +87,6 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
               Hakiki reports what published sources say. It is not legal advice. Statute text comes from Kenya Law (CC
               BY-NC 4.0) via the Internet Archive; court rulings are quoted word for word, with a link to each judgment.
             </p>
-            <p>Built for LexHack 2026.</p>
           </div>
         </footer>
       </body>

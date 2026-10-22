@@ -1,4 +1,4 @@
-"""LexHack API. The response models below ARE the contract the web UI builds against.
+"""Hakiki API. The response models below ARE the contract the web UI builds against.
 
 API documentation:
   - Scalar: http://127.0.0.1:8000/scalar
@@ -479,7 +479,7 @@ curl -s -X POST "http://127.0.0.1:8000/api/check" \\
     </div>
 
     <footer class="footer">
-      <div>Hakiki &middot; Built for LexHack 2026</div>
+      <div>Hakiki</div>
       <div>Data from Kenya Law via Internet Archive &middot; Quotations verbatim</div>
     </footer>
   </div>

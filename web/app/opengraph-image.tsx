@@ -86,9 +86,6 @@ export default async function Image() {
             paddingTop: '24px',
           }}
         >
-          <span style={{ fontSize: '22px', color: '#8E2C48', fontWeight: 600 }}>
-            Built for LexHack 2026
-          </span>
           <span style={{ fontSize: '20px', color: '#6B7280' }}>
             Kenya Law Citator
           </span>

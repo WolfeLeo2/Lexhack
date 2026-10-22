@@ -166,7 +166,6 @@ export default async function AboutPage() {
         Hakiki reports what published sources say. It is not legal advice, and it does not tell you whether a case
         supports your argument. Always read the judgment itself.
       </p>
-      <p className="mt-4 text-ink-2">Hakiki was built by a team of two for LexHack 2026, a student hackathon on AI, law and civic tech.</p>
     </div>
   )
 }

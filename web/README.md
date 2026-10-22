@@ -1,6 +1,6 @@
 # Hakiki (web UI)
 
-Hakiki (Swahili for "verify") is the product; LexHack 2026 is the hackathon it was built for.
+Hakiki (Swahili for "verify").
 
 Next.js (App Router, Tailwind v4) over the FastAPI service in `../api`. Pages are server components that call the API
 directly (`lib/api.ts`), so there is no CORS and the pages work before JavaScript loads.
