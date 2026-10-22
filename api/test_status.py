@@ -104,9 +104,19 @@ def main():
             "sec_52": "part_VII__sec_52"}
     if got != want:
         fails.append(("renumbering chains", got))
+    # a reversal of a ruling that UPHELD the section did not undo a limit (PAK: ss.158-160, set aside 2026-04-24)
+    up = dict(ev[0], event_id=80, event_key="HCU", event_type="upheld", court="High Court", effective_date="2022-03-24",
+              affects_event_id=None)
+    rev = dict(ev[0], event_id=81, event_key="CAR", event_type="reversed_on_appeal", court="Court of Appeal",
+               effective_date="2026-04-24", affects_event_id=80)
+    r = resolve([up, rev])
+    if r["status"] != "in force; a lower court's ruling on it was set aside on appeal" or states(r) != {"HCU": "reversed on appeal", "CAR": "in effect"}:
+        fails.append(("reversal of an upheld ruling", r["status"], states(r)))
+    if resolve([dict(rev, affects_event_id=None)])["status"] != "in force; earlier court limits were reversed":
+        fails.append(("unlinked reversal keeps the old label",))
     for f in fails:
         print("FAIL", *f)
-    print(f"{14 - len(fails)}/14 passed")
+    print(f"{16 - len(fails)}/16 passed")
     raise SystemExit(1 if fails else 0)
 
 

@@ -58,7 +58,11 @@ def main():
             errors.append(f"{k}: bad scope {e['scope']}")
         if e["scope"] == "partial" and not e["scope_text"]:
             errors.append(f"{k}: partial scope needs scope_text")
-        if e["affects_event"] and e["affects_event"] not in keys:
+        if "|" in e["affects_event"]:   # judgment_id|provision_id|event_type of a checked event without a key
+            j, p, t = e["affects_event"].split("|")
+            if judgment_text(j) is None or not provision_exists(p) or t not in EVENT_TYPES:
+                errors.append(f"{k}: affects_event {e['affects_event']} does not point at a held judgment and section")
+        elif e["affects_event"] and e["affects_event"] not in keys:
             errors.append(f"{k}: affects_event {e['affects_event']} does not exist")
         if e["verified"] not in ("true", "false"):
             errors.append(f"{k}: verified must be true/false")

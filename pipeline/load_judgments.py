@@ -31,10 +31,17 @@ def row(d):
             m.get("Case number"),
             decision_date(d),
             judges,
-            d["display_type"] != "pdf" and bool(d["text"]),
+            bool(d["text"]),   # PDF-only shells have text "" until fetch_sources/add_manual_judgment attach some
             "manual" if d["retrieved_from"].startswith("manual/") else "wayback",
             d["url"],                                                  # Kenya Law URL: what users click
             str(out_path(parsed_dir(), d).relative_to(data_dir())))
+
+
+UPSERT = """INSERT INTO judgments VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+    ON CONFLICT (judgment_id) DO UPDATE SET neutral_citation=EXCLUDED.neutral_citation,
+    title=EXCLUDED.title, court=EXCLUDED.court, case_number=EXCLUDED.case_number,
+    decision_date=EXCLUDED.decision_date, judges=EXCLUDED.judges, has_full_text=EXCLUDED.has_full_text,
+    source=EXCLUDED.source, source_url=EXCLUDED.source_url, raw_path=EXCLUDED.raw_path"""
 
 
 def main():
@@ -47,12 +54,7 @@ def main():
     with connect() as conn:
         apply_schema(conn)
         with conn.cursor() as cur:
-            cur.executemany("""INSERT INTO judgments VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-                ON CONFLICT (judgment_id) DO UPDATE SET neutral_citation=EXCLUDED.neutral_citation,
-                title=EXCLUDED.title, court=EXCLUDED.court, case_number=EXCLUDED.case_number,
-                decision_date=EXCLUDED.decision_date, judges=EXCLUDED.judges, has_full_text=EXCLUDED.has_full_text,
-                source=EXCLUDED.source, source_url=EXCLUDED.source_url, raw_path=EXCLUDED.raw_path""",
-                            [r for r, _ in rows.values()])
+            cur.executemany(UPSERT, [r for r, _ in rows.values()])
         print(f"loaded {len(rows)} judgments")
         for court, n, full, dated in conn.execute("""SELECT court, count(*), count(*) FILTER (WHERE has_full_text),
                 count(*) FILTER (WHERE decision_date IS NOT NULL) FROM judgments GROUP BY 1 ORDER BY 2 DESC LIMIT 12"""):

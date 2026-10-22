@@ -57,6 +57,18 @@ export interface Stats {
   lead_sections: number
 }
 
+/** An appeal against the judgment behind a ruling that the later-appeal check found. It never changes the ruling's state. */
+export interface Appeal {
+  status: string // 'appeal_pending'
+  case: string | null // the appeal's name, as the source gives it
+  court: string | null
+  date: string | null
+  outcome: string | null // one or two sentences summarised from the source (not the court's words)
+  source_url: string
+  confidence: string | null // medium | high
+  checked_by: string | null // 'agent:…'
+}
+
 export interface CourtEvent {
   event_id: number
   event_type: string
@@ -75,6 +87,7 @@ export interface CourtEvent {
   state: 'in effect' | 'reversed on appeal' | 'displaced by a later ruling'
   superseded_by: number | null
   provision_id: string | null // the ID the ruling was recorded on: an older numbering if the section was renumbered
+  appeal?: Appeal | null // a reported appeal against this ruling's judgment, if one was found
 }
 
 /** The section under another ID in earlier / later versions (Kenya Law renumbered it). */

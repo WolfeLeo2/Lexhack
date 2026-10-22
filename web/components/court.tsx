@@ -1,5 +1,5 @@
-import { ExternalLink } from 'lucide-react'
-import type { CourtEvent } from '@/lib/api'
+import { ExternalLink, Hourglass } from 'lucide-react'
+import type { Appeal, CourtEvent } from '@/lib/api'
 import { EVENT_LABEL, cap, fmtDate, shortCase } from '@/lib/format'
 import { cleanUrl, locator, tidySpaces } from '@/lib/text'
 
@@ -75,6 +75,31 @@ export function Attribution({ e }: { e: CourtEvent }) {
   )
 }
 
+/** A reported appeal against the judgment behind a ruling. It says an appeal exists; it does not change the ruling's state. */
+export function AppealNote({ a }: { a: Appeal }) {
+  const href = cleanUrl(a.source_url)
+  return (
+    <p className="mt-2 flex items-start gap-2 text-sm text-ink-2">
+      <Hourglass className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+      <span>
+        <strong className="font-medium text-ink">An appeal is reported pending</strong>
+        {a.court && <> ({a.court})</>}. {a.outcome}{' '}
+        {href && (
+          <>
+            <a href={href} className="link inline-flex items-center gap-1 whitespace-nowrap" target="_blank" rel="noreferrer">
+              Source
+              <ExternalLink className="h-3.5 w-3.5" aria-hidden />
+              <span className="sr-only">(opens in a new tab)</span>
+            </a>
+            .{' '}
+          </>
+        )}
+        Found by an AI check of public sources ({a.confidence} confidence), not yet confirmed by a person.
+      </span>
+    </p>
+  )
+}
+
 /** One entry in the section's history. `id` lets the lineage chart scroll to it. */
 export function EventEntry({ e, all }: { e: CourtEvent; all: CourtEvent[] }) {
   const by = e.superseded_by == null ? undefined : all.find((x) => x.event_id === e.superseded_by)
@@ -99,6 +124,7 @@ export function EventEntry({ e, all }: { e: CourtEvent; all: CourtEvent[] }) {
       <div className="mt-3">
         <Attribution e={e} />
       </div>
+      {e.appeal && <AppealNote a={e.appeal} />}
       {by && (
         <p className="mt-2 text-sm text-ink-2">
           {e.state === 'reversed on appeal' ? 'Reversed by ' : 'Displaced by '}

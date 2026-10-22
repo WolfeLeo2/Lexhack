@@ -115,17 +115,23 @@ def load_own(conn, provision_ids, include_unverified):
     rows = conn.execute("""
         SELECT e.provision_id, e.event_id, e.event_key, e.event_type, e.scope, e.scope_text, e.subsection, e.operative_quote,
                e.source_paragraph, e.effective_date::text, e.affects_event_id, e.method, e.verified, e.verified_by, e.confidence, e.issue, e.stance,
-               j.judgment_id, j.title, j.court, j.neutral_citation, j.source_url
+               j.judgment_id, j.title, j.court, j.neutral_citation, j.source_url,
+               ja.later_history, ja.appellate_case, ja.appellate_court, ja.appellate_date, ja.outcome, ja.source_url,
+               ja.confidence, ja.checked_by
         FROM citation_events e LEFT JOIN judgments j USING (judgment_id)
+        LEFT JOIN judgment_appeals ja ON ja.judgment_id = e.judgment_id   -- a reported appeal against the judgment
         WHERE e.provision_id = ANY(%s) AND (e.verified OR (%s AND e.check_verdict IS DISTINCT FROM 'fail'))
           AND j.duplicate_of IS NULL   -- a judgment Kenya Law published twice counts once (pipeline/dedupe_judgments.py)
         ORDER BY e.method = 'manual' DESC, e.event_id""", (list(provision_ids), include_unverified)).fetchall()
     cols = ["event_id", "event_key", "event_type", "scope", "scope_text", "subsection", "operative_quote",
             "source_paragraph", "effective_date", "affects_event_id", "method", "verified", "verified_by", "confidence", "issue", "stance",
             "judgment_id", "title", "court", "neutral_citation", "source_url"]
+    appeal_cols = ["status", "case", "court", "date", "outcome", "source_url", "confidence", "checked_by"]
     seen, out = set(), {}
     for pid, *r in rows:
-        e = dict(zip(cols, r))
+        e = dict(zip(cols + ["appeal_" + c for c in appeal_cols], r))
+        appeal = {c: e.pop("appeal_" + c) for c in appeal_cols}
+        e["appeal"] = appeal if appeal["status"] else None
         k = (pid, e["judgment_id"] or e["event_key"] or e["event_id"], e["event_type"])   # Parliament's events have no judgment
         if k in seen:
             continue

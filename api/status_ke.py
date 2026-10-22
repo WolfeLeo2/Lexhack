@@ -33,6 +33,13 @@ def same_point(a, b):
     return not a.get("issue") or not b.get("issue") or a["issue"] == b["issue"]
 
 
+def reversed_a_limit(e, by_id):
+    """Did this reversal undo a limit? An unlinked reversal is assumed to have (the older, usual case); one linked to a
+    ruling that upheld or interpreted the section did not."""
+    target = by_id.get(e.get("affects_event_id"))
+    return target is None or direction(target) == "limits"
+
+
 def resolve(events):
     """events: dicts with event_id, event_type, scope, court, effective_date, affects_event_id (+ anything else, passed
     through). -> {"status", "summary_events", "history"}; history entries gain "state" and "superseded_by"."""
@@ -61,8 +68,9 @@ def resolve(events):
         status = "declared unconstitutional"
     elif (limits := [e for e in limits if e["event_type"] not in STATUTORY]):
         status = "limited by a court"
-    elif any(e["event_type"] == "reversed_on_appeal" for e in live):   # the reversal is the news, even if also upheld
-        status = "in force; earlier court limits were reversed"
+    elif (reversals := [e for e in live if e["event_type"] == "reversed_on_appeal"]):   # the reversal is the news
+        status = ("in force; earlier court limits were reversed" if any(reversed_a_limit(e, by_id) for e in reversals)
+                  else "in force; a lower court's ruling on it was set aside on appeal")
     elif any(e["event_type"] == "upheld" for e in live):
         status = "in force; its validity has been tested in court"
     elif court:

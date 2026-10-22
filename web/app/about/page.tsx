@@ -14,6 +14,10 @@ const STATUSES: [string, string][] = [
   ],
   ['In force; its validity has been tested in court', 'Someone challenged the section and a court upheld it.'],
   ['In force; earlier court limits were reversed', 'A court limited the section, and a higher court later reversed or overruled that ruling.'],
+  [
+    'In force; a lower court’s ruling on it was set aside on appeal',
+    'A higher court set aside a lower court’s ruling on the section (for example one that upheld it) without limiting the section itself. Read the history to see what was and was not decided.',
+  ],
   ['In force; interpreted by a court', 'A court has said how the section must be read, without limiting or upholding it.'],
   [
     'In force; no recorded court rulings',

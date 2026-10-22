@@ -37,11 +37,19 @@ def checked_by(verified_by):
     return next((label for prefix, label in LABELS if (verified_by or "").startswith(prefix)), "unverified")
 
 
+def appeal_view(a):
+    """A reported appeal in words for the model: what was found, from where and how sure, never the raw checked_by tag."""
+    return a and {"status": "an appeal against this judgment is reported pending, outcome not known", "court": a["court"],
+                  "summary": a["outcome"], "source_url": a["source_url"], "confidence": a["confidence"],
+                  "found_by": "an AI check of public sources"}
+
+
 def event_view(e):
     """An event as the model reads it: the court's words capped, how it was checked."""
     return {k: e[k] for k in ("event_id", "event_type", "scope", "subsection", "effective_date", "court", "title",
                               "neutral_citation", "source_paragraph", "verified", "state", "provision_id",
                               "superseded_by")} | {"checked_by": checked_by(e["verified_by"]),
+                                                    "appeal": appeal_view(e.get("appeal")),
                                                     "operative_quote": e["operative_quote"][:MAX_QUOTE],
                                                     "scope_text": (e["scope_text"] or "")[:MAX_QUOTE] or None}
 

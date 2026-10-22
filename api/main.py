@@ -581,6 +581,19 @@ class Provision(ProvisionRef):
     source_url: str | None         # Kenya Law page of that version
 
 
+class Appeal(BaseModel):
+    """An appeal against the judgment behind a ruling that the later-appeal check found. It never changes the ruling's
+    state or the section's status: it says an appeal exists, with the source."""
+    status: str                    # 'appeal_pending'
+    case: str | None               # the appeal's name, as the source gives it
+    court: str | None
+    date: str | None               # YYYY-MM-DD or YYYY, as the source gives it
+    outcome: str | None            # one or two sentences summarised from the source (not the court's words)
+    source_url: str
+    confidence: str | None         # medium | high (low-confidence findings are not shown)
+    checked_by: str | None         # 'agent:…': found by an AI check of public sources
+
+
 class Event(BaseModel):
     event_id: int
     event_type: str                # declared_unconstitutional | read_down | severed | upheld | interpreted | reversed_on_appeal
@@ -599,6 +612,7 @@ class Event(BaseModel):
     state: str                     # 'in effect' | 'reversed on appeal' | 'displaced by a later ruling'
     superseded_by: int | None      # event_id of the event that reversed or displaced this one
     provision_id: str | None = None   # the ID the ruling was recorded on: an older numbering if the section was renumbered
+    appeal: Appeal | None = None   # a reported appeal against this ruling's judgment, if one was found
 
 
 class Numbering(BaseModel):

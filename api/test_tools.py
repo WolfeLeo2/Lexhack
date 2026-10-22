@@ -25,6 +25,27 @@ def test_declarations():
     expect("no params", "parameters" in d["list_acts"], False)
 
 
+S162 = "ke/act/cap-63/part_II__chp_XV__sec_162"      # EG (2019): an appeal is pending
+S159 = "ke/act/cap-63/part_II__chp_XV__sec_159"      # PAK: High Court ruling set aside on appeal (2026)
+
+
+def test_appeals():
+    """A reported appeal reaches the model in words, with its source; the raw checked_by tag does not."""
+    out = tools.get_section(S162)
+    ruled = [e for e in out["result"]["history"] if e["event_type"] == "upheld"]
+    ap = ruled[0]["appeal"]
+    expect("pending appeal shown", (ap["status"].startswith("an appeal against this judgment is reported pending"),
+                                    bool(ap["source_url"]), ap["found_by"]), (True, True, "an AI check of public sources"))
+    expect("no raw agent tag", "agent:" in str(out["result"]), False)
+    expect("a pending appeal does not change the status", out["result"]["status"],
+           "in force; its validity has been tested in court")
+    pak = tools.get_section(S159)["result"]
+    expect("reversal of an upheld ruling: wording", pak["status"],
+           "in force; a lower court's ruling on it was set aside on appeal")
+    expect("PAK High Court ruling is reversed", [e["state"] for e in pak["history"] if e["court"] == "High Court"],
+           ["reversed on appeal"])
+
+
 def test_get_section():
     out = tools.get_section(S204)
     shown = out["result"]["summary_events"] + out["result"]["history"]
@@ -220,7 +241,8 @@ def test_call():
 
 def main_():
     with main.POOL:   # opens the pool and closes it on exit
-        for t in (test_declarations, test_get_section, test_find_section, test_renumbered_pages, test_search_and_cases,
+        for t in (test_declarations, test_get_section, test_appeals, test_find_section, test_renumbered_pages,
+                  test_search_and_cases,
                   test_call):
             t()
     for f in fails:

@@ -14,7 +14,7 @@ history, would a careful Kenyan lawyer agree with the status and with each event
 - `interpreted` events never displace anything.
 - Status from the events still in effect: any `declared_unconstitutional` with scope total → "declared
   unconstitutional"; any other limiting event → "limited by a court"; else any `upheld` → "in force; its validity
-  has been tested in court"; else any `reversed_on_appeal` → "in force; earlier court limits were reversed"; else
+  has been tested in court"; else any `reversed_on_appeal` → "in force; earlier court limits were reversed" (or, when every reversal undid a ruling that upheld or interpreted the section rather than a limit, "in force; a lower court's ruling on it was set aside on appeal"); else
   "in force; interpreted by a court".
 
 Known weak spots to look for: a `reversed_on_appeal` event that is really an ordinary appeal and wrongly displaces

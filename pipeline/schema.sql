@@ -118,3 +118,19 @@ ALTER TABLE judgments ADD COLUMN IF NOT EXISTS duplicate_of TEXT REFERENCES judg
 -- earlier limits ('validates' | 'limits'), e.g. the 2021 Muruatetu directions. Labelled by agents (api/status_ke.py).
 ALTER TABLE citation_events ADD COLUMN IF NOT EXISTS issue TEXT;
 ALTER TABLE citation_events ADD COLUMN IF NOT EXISTS stance TEXT;
+
+-- What the later-appeal pass (pipeline/appeal_check.py) found about a judgment. Positive findings only: "none found" is
+-- absence of evidence, not a fact. Shown beside the judgment's rulings (api/status.py); it never changes a status.
+CREATE TABLE IF NOT EXISTS judgment_appeals (
+  judgment_id     TEXT PRIMARY KEY REFERENCES judgments,
+  later_history   TEXT NOT NULL CHECK (later_history IN
+                    ('appeal_pending', 'reversed', 'partly_reversed', 'upheld', 'appeal_withdrawn')),
+  appellate_case  TEXT,            -- the appeal's name, as the source gives it
+  appellate_court TEXT,
+  appellate_date  TEXT,            -- YYYY-MM-DD or YYYY, as the source gives it
+  outcome         TEXT,            -- one or two sentences, summarised from the source (not the court's words)
+  source_url      TEXT NOT NULL,
+  confidence      TEXT,            -- high | medium | low
+  checked_by      TEXT NOT NULL,   -- 'agent:claude-sonnet appeal check v1'
+  checked_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
