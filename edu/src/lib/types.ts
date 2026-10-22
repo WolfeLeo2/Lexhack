@@ -28,6 +28,8 @@ export interface CourtEvent {
   state: 'in effect' | 'reversed on appeal' | 'displaced by a later ruling'
   superseded_by: number | null
   affects_event_id?: number | null
+  issue?: string | null    // the legal point a ruling decides; displacement only on the same point
+  stance?: 'limits' | 'validates' | null   // which way an `interpreted` event cuts
   method?: 'manual' | 'extracted'
   check_verdict?: 'pass' | 'fail' | 'unsure' | null   // second-pass checker, extracted events only
   check_reason?: string | null
