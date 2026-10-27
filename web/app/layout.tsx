@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
-import { Search } from 'lucide-react'
 import { IBM_Plex_Sans, Newsreader } from 'next/font/google'
 import Link from 'next/link'
+import { MobileMenu } from '@/components/MobileMenu'
 import { SearchBox } from '@/components/SearchBox'
 import { Seal } from '@/components/Seal'
 import { THEME_SCRIPT, ThemeToggle } from '@/components/ThemeToggle'
@@ -10,7 +10,14 @@ import './globals.css'
 const plex = IBM_Plex_Sans({ subsets: ['latin'], weight: ['400', '500', '600'], variable: '--font-plex' })
 const newsreader = Newsreader({ subsets: ['latin'], style: ['normal', 'italic'], axes: ['opsz'], variable: '--font-newsreader' })
 
-const siteUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL
+const NAV = [
+  { href: '/acts', label: 'Acts' },
+  { href: '/check', label: 'Check a filing' },
+  { href: '/ask', label: 'Ask' },
+  { href: '/about', label: 'About' },
+]
+
+const siteUrl =process.env.VERCEL_PROJECT_PRODUCTION_URL
   ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
   : process.env.VERCEL_URL
     ? `https://${process.env.VERCEL_URL}`
@@ -48,34 +55,26 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:bg-paper focus:px-3 focus:py-2">
           Skip to content
         </a>
-        <header className="sticky top-0 z-40 border-b border-rule bg-paper/85 backdrop-blur-md">
-          <div className="mx-auto flex max-w-6xl items-center gap-4 px-5 py-3 sm:gap-6 sm:px-8">
-            <Link href="/" className="flex items-center gap-2.5" aria-label="Hakiki home">
+        <header className="sticky top-0 z-40 border-b border-rule bg-paper">
+          <div className="mx-auto flex max-w-6xl items-center gap-4 px-5 py-1.5 md:gap-6 md:px-8">
+            <Link href="/" className="flex min-h-11 items-center gap-2.5" aria-label="Hakiki home">
               <Seal className="h-8 w-8 text-seal" />
               <span className="statute text-[1.4rem] leading-none font-medium tracking-[-0.01em]">Hakiki</span>
             </Link>
-            <nav className="flex gap-4 text-[0.95rem] text-ink-2 sm:gap-5" aria-label="Main">
-              <Link href="/acts" className="hover:text-ink">
-                Acts
-              </Link>
-              <Link href="/check" className="whitespace-nowrap hover:text-ink">
-                <span className="sm:hidden">Check</span>
-                <span className="hidden sm:inline">Check a filing</span>
-              </Link>
-              <Link href="/ask" className="hover:text-ink">
-                Ask
-              </Link>
-              <Link href="/about" className="hover:text-ink">
-                About
-              </Link>
+            <nav className="hidden gap-5 text-[0.95rem] text-ink-2 md:flex" aria-label="Main">
+              {NAV.map((l) => (
+                <Link key={l.href} href={l.href} className="inline-flex min-h-11 items-center whitespace-nowrap hover:text-ink">
+                  {l.label}
+                </Link>
+              ))}
             </nav>
-            <div className="ml-auto hidden w-full max-w-sm sm:block">
+            <div className="ml-auto hidden w-full max-w-sm md:block">
               <SearchBox size="sm" />
             </div>
-            <Link href="/search" className="ml-auto text-ink-2 hover:text-ink sm:hidden" aria-label="Search sections">
-              <Search className="h-5 w-5" aria-hidden />
-            </Link>
-            <ThemeToggle />
+            <div className="hidden md:block">
+              <ThemeToggle />
+            </div>
+            <MobileMenu links={NAV} />
           </div>
         </header>
         <main id="main" className="mx-auto max-w-6xl px-5 sm:px-8">

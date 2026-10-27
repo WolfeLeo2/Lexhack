@@ -1,6 +1,7 @@
 'use client'
-import { ArrowUp, History, Plus } from 'lucide-react'
+import { Add01Icon, ArrowUp01Icon, Clock01Icon } from '@hugeicons/core-free-icons'
 import { useEffect, useRef, useState } from 'react'
+import { Glyph } from '@/components/Glyph'
 import type { ChatEvent } from '@/lib/answer'
 import { TurnView } from './AnswerView'
 import { ChatList, HistorySheet, plural } from './History'
@@ -162,15 +163,15 @@ export function Ask() {
       {active && (
         <div className="mb-8 flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-b border-rule pb-4">
           <p className="text-sm text-ink-2">
-            {plural(turns.length, 'question')} in this chat{store === 'off' ? ' · not kept after you leave' : ' · kept in this browser'}
+            {plural(turns.length, 'question')} in this chat{store === 'off' ? ', not kept after you leave' : ', kept in this browser'}
           </p>
           <div className="flex items-center gap-2 text-sm">
             <button
               type="button"
               onClick={() => open(null)}
-              className="inline-flex items-center gap-1.5 rounded-sm border border-rule bg-paper px-3 py-1.5 transition-colors hover:border-ink"
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-sm border border-rule bg-paper px-3 py-1.5 transition-colors hover:border-ink"
             >
-              <Plus className="h-3.5 w-3.5" aria-hidden />
+              <Glyph icon={Add01Icon} className="h-3.5 w-3.5" />
               New chat
             </button>
             <button
@@ -180,9 +181,9 @@ export function Ask() {
                 setSheet(true)
               }}
               aria-haspopup="dialog"
-              className="inline-flex items-center gap-1.5 rounded-sm border border-rule bg-panel px-3 py-1.5 text-ink-2 transition-colors hover:border-ink hover:text-ink"
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-sm border border-rule bg-panel px-3 py-1.5 text-ink-2 transition-colors hover:border-ink hover:text-ink"
             >
-              <History className="h-3.5 w-3.5" aria-hidden />
+              <Glyph icon={Clock01Icon} className="h-3.5 w-3.5" />
               Your chats ({chats.length})
             </button>
           </div>
@@ -212,7 +213,7 @@ export function Ask() {
           </label>
           <ModeToggle mode={mode} onChange={setMode} />
         </div>
-        <div className="mt-3 flex items-end gap-3 rounded-md border border-rule bg-paper p-2 focus-within:border-ink-2">
+        <div className="mt-3 flex items-end gap-3 rounded-md border border-edge bg-paper p-2 focus-within:border-ink focus-within:ring-1 focus-within:ring-ink">
           <textarea
             id="ask-q"
             value={q}
@@ -227,15 +228,15 @@ export function Ask() {
             rows={2}
             placeholder={mode === 'draft' ? 'Draft a submission paragraph on…' : 'Is this section still good law? What did the court decide in…?'}
             aria-describedby="ask-hint"
-            className="min-h-[3.5rem] w-full resize-y bg-transparent px-2 py-1.5 outline-none placeholder:text-ink-2/70"
+            className="min-h-[3.5rem] w-full resize-y bg-transparent px-2 py-1.5 outline-none placeholder:text-ink-2"
           />
           <button
             type="submit"
             disabled={pending || !q.trim()}
-            className="ask-send grid h-10 w-10 shrink-0 place-items-center rounded-full bg-ink text-paper disabled:opacity-35"
+            className="ask-send grid h-11 w-11 shrink-0 place-items-center rounded-full bg-ink text-paper disabled:opacity-35"
             aria-label={mode === 'draft' ? 'Draft' : 'Ask'}
           >
-            <ArrowUp className="h-5 w-5" aria-hidden />
+            <Glyph icon={ArrowUp01Icon} className="h-5 w-5" />
           </button>
         </div>
         <p id="ask-hint" className="mt-2 text-sm text-ink-2">
@@ -255,7 +256,7 @@ export function Ask() {
                 <button
                   type="button"
                   onClick={() => ask(ex, turns, mode)}
-                  className="ask-chip rounded-full border border-note-rule bg-note px-3.5 py-1.5 text-left text-[0.95rem]"
+                  className="ask-chip inline-flex min-h-11 items-center rounded-full border border-note-rule bg-note px-3.5 py-1.5 text-left text-[0.95rem]"
                   style={{ ['--i' as string]: k }}
                 >
                   {ex}
@@ -282,21 +283,41 @@ export function Ask() {
   )
 }
 
-/** Answer | Draft: two toggle buttons, the pressed one is the mode. */
+const MODES = [
+  ['answer', 'Answer'],
+  ['draft', 'Draft'],
+] as const
+
+/**
+ * Answer | Draft. A second copy of the labels in the active colours sits on top, clipped to the chosen half: the dark pill
+ * slides and each label changes colour in one movement, with no separate colour timing to line up. The two halves are
+ * equal width, so the clip is plain percentages.
+ */
 function ModeToggle({ mode, onChange }: { mode: Mode; onChange: (m: Mode) => void }) {
   return (
-    <div role="group" aria-label="Mode" className="inline-flex rounded-full border border-rule bg-paper p-0.5 text-sm">
-      {(['answer', 'draft'] as const).map((m) => (
+    <div role="group" aria-label="Mode" className="relative inline-grid grid-cols-2 rounded-full border border-rule bg-paper p-0.5 text-sm">
+      {MODES.map(([m, label]) => (
         <button
           key={m}
           type="button"
           aria-pressed={mode === m}
           onClick={() => onChange(m)}
-          className={`ask-mode rounded-full px-3.5 py-1 ${mode === m ? 'bg-ink text-paper' : 'text-ink-2 hover:text-ink'}`}
+          className="ask-mode min-h-11 rounded-full px-5 py-1 text-ink-2 hover:text-ink focus-visible:rounded-full"
         >
-          {m === 'answer' ? 'Answer' : 'Draft'}
+          {label}
         </button>
       ))}
+      <div
+        aria-hidden
+        className="ask-mode-clip pointer-events-none absolute inset-0.5 grid grid-cols-2 rounded-full bg-ink text-paper"
+        style={{ clipPath: mode === 'answer' ? 'inset(0 50% 0 0 round 9999px)' : 'inset(0 0 0 50% round 9999px)' }}
+      >
+        {MODES.map(([m, label]) => (
+          <span key={m} className="grid place-items-center px-5 py-1">
+            {label}
+          </span>
+        ))}
+      </div>
     </div>
   )
 }

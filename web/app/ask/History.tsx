@@ -1,8 +1,9 @@
 'use client'
 // Earlier chats: one list, shown on the empty page and in a side sheet (a native <dialog>: focus moves in, is trapped,
 // Escape closes it, focus returns to the button that opened it).
-import { Plus, Undo2, X } from 'lucide-react'
+import { Add01Icon, Cancel01Icon, Undo02Icon } from '@hugeicons/core-free-icons'
 import { type ReactNode, useEffect, useRef } from 'react'
+import { Glyph } from '@/components/Glyph'
 import type { Chat, Store } from './useChats'
 
 function timeAgo(ms: number): string {
@@ -57,7 +58,7 @@ export function ChatList({ chats, activeId, store, removed, onOpen, onRemove, on
           <p className="step-in mb-3 flex flex-wrap items-center gap-x-3 rounded-md border border-note-rule bg-note px-3 py-2 text-sm">
             <span className="min-w-0 truncate">{removed.length === 1 ? `Removed “${clip(removed[0].title)}”.` : `Removed ${plural(removed.length, 'chat')}.`}</span>
             <button ref={undoRef} type="button" onClick={onUndo} className="link inline-flex items-center gap-1 text-gazette underline underline-offset-[3px]">
-              <Undo2 className="h-3.5 w-3.5" aria-hidden />
+              <Glyph icon={Undo02Icon} className="h-3.5 w-3.5" />
               Undo
             </button>
           </p>
@@ -79,9 +80,9 @@ export function ChatList({ chats, activeId, store, removed, onOpen, onRemove, on
                   <span className="statute line-clamp-2 text-lg leading-snug break-words text-ink transition-colors group-hover:text-gazette">{c.title}</span>
                   <span className="mt-1 flex flex-wrap items-center gap-x-2 text-sm text-ink-2">
                     {draft && <span className="rounded-sm border border-rule px-1.5 text-xs">Draft</span>}
-                    <span>{plural(c.turns.length, 'question')}</span>
-                    <span aria-hidden>·</span>
-                    <span>{timeAgo(c.updatedAt)}</span>
+                    <span>
+                      {plural(c.turns.length, 'question')}, {timeAgo(c.updatedAt)}
+                    </span>
                     {active && <span className="sr-only">(open now)</span>}
                   </span>
                 </button>
@@ -92,7 +93,7 @@ export function ChatList({ chats, activeId, store, removed, onOpen, onRemove, on
                   title="Remove this chat"
                   className="mt-2.5 shrink-0 rounded-sm p-2 text-ink-2 transition-colors hover:bg-panel hover:text-ink"
                 >
-                  <X className="h-4 w-4" aria-hidden />
+                  <Glyph icon={Cancel01Icon} className="h-4 w-4" />
                 </button>
               </li>
             )
@@ -127,23 +128,23 @@ export function HistorySheet({ open, onClose, onNew, children }: { open: boolean
       onClose={onClose}
       onClick={(e) => e.target === ref.current && onClose()} // the backdrop
       aria-labelledby="chats-h"
-      className="history-sheet paper-grain fixed inset-y-0 right-0 left-auto m-0 h-dvh max-h-dvh w-full max-w-md border-l border-rule bg-paper p-0 text-ink shadow-[-8px_0_24px_-12px_rgba(24,33,43,0.35)] backdrop:bg-ink/30"
+      className="history-sheet paper-grain fixed inset-y-0 right-0 left-auto m-0 h-dvh max-h-dvh w-full max-w-md border-l border-rule bg-paper p-0 text-ink shadow-[-8px_0_24px_-12px_rgb(var(--shadow-rgb)/0.35)] backdrop:bg-ink/30"
     >
       <div className="flex h-full flex-col p-6 sm:p-8">
         <div className="flex items-start justify-between gap-4 border-b border-rule pb-4">
           <h2 id="chats-h" className="statute text-2xl font-medium tracking-tight">
             Your chats
           </h2>
-          <button type="button" onClick={onClose} className="rounded-sm border border-rule px-2.5 py-1 text-sm text-ink-2 hover:border-ink hover:text-ink">
+          <button type="button" onClick={onClose} className="min-h-11 min-w-11 rounded-sm border border-rule px-3 py-1 text-sm text-ink-2 hover:border-ink hover:text-ink">
             Close
           </button>
         </div>
         <button
           type="button"
           onClick={onNew}
-          className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-sm border border-rule bg-panel px-4 py-2.5 text-sm font-medium transition-colors hover:border-ink"
+          className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-sm border border-rule bg-panel px-4 py-2.5 text-sm font-medium transition-colors hover:border-ink"
         >
-          <Plus className="h-4 w-4" aria-hidden />
+          <Glyph icon={Add01Icon} className="h-4 w-4" />
           New chat
         </button>
         <div className="mt-4 -mr-2 flex-1 overflow-y-auto pr-2">{children}</div>

@@ -1,5 +1,6 @@
-import { ExternalLink } from 'lucide-react'
+import { LinkSquare01Icon } from '@hugeicons/core-free-icons'
 import Link from 'next/link'
+import { Glyph } from '@/components/Glyph'
 import type { CitingJudgment } from '@/lib/api'
 import { fmtDate, shortCase } from '@/lib/format'
 import { cleanUrl, tidySpaces } from '@/lib/text'
@@ -26,7 +27,7 @@ export function Citations({ total, judgments, more }: { total: number; judgments
                 {url && (
                   <a href={url} className="link inline-flex items-center gap-1 whitespace-nowrap" target="_blank" rel="noreferrer">
                     Read it
-                    <ExternalLink className="h-3.5 w-3.5" aria-hidden />
+                    <Glyph icon={LinkSquare01Icon} className="h-3.5 w-3.5" />
                     <span className="sr-only">(opens Kenya Law in a new tab)</span>
                   </a>
                 )}

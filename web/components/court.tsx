@@ -1,4 +1,5 @@
-import { ExternalLink, Hourglass } from 'lucide-react'
+import { HourglassIcon, LinkSquare01Icon } from '@hugeicons/core-free-icons'
+import { Glyph } from '@/components/Glyph'
 import type { Appeal, CourtEvent } from '@/lib/api'
 import { EVENT_LABEL, cap, fmtDate, shortCase } from '@/lib/format'
 import { cleanUrl, locator, tidySpaces } from '@/lib/text'
@@ -67,7 +68,7 @@ export function Attribution({ e }: { e: CourtEvent }) {
       {url && (
         <a href={url} className="link inline-flex items-center gap-1 whitespace-nowrap" target="_blank" rel="noreferrer">
           Read the judgment
-          <ExternalLink className="h-3.5 w-3.5" aria-hidden />
+          <Glyph icon={LinkSquare01Icon} className="h-3.5 w-3.5" />
           <span className="sr-only">(opens Kenya Law in a new tab)</span>
         </a>
       )}
@@ -80,7 +81,7 @@ export function AppealNote({ a }: { a: Appeal }) {
   const href = cleanUrl(a.source_url)
   return (
     <p className="mt-2 flex items-start gap-2 text-sm text-ink-2">
-      <Hourglass className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+      <Glyph icon={HourglassIcon} className="mt-0.5 h-4 w-4 shrink-0" />
       <span>
         <strong className="font-medium text-ink">An appeal is reported pending</strong>
         {a.court && <> ({a.court})</>}. {a.outcome}{' '}
@@ -88,7 +89,7 @@ export function AppealNote({ a }: { a: Appeal }) {
           <>
             <a href={href} className="link inline-flex items-center gap-1 whitespace-nowrap" target="_blank" rel="noreferrer">
               Source
-              <ExternalLink className="h-3.5 w-3.5" aria-hidden />
+              <Glyph icon={LinkSquare01Icon} className="h-3.5 w-3.5" />
               <span className="sr-only">(opens in a new tab)</span>
             </a>
             .{' '}

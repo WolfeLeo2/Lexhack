@@ -115,7 +115,7 @@ export function Lineage({ events }: { events: CourtEvent[] }) {
               onFocus={() => setActive(e.event_id)}
               onBlur={() => setActive(null)}
               style={{ opacity: dim ? 0.35 : 1, transition: 'opacity 0.2s' }}
-              className="cursor-pointer outline-none"
+              className="cursor-pointer"
             >
               <g className="lineage-node" style={{ transformOrigin: `${p.x}px ${p.y}px`, animationDelay: `${step * order.get(e.event_id)!}s` }}>
               <circle cx={p.x} cy={p.y} r="16" fill="transparent" />

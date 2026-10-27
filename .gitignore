@@ -3,13 +3,13 @@
 *.warc.gz
 *.db
 data/
+docs/leo
 # the edu site's demo data: small exports (13 sections, 20 judgments), needed to build it
 !edu/src/data/
 parsed/
 .venv/
 __pycache__/
 .neon
-node_modules/
 node_modules/
 .DS_Store
 .idea/

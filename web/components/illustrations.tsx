@@ -34,7 +34,7 @@ export function Shelf({ acts }: { acts: Act[] }) {
           const ink = BINDINGS[i % BINDINGS.length]
           return (
             <li key={a.act_id}>
-              <Link href={actHref(a.act_id)} className="group block outline-none" aria-label={`${a.title}, ${a.versions.length} versions`}>
+              <Link href={actHref(a.act_id)} className="group block" aria-label={`${a.title}, ${a.versions.length} versions`}>
                 <svg viewBox={`0 0 ${w} ${h}`} width={w} height={h} className="spine block" aria-hidden>
                   <rect x="0.5" y="0.5" width={w - 1} height={h - 1} rx="3" fill={ink} />
                   <rect x="0.5" y="0.5" width="5" height={h - 1} rx="2" fill="#fff" opacity=".08" />

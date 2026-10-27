@@ -27,7 +27,7 @@ export function SectionList({ sections }: { sections: ActSection[] }) {
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Filter by number or heading, e.g. 204"
-            className="w-full rounded-md border border-rule bg-paper/80 px-3 py-2 placeholder:text-ink-2/70 focus:border-ink focus:outline-none"
+            className="w-full rounded-md border border-edge bg-paper/80 px-3 py-2 placeholder:text-ink-2 focus:border-ink focus:outline-none"
           />
         </label>
         <fieldset className="flex flex-wrap gap-x-5 gap-y-2 text-[0.95rem] text-ink-2">

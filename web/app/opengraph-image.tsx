@@ -4,6 +4,17 @@ export const alt = 'Hakiki: is this section still good law?'
 export const size = { width: 1200, height: 630 }
 export const contentType = 'image/png'
 
+// The OG renderer cannot read CSS variables, so the page's inks live here once: seal and ink match globals.css.
+const INK = {
+  paper: '#FAF7F2',
+  seal: '#8E2C48',
+  ink: '#18212B',
+  ink2: '#4B5563',
+  rule: '#E5E0D8',
+  muted: '#6B7280',
+}
+const SERIF = 'serif'
+
 export default async function Image() {
   return new ImageResponse(
     (
@@ -15,8 +26,8 @@ export default async function Image() {
           flexDirection: 'column',
           justifyContent: 'space-between',
           padding: '72px 80px',
-          backgroundColor: '#FAF7F2',
-          border: '14px solid #8E2C48',
+          backgroundColor: INK.paper,
+          border: `14px solid ${INK.seal}`,
         }}
       >
         {/* Header: Seal + Wordmark */}
@@ -26,13 +37,13 @@ export default async function Image() {
               width: '76px',
               height: '76px',
               borderRadius: '50%',
-              border: '3.5px solid #8E2C48',
+              border: `3.5px solid ${INK.seal}`,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               fontSize: '44px',
-              color: '#8E2C48',
-              fontFamily: 'serif',
+              color: INK.seal,
+              fontFamily: SERIF,
             }}
           >
             §
@@ -41,9 +52,9 @@ export default async function Image() {
             style={{
               fontSize: '52px',
               fontWeight: 600,
-              color: '#18212B',
+              color: INK.ink,
               letterSpacing: '-0.02em',
-              fontFamily: 'serif',
+              fontFamily: SERIF,
             }}
           >
             Hakiki
@@ -56,9 +67,9 @@ export default async function Image() {
             style={{
               fontSize: '58px',
               fontWeight: 600,
-              color: '#18212B',
+              color: INK.ink,
               lineHeight: 1.15,
-              fontFamily: 'serif',
+              fontFamily: SERIF,
             }}
           >
             Is this section still good law?
@@ -66,7 +77,7 @@ export default async function Image() {
           <div
             style={{
               fontSize: '26px',
-              color: '#4B5563',
+              color: INK.ink2,
               maxWidth: '960px',
               lineHeight: 1.45,
             }}
@@ -82,11 +93,11 @@ export default async function Image() {
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            borderTop: '2px solid #E5E0D8',
+            borderTop: `2px solid ${INK.rule}`,
             paddingTop: '24px',
           }}
         >
-          <span style={{ fontSize: '20px', color: '#6B7280' }}>
+          <span style={{ fontSize: '20px', color: INK.muted }}>
             Kenya Law Citator
           </span>
         </div>

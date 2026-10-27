@@ -58,25 +58,32 @@ export default async function ProvisionPage(props: Props) {
   return (
     <article className="pt-8">
       <nav aria-label="Breadcrumb" className="text-[0.95rem] text-ink-2">
-        <Link href="/acts" className="hover:text-ink">
+        <Link href="/acts" className="inline-flex min-h-11 items-center hover:text-ink">
           Acts
         </Link>
         <span aria-hidden> / </span>
-        <Link href={actHref(p.act_id)} className="hover:text-ink">
+        <Link href={actHref(p.act_id)} className="inline-flex min-h-11 items-center hover:text-ink">
           {p.act_title}
         </Link>
         <span aria-hidden> / </span>
         <span aria-current="page">Section {p.number}</span>
       </nav>
 
-      <div className="mt-8 grid grid-cols-1 gap-x-14 gap-y-10 lg:grid-cols-[minmax(0,1fr)_22rem]">
-        <div>
+      <header className="mt-8 flex flex-wrap items-end justify-between gap-x-10 gap-y-6">
+        <div className="min-w-0">
           <p className="statute text-lg text-ink-2">
             {p.act_title}, section {p.number}
           </p>
-          <h1 className="statute mt-1 text-[2.5rem] leading-[1.1] font-medium tracking-[-0.015em] sm:text-[3.2rem]">
+          <h1 className="statute mt-1 min-w-0 text-[2.5rem] leading-[1.1] font-medium tracking-[-0.015em] [overflow-wrap:break-word] sm:text-[3.2rem]">
             {p.heading ?? `Section ${p.number}`}
           </h1>
+        </div>
+        <StatusStamp status={status} />
+      </header>
+
+      {/* The law's text stays in view while you read what the courts said about it. */}
+      <div className="mt-10 grid grid-cols-1 gap-x-14 gap-y-10 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
+        <div className="lg:sticky lg:top-24 lg:max-h-[calc(100dvh-7rem)] lg:self-start lg:overflow-y-auto">
           <StatuteText text={stripHead(p.text, p.number, p.heading)} number={p.number} />
           <p className="mt-3 text-sm text-ink-2">
             Text as published by Kenya Law, version of {fmtDate(p.version_date)}.{' '}
@@ -89,10 +96,9 @@ export default async function ProvisionPage(props: Props) {
           </p>
         </div>
 
-        <aside className="lg:pt-16" aria-label="Status">
-          <StatusStamp status={status} />
+        <aside aria-label="What the courts said">
           {(from || to) && (
-            <p className="mt-4 text-[0.95rem] text-ink-2">
+            <p className="mb-6 text-[0.95rem] text-ink-2">
               {to ? (
                 <>
                   Kenya Law renumbered this section from the version of {fmtDate(to.versions[0])}: it is now{' '}

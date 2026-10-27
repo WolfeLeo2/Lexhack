@@ -104,7 +104,7 @@ export default async function AboutPage() {
       <dl className="mt-4 divide-y divide-rule border-y border-rule">
         {STATUSES.map(([label, meaning]) => (
           <div key={label} className="grid gap-x-6 gap-y-1 py-3 sm:grid-cols-[16rem_minmax(0,1fr)]">
-            <dt className="statute text-lg text-seal">{label}</dt>
+            <dt className="statute text-lg">{label}</dt>
             <dd className="text-ink-2">{meaning}</dd>
           </div>
         ))}
@@ -130,8 +130,8 @@ export default async function AboutPage() {
           {plural(s.verified_sections, 'section')}, each read against the full judgment, with the operative words
           copied exactly. Each is labelled with who checked it: {plural(s.person_events, 'ruling')} by a person,{' '}
           {plural(s.agent_events, 'ruling')} by an AI reviewer. The AI reviewer reads the judgment itself and is held to
-          a benchmark: on 111 events reviewed blind by two earlier reviewers, every ruling it accepted was right, and it
-          kept 59 of 63 real ones.
+          a benchmark: on 111 events reviewed blind by two earlier reviewers, all 59 rulings it accepted were right, and it
+          kept 59 of the 63 real ones.
         </li>
         <li>
           <strong className="font-medium">Leads:</strong> {plural(s.leads, 'possible ruling')} on{' '}
@@ -155,7 +155,7 @@ export default async function AboutPage() {
         {CHECKER_SCORES.map(([what, score, note]) => (
           <div key={what} className="grid gap-x-6 gap-y-1 py-3 sm:grid-cols-[16rem_7rem_minmax(0,1fr)]">
             <dt className="text-ink">{what}</dt>
-            <dd className="statute text-lg text-seal tabular-nums">{score}</dd>
+            <dd className="statute text-lg tabular-nums">{score}</dd>
             <dd className="text-ink-2">{note}</dd>
           </div>
         ))}

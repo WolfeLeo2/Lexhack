@@ -40,7 +40,14 @@ export function Checker() {
     setReading(file.name)
     const form = new FormData()
     form.append('file', file)
-    const r = await readFiling(form)
+    let r: Awaited<ReturnType<typeof readFiling>>
+    try {
+      r = await readFiling(form)
+    } catch {
+      // the action itself failed (connection dropped, body refused): the overlay must not stay up
+      setReading(null)
+      return setReadNote({ ok: false, text: 'The file didn’t reach Hakiki. Check your connection and try again, or paste the text.' })
+    }
     setReading(null)
     if ('error' in r) return setReadNote({ ok: false, text: r.error })
     setText(r.text)
@@ -62,33 +69,27 @@ export function Checker() {
   }, [state.report])
 
   async function loadExhibit(name: string) {
-    setExhibit(name)
-    setOcr(false)
-    setText(await (await fetch(`/demo/${name}.txt`)).text())
+    setReadNote(null)
+    try {
+      const res = await fetch(`/demo/${name}.txt`)
+      if (!res.ok) throw new Error(String(res.status)) // a 404 page must never land in the filing box
+      setText(await res.text())
+      setExhibit(name)
+      setOcr(false)
+    } catch {
+      setReadNote({ ok: false, text: 'Couldn’t load that example. Try again in a moment.' })
+    }
   }
 
   return (
     <>
       <form action={action} className="mt-6">
-        <div role="group" aria-label="Synthetic example filings" className="-mb-px flex items-end gap-1.5 overflow-x-auto pt-1 pl-3">
-          {EXHIBITS.map(([name, label], k) => (
-            <button
-              key={name}
-              type="button"
-              aria-pressed={exhibit === name}
-              onClick={() => loadExhibit(name)}
-              className="exhibit-tab shrink-0 rounded-t-md border border-b-0 border-note-rule bg-note px-3.5 pt-1.5 pb-2 text-left aria-pressed:border-rule aria-pressed:bg-paper"
-            >
-              <span className="block text-xs text-ink-2">Exhibit {'ABC'[k]}</span>
-              <span className="block text-[0.95rem]">{label}</span>
-            </button>
-          ))}
-          <span className="shrink-0 pb-2 pl-2 text-sm text-ink-2">Synthetic examples, written by us</span>
+        <div className="-mb-px flex flex-wrap items-end gap-x-1.5 gap-y-1.5 pt-1 sm:flex-nowrap sm:pl-3">
           <button
             type="button"
             onClick={() => picker.current?.click()}
             disabled={!!reading}
-            className="exhibit-tab group ml-auto flex shrink-0 items-center gap-2 rounded-t-md border border-b-0 border-rule bg-panel px-3.5 pt-1.5 pb-2 text-left disabled:opacity-60"
+            className="exhibit-tab group flex min-h-11 w-full items-center gap-2 whitespace-nowrap rounded-t-md border border-b-0 border-rule bg-panel px-3.5 pt-1.5 pb-2 text-left disabled:opacity-60 sm:w-auto sm:shrink-0"
           >
             <svg viewBox="0 0 20 20" className="h-5 w-5 text-ink-2 transition-transform group-hover:-rotate-12" aria-hidden fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
               <path d="M13.5 6.5 7.8 12.2a1.6 1.6 0 0 0 2.3 2.3l6-6a3.2 3.2 0 0 0-4.5-4.5l-6.2 6.2a4.8 4.8 0 0 0 6.8 6.8l4.2-4.2" />
@@ -98,6 +99,24 @@ export function Checker() {
               <span className="block text-[0.95rem]">Upload PDF or DOCX</span>
             </span>
           </button>
+          {/* the examples scroll sideways on a phone; the upload button stays put above them */}
+          <div className="flex min-w-0 basis-full items-end gap-1.5 overflow-x-auto sm:flex-1 sm:basis-auto">
+            <span className="shrink-0 pb-2 pl-1 text-sm whitespace-nowrap text-ink-2 sm:pl-2">Synthetic examples, written by us</span>
+            <div role="group" aria-label="Synthetic example filings" className="flex items-end gap-1.5">
+              {EXHIBITS.map(([name, label], k) => (
+                <button
+                  key={name}
+                  type="button"
+                  aria-pressed={exhibit === name}
+                  onClick={() => loadExhibit(name)}
+                  className="exhibit-tab min-h-11 shrink-0 rounded-t-md border border-b-0 border-note-rule bg-note px-3.5 pt-1.5 pb-2 text-left aria-pressed:border-rule aria-pressed:bg-paper"
+                >
+                  <span className="block text-xs text-ink-2">Exhibit {'ABC'[k]}</span>
+                  <span className="block text-[0.95rem]">{label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
           <input
             ref={picker}
             type="file"
@@ -125,7 +144,7 @@ export function Checker() {
             setDragging(false)
             readFile(e.dataTransfer.files[0])
           }}
-          className={`relative overflow-hidden rounded-sm bg-paper shadow-[0_1px_0_var(--color-rule),0_22px_44px_-30px_rgba(24,33,43,0.55)] ring-1 ring-rule ${pending || reading ? 'scan' : ''} ${fed ? 'feed-in' : ''}`}
+          className={`relative overflow-hidden rounded-sm bg-paper shadow-[0_1px_0_var(--color-rule),0_22px_44px_-30px_rgb(var(--shadow-rgb)/0.55)] ring-1 ring-edge focus-within:ring-2 focus-within:ring-gazette ${pending || reading ? 'scan' : ''} ${fed ? 'feed-in' : ''}`}
         >
           {(dragging || reading) && (
             <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 border-2 border-dashed border-gazette bg-paper/85 text-ink-2" aria-live="polite">
@@ -152,7 +171,7 @@ export function Checker() {
             }}
             rows={14}
             placeholder="Paste a filing here, drop a PDF or DOCX on this page, or open one of the exhibits above."
-            className="ruled statute block min-h-[24.5rem] w-full resize-y bg-transparent py-4 pr-5 pl-14 text-[1.02rem] placeholder:text-ink-2/70 focus:outline-none"
+            className="ruled statute block min-h-[24.5rem] w-full resize-y bg-transparent py-4 pr-5 pl-14 text-[1.02rem] placeholder:text-ink-2 focus:outline-none"
           />
         </div>
         <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
@@ -164,11 +183,22 @@ export function Checker() {
             disabled={pending}
             className="group inline-flex items-center gap-2.5 rounded-md bg-ink px-5 py-2.5 font-medium text-paper transition-[transform,background-color] hover:bg-gazette active:scale-[0.97] disabled:opacity-70"
           >
-            <svg viewBox="0 0 20 20" className={`h-5 w-5 ${pending ? 'animate-spin' : 'transition-transform group-hover:-rotate-12'}`} aria-hidden fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+            <svg viewBox="0 0 20 20" className="h-5 w-5 transition-transform group-hover:-rotate-12" aria-hidden fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
               <circle cx="8.5" cy="8.5" r="5.5" />
               <path d="M12.5 12.5 17 17" />
             </svg>
-            {pending ? 'Reading the filing…' : 'Check citations'}
+            {pending ? (
+              <span role="status">
+                Checking
+                <span aria-hidden className="dots">
+                  <i>.</i>
+                  <i>.</i>
+                  <i>.</i>
+                </span>
+              </span>
+            ) : (
+              'Check citations'
+            )}
           </button>
         </div>
         {readNote && (
@@ -249,7 +279,7 @@ function Report({
       <div className="mt-8 grid gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <div className="lg:sticky lg:top-24 lg:self-start">
           <p className="mb-2 text-sm text-ink-2">The filing, marked up. Select a mark to read its note.</p>
-          <div className="statute max-h-[72vh] overflow-y-auto rounded-sm bg-paper p-6 leading-relaxed whitespace-pre-wrap shadow-[0_1px_0_var(--color-rule),0_22px_44px_-30px_rgba(24,33,43,0.55)] ring-1 ring-rule">
+          <div className="statute max-h-[72vh] overflow-y-auto rounded-sm bg-paper p-6 leading-relaxed whitespace-pre-wrap shadow-[0_1px_0_var(--color-rule),0_22px_44px_-30px_rgb(var(--shadow-rgb)/0.55)] ring-1 ring-rule">
             {splitAt(text, findings, (i, kept) => needsLook(findings[i]) && !needsLook(findings[kept])).map((p, i, parts) =>
               p.span === null ? (
                 <span key={i}>{p.text}</span>
@@ -282,7 +312,7 @@ function Report({
                 onMouseLeave={() => setActive(null)}
                 style={{ ['--i' as string]: i, ['--tilt' as string]: look ? `${i % 2 ? 0.5 : -0.5}deg` : '0deg' }}
                 className={`note-in relative scroll-mt-28 rounded-sm px-5 pt-5 pb-4 transition-shadow ${
-                  look ? 'bg-note shadow-[0_14px_30px_-20px_rgba(24,33,43,0.5)] ring-1 ring-note-rule' : 'ring-1 ring-rule'
+                  look ? 'bg-note shadow-[0_14px_30px_-20px_rgb(var(--shadow-rgb)/0.5)] ring-1 ring-note-rule' : 'ring-1 ring-rule'
                 } ${active === i ? 'ring-2 ring-ink' : ''}`}
               >
                 {look && (
@@ -328,7 +358,7 @@ function CaseLine({ c }: { c: CaseCheck }) {
             <li
               key={k.judgment_id}
               style={{ ['--i' as string]: n, ['--tilt' as string]: `${n % 2 ? 0.8 : -0.8}deg` }}
-              className="candidate-card relative rounded-sm bg-paper px-3.5 pt-2.5 pb-2 shadow-[0_8px_18px_-14px_rgba(24,33,43,0.6)] ring-1 ring-rule"
+              className="candidate-card relative rounded-sm bg-paper px-3.5 pt-2.5 pb-2 shadow-[0_8px_18px_-14px_rgb(var(--shadow-rgb)/0.6)] ring-1 ring-rule"
             >
               <span aria-hidden className="absolute -top-2 right-3 rounded-full bg-note px-1.5 text-xs text-ink-2 ring-1 ring-note-rule">
                 {n + 1}

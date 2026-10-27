@@ -1,6 +1,7 @@
 'use client'
-import { Moon, Sun } from 'lucide-react'
+import { Moon02Icon, Sun03Icon } from '@hugeicons/core-free-icons'
 import { useSyncExternalStore } from 'react'
+import { Glyph } from './Glyph'
 
 type Theme = 'light' | 'dark'
 
@@ -15,9 +16,11 @@ function subscribe(cb: () => void) {
 }
 const current = () => (document.documentElement.dataset.theme as Theme) ?? 'light'
 
-export function ThemeToggle() {
+/** Icon only in the header; `labelled` is the full-width row inside the mobile menu. */
+export function ThemeToggle({ labelled = false }: { labelled?: boolean }) {
   const theme = useSyncExternalStore(subscribe, current, () => null)
   const next: Theme = theme === 'dark' ? 'light' : 'dark'
+  const icon = theme && (theme === 'dark' ? <Glyph key="moon" icon={Moon02Icon} className="theme-icon h-[1.15rem] w-[1.15rem]" /> : <Glyph key="sun" icon={Sun03Icon} className="theme-icon h-[1.15rem] w-[1.15rem]" />)
   return (
     <button
       type="button"
@@ -27,16 +30,16 @@ export function ThemeToggle() {
           localStorage.setItem('theme', next)
         } catch {}
       }}
-      aria-label={`Switch to ${next} theme`}
+      aria-label={labelled ? undefined : `Switch to ${next} theme`}
       title={`Switch to ${next} theme`}
-      className="grid h-9 w-9 shrink-0 place-items-center rounded-md text-ink-2 transition-colors hover:bg-panel hover:text-ink"
+      className={
+        labelled
+          ? 'flex min-h-11 w-full items-center gap-3 px-5 text-left text-ink-2 transition-colors hover:bg-panel hover:text-ink'
+          : 'grid h-11 w-11 shrink-0 place-items-center rounded-md text-ink-2 transition-colors hover:bg-panel hover:text-ink'
+      }
     >
-      {theme &&
-        (theme === 'dark' ? (
-          <Moon key="moon" className="theme-icon h-[1.15rem] w-[1.15rem]" aria-hidden />
-        ) : (
-          <Sun key="sun" className="theme-icon h-[1.15rem] w-[1.15rem]" aria-hidden />
-        ))}
+      {labelled ? <span className="grid h-5 w-5 place-items-center">{icon}</span> : icon}
+      {labelled && `Switch to ${next} theme`}
     </button>
   )
 }

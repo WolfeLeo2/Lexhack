@@ -14,7 +14,7 @@ export default function CheckPage() {
             Paste or upload a submission, pleading or judgment (PDF, DOCX or text). Hakiki finds every case and section it cites, then reports what the sources say: whether we hold the case, whether the
             quoted words are really in it, and what the courts have done to each section.
           </p>
-          <p className="mt-3 text-[0.95rem] text-ink-2">Your text or file is checked and thrown away. Nothing is stored.</p>
+          <p className="mt-3 text-[0.95rem] text-ink-2">Hakiki reads your text or file, checks it against its records and discards it. It does not save either.</p>
         </div>
         <FilingUnderGlass className="mx-auto hidden w-full max-w-[22rem] lg:block" />
       </section>

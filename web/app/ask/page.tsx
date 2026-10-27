@@ -14,9 +14,10 @@ export default function AskPage() {
             Ask about a section of a Kenyan Act or a court ruling in plain words. Hakiki looks it up in its own records and
             answers with the section’s status and the court’s words, linked to each judgment.
           </p>
-          <p className="mt-4 max-w-[60ch] border-l-2 border-seal/60 pl-3 text-[0.95rem] text-ink-2">
+          <p className="mt-4 max-w-[60ch] text-[0.95rem] text-ink-2">
             Hakiki reports what published sources say. It is not legal advice. Answers are written by an AI model from
-            Hakiki’s records; the court’s words are quoted from the database, never by the model.
+            Hakiki’s records; the court’s words are quoted from the database, never by the model. Your question is sent to
+            Google’s Gemini model to write the answer, so leave out anything confidential.
           </p>
         </div>
         <QuestionToTheBook className="mx-auto hidden w-full max-w-[20rem] lg:block" />

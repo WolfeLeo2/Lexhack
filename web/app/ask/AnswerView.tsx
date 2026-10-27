@@ -1,25 +1,42 @@
 'use client'
 // One question and its answer: the steps, the streamed text, then the answer or draft as parts (rulings quoted from the
 // database, never by the model), with Copy / Word / PDF.
-import { BookOpen, Check, CircleAlert, ClipboardCheck, Copy, FileDown, FileSearch, FileText, Gavel, Library, LoaderCircle, type LucideIcon, PenLine, RotateCcw, ScrollText, Search, Sparkles } from 'lucide-react'
+import {
+  AlertCircleIcon,
+  BookOpen01Icon,
+  ClipboardCheckIcon,
+  Copy01Icon,
+  File01Icon,
+  FileDownloadIcon,
+  FileSearchIcon,
+  LegalHammerIcon,
+  LibraryIcon,
+  Loading03Icon,
+  PencilEdit01Icon,
+  RotateLeft01Icon,
+  ScrollTextIcon,
+  Search01Icon,
+  Tick02Icon,
+} from '@hugeicons/core-free-icons'
 import Link from 'next/link'
 import { Fragment, type ReactNode, useEffect, useState } from 'react'
 import { CourtWords } from '@/components/court'
+import { Glyph, type IconData } from '@/components/Glyph'
 import { type Answer, type CaseRef, type CheckFlag, type Inline, isBlank, type Part, type Ruling as RulingPart, type SectionRef, type Step, toLines } from '@/lib/answer'
 import { cap, courtActed, sectionHref, shortCase } from '@/lib/format'
 import { cleanUrl, locator } from '@/lib/text'
 import type { Turn } from './useChats'
 
-const ICONS: Record<string, LucideIcon> = {
-  find_section: BookOpen,
-  search_sections: Search,
-  get_section: ScrollText,
-  find_case: Gavel,
-  citing_judgments: Library,
-  list_acts: Library,
-  check_text: FileSearch,
-  check: ClipboardCheck,
-  revise: PenLine,
+const ICONS: Record<string, IconData> = {
+  find_section: BookOpen01Icon,
+  search_sections: Search01Icon,
+  get_section: ScrollTextIcon,
+  find_case: LegalHammerIcon,
+  citing_judgments: LibraryIcon,
+  list_acts: LibraryIcon,
+  check_text: FileSearchIcon,
+  check: ClipboardCheckIcon,
+  revise: PencilEdit01Icon,
 }
 
 /** onRetry only on the last turn: asking again replaces it, and an earlier one would drop the turns after it. */
@@ -48,8 +65,8 @@ export function TurnView({ t, onRetry }: { t: Turn; onRetry?: () => void }) {
           <p className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-md border border-note-rule bg-note px-4 py-3" role="alert">
             <span>{t.error}</span>
             {onRetry && (
-              <button type="button" onClick={onRetry} className="link inline-flex items-center gap-1.5 text-gazette underline underline-offset-[3px]">
-                <RotateCcw className="h-4 w-4" aria-hidden />
+              <button type="button" onClick={onRetry} className="link inline-flex min-h-11 items-center gap-1.5 text-gazette underline underline-offset-[3px]">
+                <Glyph icon={RotateLeft01Icon} className="h-4 w-4" />
                 Ask again
               </button>
             )}
@@ -102,26 +119,26 @@ function Actions({ a, question }: { a: Answer; question: string }) {
     }
   }
 
-  const button = (what: Busy['what'], Icon: LucideIcon, label: string, onClick: () => void) => {
+  const button = (what: Busy['what'], icon: IconData, label: string, onClick: () => void) => {
     const mine = busy?.what === what ? busy.state : null
-    const Shown = mine === 'busy' ? LoaderCircle : mine === 'done' ? Check : Icon
+    const shown = mine === 'busy' ? Loading03Icon : mine === 'done' ? Tick02Icon : icon
     return (
       <button
         type="button"
         onClick={onClick}
         disabled={busy?.state === 'busy'}
-        className="link inline-flex items-center gap-1.5 rounded-sm px-1.5 py-1 text-sm text-ink-2 hover:text-ink disabled:opacity-60"
+        className="link inline-flex min-h-11 items-center gap-1.5 rounded-sm px-2 py-1 text-sm text-ink-2 hover:text-ink disabled:opacity-60"
       >
-        <Shown className={`h-4 w-4 ${mine === 'busy' ? 'motion-safe:animate-spin' : ''}`} aria-hidden />
+        <Glyph icon={shown} className={`h-4 w-4 ${mine === 'busy' ? 'motion-safe:animate-spin' : ''}`} />
         {what === 'copy' && mine === 'done' ? 'Copied' : label}
       </button>
     )
   }
   return (
     <div className="mt-4 flex flex-wrap items-center gap-x-1 gap-y-1 border-t border-rule pt-2">
-      {button('copy', Copy, 'Copy text', copy)}
-      {button('docx', FileText, 'Download Word', () => download('docx'))}
-      {button('pdf', FileDown, 'Download PDF', () => download('pdf'))}
+      {button('copy', Copy01Icon, 'Copy text', copy)}
+      {button('docx', File01Icon, 'Download Word', () => download('docx'))}
+      {button('pdf', FileDownloadIcon, 'Download PDF', () => download('pdf'))}
       <span className="px-1.5 text-sm text-ink-2" role="status">
         {busy?.state === 'busy' ? 'Building the file from Hakiki’s records…' : busy?.state === 'failed' ? busy.message : ''}
       </span>
@@ -134,8 +151,8 @@ function Actions({ a, question }: { a: Answer; question: string }) {
 const CHECK_WORDS: Record<string, string> = {
   found: 'Verified: in Hakiki’s collection',
   verbatim: 'Quote matches the judgment, word for word',
-  not_in_collection: 'Not in Hakiki’s collection — check before relying on it',
-  possible_match: 'Could be more than one case in Hakiki’s collection — check which one is meant',
+  not_in_collection: 'Not in Hakiki’s collection: check before relying on it',
+  possible_match: 'Could be more than one case in Hakiki’s collection: check which one is meant',
   name_mismatch: 'The citation belongs to a different case in Hakiki’s collection',
   close: 'The quote is close to the judgment, but not word for word',
   not_found: 'The quoted words are not in the judgment',
@@ -149,7 +166,7 @@ function Draft({ a, question }: { a: Answer; question: string }) {
   return (
     <div className="answer-in mt-5 max-w-[72ch]">
       <p className="text-sm text-ink-2">{a.label}</p>
-      <div className="draft-paper relative mt-3 rounded-sm bg-paper px-6 pt-5 pb-3 shadow-[0_14px_30px_-22px_rgba(24,33,43,0.7)] ring-1 ring-rule sm:px-8">
+      <div className="draft-paper relative mt-3 rounded-sm bg-paper px-6 pt-5 pb-3 shadow-[0_14px_30px_-22px_rgb(var(--shadow-rgb)/0.7)] ring-1 ring-rule sm:px-8">
         <div className="statute space-y-4 text-[1.05rem] leading-relaxed">
           <AnswerBody parts={a.parts} />
         </div>
@@ -157,7 +174,7 @@ function Draft({ a, question }: { a: Answer; question: string }) {
       </div>
       <section className="mt-6" aria-label="Checked by Hakiki">
         <h2 className="statute flex items-center gap-2 text-lg font-medium">
-          <ClipboardCheck className="h-5 w-5 text-ink-2" aria-hidden />
+          <Glyph icon={ClipboardCheckIcon} className="h-5 w-5 text-ink-2" />
           Checked by Hakiki
         </h2>
         {!anyFlagged && (
@@ -168,14 +185,14 @@ function Draft({ a, question }: { a: Answer; question: string }) {
         {check.length > 0 && (
           <ul className="mt-2 space-y-3">
             {check.map((f, k) => {
-              const Icon = f.flagged ? CircleAlert : Check
+              const icon = f.flagged ? AlertCircleIcon : Tick02Icon
               return (
                 <li key={k} className="step-in flex gap-2.5 border-l-2 border-rule pl-3" style={{ animationDelay: `${k * 0.06}s` }}>
-                  <Icon className="mt-1 h-4 w-4 shrink-0 text-ink-2" aria-hidden />
+                  <Glyph icon={icon} className="mt-1 h-4 w-4 shrink-0 text-ink-2" />
                   <div>
                     <p>
                       <span className="text-sm text-ink-2">
-                        {f.flagged ? 'Flagged' : 'Checked'} · {KIND_WORDS[f.kind] ?? f.kind}
+                        {f.flagged ? 'Flagged' : 'Checked'}, {KIND_WORDS[f.kind] ?? f.kind}
                         {f.raw_text ? ': ' : ''}
                       </span>
                       {f.raw_text && <span className="statute">{f.kind === 'quote' ? `“${f.raw_text}”` : f.raw_text}</span>}
@@ -198,7 +215,7 @@ function Writing({ chunks, draft }: { chunks: string[]; draft: boolean }) {
   return (
     <div className="mt-5 max-w-[68ch]">
       <p className="step-now flex items-center gap-2.5 text-[0.95rem]">
-        <PenLine className="h-4 w-4 shrink-0 text-seal" aria-hidden />
+        <Glyph icon={PencilEdit01Icon} className="h-4 w-4 shrink-0 text-seal" />
         {draft ? 'Writing the draft…' : 'Writing…'}
       </p>
       <p className={`mt-3 whitespace-pre-wrap text-ink-2 ${draft ? 'statute' : ''}`} aria-hidden>
@@ -218,11 +235,11 @@ function Steps({ steps, pending }: { steps: Step[]; pending: boolean }) {
   return (
     <ol className={`space-y-1.5 text-[0.95rem] ${pending ? 'text-ink' : 'text-ink-2'}`} aria-label="What Hakiki looked up">
       {shown.map((s, k) => {
-        const Icon = ICONS[s.tool] ?? Sparkles
+        const icon = ICONS[s.tool] ?? Search01Icon //a lookup is a lookup: no generic AI glyph for tools the table doesn't know
         const now = pending && k === shown.length - 1
         return (
           <li key={k} className={`step-in flex items-center gap-2.5 ${now ? 'step-now' : ''}`}>
-            <Icon className={`h-4 w-4 shrink-0 ${now ? 'text-seal' : 'text-ink-2'}`} aria-hidden />
+            <Glyph icon={icon} className={`h-4 w-4 shrink-0 ${now ? 'text-seal' : 'text-ink-2'}`} />
             <span>{s.label}</span>
           </li>
         )

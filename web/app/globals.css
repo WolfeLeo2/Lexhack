@@ -1,3 +1,7 @@
+/* Hallmark · checked: 2026-10-27 · genre: editorial (inferred)
+ * floor: 0 FAIL · fixed: 5 (12, 29, 34, 48, 63) · structural: section page recomposed (sticky text beside the rulings)
+ * waive 80: the owner asked for illustrations (CLAUDE.md, UI creative control) · waive 84: the home specimen holds real s.204 data
+ * built: the project · redesign: polish · v2.0.0 */
 @import "tailwindcss";
 
 /* Same paper, ink and court colours as the edu site (edu/src/index.css): one product, two doors. */
@@ -12,6 +16,7 @@
   --color-seal: #8e2c48;
   --color-note: #fbf7e4;      /* the court's note pinned to the page */
   --color-note-rule: #e5dcb2;
+  --color-edge: #788690;      /* the border of a field you type in: 3:1 against the page (rule is only for dividers) */
 
   --font-sans: var(--font-plex), ui-sans-serif, system-ui, sans-serif;
   --font-serif: var(--font-newsreader), Georgia, serif;
@@ -20,6 +25,7 @@
 /* Dark: the same inks on a night-time page. Highlighter becomes a translucent wash so light text stays readable. */
 html {
   --hl: var(--color-mark);
+  --shadow-rgb: 24 33 43;
   --grain: rgba(24, 33, 43, 0.045);
   color-scheme: light;
 }
@@ -33,9 +39,16 @@ html[data-theme='dark'] {
   --color-seal: #ea8ca7;
   --color-note: #262416;
   --color-note-rule: #4a4428;
+  --color-edge: #6a7782;
+  --shadow-rgb: 0 0 0;
   --hl: rgba(245, 215, 110, 0.28);
   --grain: rgba(255, 255, 255, 0.03);
   color-scheme: dark;
+}
+
+html,
+body {
+  overflow-x: clip;
 }
 
 body {
@@ -54,6 +67,9 @@ body {
 :focus-visible {
   outline: 2px solid var(--color-gazette);
   outline-offset: 2px;
+}
+/* Inline links get a softly rounded outline; buttons and pills keep their own radius. */
+a.link:focus-visible {
   border-radius: 2px;
 }
 
@@ -105,11 +121,11 @@ a.link {
    is complete even before (or without) JavaScript. */
 .stamp {
   transform: rotate(-1.5deg);
-  animation: stamp 0.45s 0.2s both cubic-bezier(0.34, 1.56, 0.64, 1);
+  animation: stamp 0.45s 0.2s both cubic-bezier(0.22, 1, 0.36, 1);
 }
 .lineage-node {
   transform-box: view-box;
-  animation: node-in 0.4s both cubic-bezier(0.34, 1.56, 0.64, 1);
+  animation: node-in 0.4s both cubic-bezier(0.22, 1, 0.36, 1);
 }
 .lineage-edge {
   stroke-dasharray: 1;
@@ -261,6 +277,17 @@ a:focus-visible > .spine {
 .drop-hint {
   animation: drop-hint 1.2s ease-in-out infinite;
 }
+/* "Checking..." while the checker works: the three dots light up in turn. */
+.dots i {
+  font-style: normal;
+  animation: dot 1.2s infinite both;
+}
+.dots i:nth-child(2) { animation-delay: 0.2s; }
+.dots i:nth-child(3) { animation-delay: 0.4s; }
+@keyframes dot {
+  0%, 60%, 100% { opacity: 0.2; }
+  30% { opacity: 1; }
+}
 @keyframes drop-hint {
   50% { transform: translateY(6px); }
 }
@@ -276,7 +303,7 @@ a:focus-visible > .spine {
 .ask-bubble {
   transform-box: fill-box;
   transform-origin: 30% 100%;
-  animation: bubble-in 0.5s 0.2s both cubic-bezier(0.34, 1.56, 0.64, 1);
+  animation: bubble-in 0.5s 0.2s both cubic-bezier(0.22, 1, 0.36, 1);
 }
 @keyframes bubble-in {
   from { opacity: 0; transform: scale(0.5) translateY(10px); }
@@ -312,7 +339,11 @@ a:focus-visible > .spine {
   border-color: var(--color-ink-2);
 }
 .ask-mode {
-  transition: background-color 0.2s, color 0.2s, box-shadow 0.2s;
+  transition: color 0.2s;
+}
+/* The Answer/Draft pill: the clip moves with an ease-in-out, since it travels across the control. */
+.ask-mode-clip {
+  transition: clip-path 240ms cubic-bezier(0.77, 0, 0.175, 1);
 }
 /* A draft lands on the desk like a sheet of paper: a slight lift and settle. */
 .draft-paper {
@@ -342,8 +373,9 @@ a:focus-visible > .spine {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .dots i { animation: none; }
   .ask-bubble, .step-in, .step-now svg, .answer-in, .delta-in, .ask-chip, .draft-paper, .history-sheet[open], .history-sheet[open]::backdrop { animation: none; }
-  .ask-chip, .ask-send, .ask-mode { transition: none; }
+  .ask-chip, .ask-send, .ask-mode, .ask-mode-clip { transition: none; }
   .pinned-note { animation: none; transform: rotate(-1.2deg); }
   .spine { transition: none; }
   .theme-icon, .stamp, .lineage-node, .lineage-edge, .lineage-edge-dashed { animation: none; stroke-dashoffset: 0; }

@@ -34,7 +34,7 @@ export function Specimen({ examples }: { examples: Example[] }) {
             aria-selected={i === j}
             aria-controls="ex-panel"
             onClick={() => setI(j)}
-            className="rounded-md border border-rule px-3 py-1.5 text-sm text-ink-2 transition-colors hover:border-ink-2 aria-selected:border-ink aria-selected:bg-ink aria-selected:text-paper"
+            className="min-h-11 rounded-md border border-rule px-3 py-1.5 text-sm text-ink-2 transition-colors hover:border-ink-2 aria-selected:border-ink aria-selected:bg-ink aria-selected:text-paper"
           >
             {e.tab}
           </button>
@@ -42,7 +42,7 @@ export function Specimen({ examples }: { examples: Example[] }) {
       </div>
 
       <div key={i} id="ex-panel" role="tabpanel" aria-labelledby={`ex-tab-${i}`} className="relative mt-5">
-        <div className="relative rounded-sm bg-paper px-7 pt-6 pb-7 shadow-[0_1px_0_var(--color-rule),0_18px_40px_-26px_rgba(24,33,43,0.5)] ring-1 ring-rule">
+        <div className="relative rounded-sm bg-paper px-7 pt-6 pb-7 shadow-[0_1px_0_var(--color-rule),0_18px_40px_-26px_rgb(var(--shadow-rgb)/0.5)] ring-1 ring-rule">
           <p className="text-sm text-ink-2">Kenya Law’s published text</p>
           <p className="statute mt-3 text-[0.95rem] text-ink-2">
             {x.act}, section {x.number}
@@ -55,7 +55,7 @@ export function Specimen({ examples }: { examples: Example[] }) {
         </div>
         <Link
           href={x.href}
-          className="pinned-note relative mt-5 mr-10 -ml-3 block rounded-sm bg-note px-6 pt-6 pb-5 shadow-[0_14px_30px_-18px_rgba(24,33,43,0.5)] ring-1 ring-note-rule transition-shadow hover:ring-ink-2 sm:mr-24"
+          className="pinned-note relative mt-5 mr-10 -ml-3 block rounded-sm bg-note px-6 pt-6 pb-5 shadow-[0_14px_30px_-18px_rgb(var(--shadow-rgb)/0.5)] ring-1 ring-note-rule transition-shadow hover:ring-ink-2 sm:mr-24"
         >
           <svg viewBox="0 0 24 24" className="absolute -top-3 left-8 h-6 w-6" aria-hidden>
             <circle cx="12" cy="10" r="6.5" fill="var(--color-seal)" />
